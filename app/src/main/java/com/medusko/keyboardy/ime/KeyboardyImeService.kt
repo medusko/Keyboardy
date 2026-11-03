@@ -958,7 +958,7 @@ class KeyboardyImeService : InputMethodService() {
             triggerSearch(immediate = false, hideKeyboardOnStart = false)
         }
 
-        val spaceBtn = createActionKey("space", 2.9f, false, scale, palette) {
+        val spaceBtn = createActionKey("Space", 2.9f, false, scale, palette) {
             queryOriginatedFromHostEditor = false
             setHistoryPanelVisible(false)
             etSearchQuery?.insertTextAtCursor(" ")

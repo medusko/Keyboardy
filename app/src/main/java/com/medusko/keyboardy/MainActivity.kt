@@ -55,10 +55,18 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnAboutInfo: ImageButton
     private lateinit var btnToggleTheme: ImageButton
 
+    private lateinit var tvSectionEnablement: TextView
+    private lateinit var tvSectionCustomization: TextView
+    private lateinit var tvSectionHelp: TextView
+
     private lateinit var cardSetup: LinearLayout
+    private lateinit var setupHeaderRow: LinearLayout
     private lateinit var tvImeStatus: TextView
+    private lateinit var tvSetupChevron: TextView
+    private lateinit var setupCollapsibleBody: LinearLayout
     private lateinit var tvSetupDesc: TextView
     private lateinit var btnEnableIme: Button
+    private var setupCardManuallyExpanded: Boolean = false
 
     private lateinit var cardScale: LinearLayout
     private lateinit var tvScaleHeader: TextView
@@ -127,8 +135,15 @@ class MainActivity : AppCompatActivity() {
         btnAboutInfo = findViewById(R.id.btn_about_info)
         btnToggleTheme = findViewById(R.id.btn_toggle_theme)
 
+        tvSectionEnablement = findViewById(R.id.tv_section_enablement)
+        tvSectionCustomization = findViewById(R.id.tv_section_customization)
+        tvSectionHelp = findViewById(R.id.tv_section_help)
+
         cardSetup = findViewById(R.id.card_setup)
+        setupHeaderRow = findViewById(R.id.setup_header_row)
         tvImeStatus = findViewById(R.id.tv_ime_status)
+        tvSetupChevron = findViewById(R.id.tv_setup_chevron)
+        setupCollapsibleBody = findViewById(R.id.setup_collapsible_body)
         tvSetupDesc = findViewById(R.id.tv_setup_desc)
         btnEnableIme = findViewById(R.id.btn_enable_ime)
 
@@ -186,7 +201,7 @@ class MainActivity : AppCompatActivity() {
             )
             mainContentContainer.setPadding(
                 dpToPx(18),
-                dpToPx(16),
+                dpToPx(14),
                 dpToPx(18),
                 bars.bottom + dpToPx(28)
             )
@@ -210,12 +225,18 @@ class MainActivity : AppCompatActivity() {
             applyThemeAndState()
         }
 
+        // Toggle Auxiliary Keyboard Setup card collapse/expand
+        setupHeaderRow.setOnClickListener {
+            setupCardManuallyExpanded = setupCollapsibleBody.visibility != View.VISIBLE
+            updateImeStatusBanner()
+        }
+
         // Open Android Keyboard Settings
         btnEnableIme.setOnClickListener {
             startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
         }
 
-        // 3. Keyboard Scale Selector Buttons
+        // Keyboard Scale Selector Buttons
         val scaleMap = mapOf(
             KeyboardScale.COMPACT to btnScaleCompact,
             KeyboardScale.NORMAL to btnScaleNormal,
@@ -229,17 +250,17 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Bottom Navigation Clearance Stepper (− 8dp / + 8dp)
+        // Bottom Navigation Clearance Stepper (− 4dp / + 4dp)
         btnClearanceMinus.setOnClickListener {
-            prefs.bottomNavClearanceDp = (prefs.bottomNavClearanceDp - 8).coerceAtLeast(0)
+            prefs.bottomNavClearanceDp = (prefs.bottomNavClearanceDp - 4).coerceAtLeast(0)
             applyThemeAndState()
         }
         btnClearancePlus.setOnClickListener {
-            prefs.bottomNavClearanceDp = (prefs.bottomNavClearanceDp + 8).coerceAtMost(160)
+            prefs.bottomNavClearanceDp = (prefs.bottomNavClearanceDp + 4).coerceAtMost(160)
             applyThemeAndState()
         }
 
-        // 4. Configure Live Chat Sandbox EditText to accept rich images & GIFs via CommitContent API!
+        // Configure Live Chat Sandbox EditText to accept rich images & GIFs via CommitContent API!
         val imageLoader = ImageLoader.Builder(this)
             .components {
                 if (Build.VERSION.SDK_INT >= 28) {
@@ -272,7 +293,7 @@ class MainActivity : AppCompatActivity() {
             null
         }
 
-        // 5. Save Preferences
+        // Save Preferences
         cbAutoReturn.setOnCheckedChangeListener { _, isChecked ->
             prefs.autoReturnToPreviousKeyboard = isChecked
         }
@@ -482,6 +503,11 @@ class MainActivity : AppCompatActivity() {
         )
         btnToggleTheme.setColorFilter(palette.accentBlue)
 
+        // Section Headers (Enablement, Customization, Help)
+        for (sec in listOf(tvSectionEnablement, tvSectionCustomization, tvSectionHelp)) {
+            sec.setTextColor(palette.accentBlue)
+        }
+
         // Style all 6 Cards
         val cards = listOf(cardSetup, cardScale, cardSandbox, cardSettings, cardBadges, cardQuota)
         for (card in cards) {
@@ -493,7 +519,7 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
-        // Headers & Descriptions
+        // Card Headers & Descriptions
         val headers = listOf(
             tvImeStatus,
             tvScaleHeader,
@@ -510,6 +536,7 @@ class MainActivity : AppCompatActivity() {
         for (d in descriptions) {
             d.setTextColor(palette.textSecondary)
         }
+        tvSetupChevron.setTextColor(palette.textSecondary)
 
         btnEnableIme.backgroundTintList = ColorStateList.valueOf(palette.accentBlue)
         btnEnableIme.setTextColor(Color.WHITE)
@@ -618,6 +645,10 @@ class MainActivity : AppCompatActivity() {
         )
         tvStatusPillText.text = if (isEnabled) "ENABLED" else "SETUP NEEDED"
         tvStatusPillText.setTextColor(pillColor)
+
+        val shouldExpand = !isEnabled || setupCardManuallyExpanded
+        setupCollapsibleBody.visibility = if (shouldExpand) View.VISIBLE else View.GONE
+        tvSetupChevron.text = if (shouldExpand) "▲" else "▼"
 
         tvImeStatus.text = if (isEnabled) {
             "Auxiliary Keyboard Enabled & Ready"
