@@ -1,0 +1,59 @@
+name: Release macOS App
+
+on:
+  push:
+    tags:
+      - 'macos-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'macOS Release Version (e.g. 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release-macos:
+    runs-on: macos-14
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine Version & Tag
+        id: meta
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VER="${{ github.event.inputs.version }}"
+            TAG="macos-v${VER}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+            VER="${TAG#macos-v}"
+          fi
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Build & Package Keyboardy.app (DMG + ZIP)
+        run: |
+          chmod +x macos/build_app.sh
+          cd macos
+          VERSION="${{ steps.meta.outputs.version }}" ./build_app.sh --package
+          ./build/Keyboardy.app/Contents/MacOS/Keyboardy --verify
+
+      - name: Create GitHub Release (macOS)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: "Keyboardy for macOS v${{ steps.meta.outputs.version }}"
+          body: |
+            ## 💻 Keyboardy for macOS v${{ steps.meta.outputs.version }}
+            Zero-step Status Bar & Global Shortcut (`⌥⇧Space`) Google Image & Animated GIF picker for macOS.
+
+            ### Installation
+            1. Download **`Keyboardy-macOS-v${{ steps.meta.outputs.version }}.dmg`** (or `.zip`) below.
+            2. Drag **`Keyboardy.app`** into your `/Applications` folder and launch it.
+            3. Click the **Keyboardy** icon in your macOS Menu Bar or press **`⌥ ⇧ Space`** from any app!
+          files: |
+            macos/build/Keyboardy-macOS-v${{ steps.meta.outputs.version }}.dmg
+            macos/build/Keyboardy-macOS-v${{ steps.meta.outputs.version }}.zip
