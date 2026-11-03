@@ -33,12 +33,14 @@ final class KeyboardyViewModel: ObservableObject {
     private var bannerClearTask: Task<Void, Never>?
     private var lastCountedSearchKey: String = ""
     private var queryOriginatedFromTargetField: Bool = false
+    private var lastSessionIncrementalHistoryQuery: String? = nil
 
     func prepareForPanelOpen(capturedApp: NSRunningApplication?, initialQueryOverride: String? = nil) {
         self.targetApp = capturedApp
         self.isShowingSettings = false
         self.isShowingHistory = false
         self.statusBannerText = nil
+        self.lastSessionIncrementalHistoryQuery = nil
 
         if let overrideText = initialQueryOverride, !overrideText.isEmpty {
             queryOriginatedFromTargetField = false
@@ -60,11 +62,13 @@ final class KeyboardyViewModel: ObservableObject {
 
     func onSearchQueryEdited(_ newValue: String) {
         queryOriginatedFromTargetField = false
-        if newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
             searchTask?.cancel()
             isSearching = false
             results = []
             selectedIndex = 0
+            lastSessionIncrementalHistoryQuery = nil
             return
         }
         triggerSearch(immediate: false)
@@ -73,6 +77,7 @@ final class KeyboardyViewModel: ObservableObject {
     func selectFilter(_ filter: SearchFilter) {
         currentFilter = filter
         isShowingHistory = false
+        lastSessionIncrementalHistoryQuery = nil
         if !searchQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             triggerSearch(immediate: true)
         }
@@ -86,12 +91,37 @@ final class KeyboardyViewModel: ObservableObject {
     }
 
     func clearSearch() {
+        let currentTrimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        if currentTrimmed.count >= 2 {
+            recordQueryInHistory(currentTrimmed, lockSession: true)
+        }
         searchTask?.cancel()
         queryOriginatedFromTargetField = false
+        lastSessionIncrementalHistoryQuery = nil
         searchQuery = ""
         results = []
         selectedIndex = 0
         isSearching = false
+    }
+
+    /// Saves a searched query to history while upgrading any half-typed prefix from the same continuous typing burst.
+    private func recordQueryInHistory(_ rawQuery: String, lockSession: Bool) {
+        let cleaned = rawQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard cleaned.count >= 2 else { return }
+
+        if let prev = lastSessionIncrementalHistoryQuery,
+           prev.caseInsensitiveCompare(cleaned) != .orderedSame {
+            let lowerClean = cleaned.lowercased()
+            let lowerPrev = prev.lowercased()
+            // If the user kept typing more letters onto the same query (e.g. "par" -> "party parrot")
+            // or backspaced a typo within the same word, replace the partial entry with the full query.
+            if lowerClean.hasPrefix(lowerPrev) || lowerPrev.hasPrefix(lowerClean) {
+                prefs.removeSearchHistoryQuery(prev)
+            }
+        }
+
+        prefs.addSearchHistoryQuery(cleaned)
+        lastSessionIncrementalHistoryQuery = lockSession ? nil : cleaned
     }
 
     func triggerSearch(immediate: Bool) {
@@ -102,16 +132,23 @@ final class KeyboardyViewModel: ObservableObject {
             return
         }
 
+        if immediate {
+            recordQueryInHistory(trimmed, lockSession: true)
+        }
+
         searchTask?.cancel()
         searchTask = Task { [weak self] in
             guard let self = self else { return }
             if !immediate {
-                try? await Task.sleep(nanoseconds: 340_000_000)
+                try? await Task.sleep(nanoseconds: 380_000_000)
                 guard !Task.isCancelled else { return }
             }
 
             isSearching = true
             isShowingHistory = false
+
+            // Save every executed search query to history!
+            recordQueryInHistory(trimmed, lockSession: immediate)
 
             let countKey = "\(trimmed.lowercased())|\(currentFilter.rawValue)|\(prefs.engineMode.rawValue)|\(prefs.nsfwModeEnabled)"
             if countKey != lastCountedSearchKey {
@@ -148,7 +185,7 @@ final class KeyboardyViewModel: ObservableObject {
     func selectImageResult(_ item: ImageResult) {
         let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         if !q.isEmpty {
-            prefs.addSearchHistoryQuery(q)
+            recordQueryInHistory(q, lockSession: true)
         }
 
         commitTask?.cancel()
@@ -196,12 +233,12 @@ final class KeyboardyViewModel: ObservableObject {
         selectedIndex = next
     }
 
-    func confirmCurrentSelection() {
-        guard !results.isEmpty, results.indices.contains(selectedIndex) else {
-            triggerSearch(immediate: true)
-            return
-        }
-        selectImageResult(results[selectedIndex])
+    /// Called when the user presses Return/Enter in the search bar: runs an immediate search and saves to history without closing the window!
+    func submitSearchFromKeyboard() {
+        let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        recordQueryInHistory(trimmed, lockSession: true)
+        triggerSearch(immediate: true)
     }
 
     func showBanner(_ message: String) {

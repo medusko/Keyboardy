@@ -112,6 +112,15 @@ final class KeyboardyAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setupBindingsAndTriggers() {
+        prefs.$isDarkMode
+            .receive(on: RunLoop.main)
+            .sink { [weak self] isDark in
+                let appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
+                self?.popover.appearance = appearance
+                self?.floatingPanel?.appearance = appearance
+            }
+            .store(in: &cancellables)
+
         prefs.$statusBarBadgeStyle
             .receive(on: RunLoop.main)
             .sink { [weak self] newStyle in
@@ -320,6 +329,20 @@ final class KeyboardyAppDelegate: NSObject, NSApplicationDelegate {
                     self.viewModel.isShowingHistory = false
                 } else {
                     self.closeAllPanels(restoreFocusToTarget: true)
+                }
+                return nil
+            }
+
+            // Return / Enter key inside the search screen runs the search (and saves to history) without dismissing the popover
+            if (event.keyCode == 36 || event.keyCode == 76) && !self.viewModel.isShowingSettings {
+                if event.modifierFlags.contains(.command) {
+                    // Cmd + Return inserts the currently highlighted grid item if any
+                    if !self.viewModel.results.isEmpty,
+                       self.viewModel.results.indices.contains(self.viewModel.selectedIndex) {
+                        self.viewModel.selectImageResult(self.viewModel.results[self.viewModel.selectedIndex])
+                    }
+                } else {
+                    self.viewModel.submitSearchFromKeyboard()
                 }
                 return nil
             }

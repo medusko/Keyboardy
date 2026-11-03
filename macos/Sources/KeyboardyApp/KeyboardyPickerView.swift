@@ -34,6 +34,7 @@ struct KeyboardyPickerView: View {
             }
         }
         .frame(width: 500, height: 550)
+        .preferredColorScheme(prefs.isDarkMode ? .dark : .light)
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 isSearchFieldFocused = true
@@ -68,7 +69,7 @@ struct KeyboardyPickerView: View {
                             viewModel.onSearchQueryEdited(newValue)
                         }
                         .onSubmit {
-                            viewModel.confirmCurrentSelection()
+                            viewModel.submitSearchFromKeyboard()
                         }
 
                     if viewModel.isSearching {
@@ -252,7 +253,7 @@ struct KeyboardyPickerView: View {
 
                 Spacer()
 
-                Text("Click or ↵ Insert  •  ⌘1–9 Quick Pick  •  \(prefs.activeHotkeyShortLabel) Toggle")
+                Text("Click or ⌘1–9 to Insert  •  ↵ Search  •  \(prefs.activeHotkeyShortLabel) Toggle")
                     .font(.system(size: 10.5, weight: .medium))
                     .foregroundColor(palette.textSecondary)
             }

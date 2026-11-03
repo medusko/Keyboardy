@@ -72,22 +72,28 @@ struct SettingsView: View {
                     // SECTION 1: SHORTCUTS & TRIGGERS
                     // =====================================================
                     sectionGroup(header: "SHORTCUTS & TRIGGERS") {
-                        // Row 1: Global Shortcut Preset
+                        // Row 1: Global Shortcut Selector (High-contrast custom dropdown menu)
                         settingRow(
                             title: "Global Keyboard Shortcut",
                             subtitle: "Open or hide Keyboardy from any app"
                         ) {
-                            Picker("", selection: $prefs.hotkeyPreset) {
+                            Menu {
                                 ForEach(HotkeyPreset.allCases) { preset in
-                                    if preset == .custom {
-                                        Text("Custom (\(prefs.customShortcutLabel))").tag(preset)
-                                    } else {
-                                        Text(preset.shortLabel == "Off" ? "Disabled" : "\(preset.shortLabel)").tag(preset)
+                                    Button(action: {
+                                        prefs.hotkeyPreset = preset
+                                    }) {
+                                        if preset == .custom {
+                                            Text("Custom (\(prefs.customShortcutLabel))")
+                                        } else {
+                                            Text(preset.displayName)
+                                        }
                                     }
                                 }
+                            } label: {
+                                dropdownPillLabel(text: prefs.activeHotkeyShortLabel == "Off" ? "Disabled" : prefs.activeHotkeyShortLabel)
                             }
-                            .labelsHidden()
-                            .frame(width: 145)
+                            .menuStyle(.borderlessButton)
+                            .fixedSize()
                         }
 
                         rowDivider
@@ -115,18 +121,37 @@ struct SettingsView: View {
 
                         rowDivider
 
-                        // Row 3: Window Position on Shortcut
-                        settingRow(
-                            title: "Shortcut Window Position",
-                            subtitle: "Where Keyboardy appears when triggered via shortcut"
-                        ) {
-                            Picker("", selection: $prefs.popupAnchorMode) {
-                                Text("Menu Bar Popover").tag(PopupAnchorMode.statusBarPopover)
-                                Text("Center Spotlight HUD").tag(PopupAnchorMode.floatingCenterHud)
-                                Text("Near Mouse Cursor").tag(PopupAnchorMode.nearMouseCursor)
+                        // Row 3: Window Position on Shortcut (High-contrast segmented pills)
+                        VStack(alignment: .leading, spacing: 7) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Shortcut Window Position")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(palette.textPrimary)
+                                Text("Where Keyboardy appears when triggered via keyboard shortcut")
+                                    .font(.system(size: 10.5))
+                                    .foregroundColor(palette.textSecondary)
                             }
-                            .labelsHidden()
-                            .frame(width: 165)
+
+                            HStack(spacing: 6) {
+                                segmentedPillButton(
+                                    title: "Menu Bar Popover",
+                                    isSelected: prefs.popupAnchorMode == .statusBarPopover
+                                ) {
+                                    prefs.popupAnchorMode = .statusBarPopover
+                                }
+                                segmentedPillButton(
+                                    title: "Center Spotlight",
+                                    isSelected: prefs.popupAnchorMode == .floatingCenterHud
+                                ) {
+                                    prefs.popupAnchorMode = .floatingCenterHud
+                                }
+                                segmentedPillButton(
+                                    title: "Near Mouse",
+                                    isSelected: prefs.popupAnchorMode == .nearMouseCursor
+                                ) {
+                                    prefs.popupAnchorMode = .nearMouseCursor
+                                }
+                            }
                         }
 
                         rowDivider
@@ -151,13 +176,22 @@ struct SettingsView: View {
                             if prefs.inlineTriggerEnabled {
                                 HStack {
                                     Text("Trigger Prefix String:")
-                                        .font(.system(size: 11, weight: .medium))
+                                        .font(.system(size: 11, weight: .semibold))
                                         .foregroundColor(palette.textSecondary)
                                     Spacer()
                                     TextField("//gif ", text: $prefs.inlineTriggerPrefix)
-                                        .textFieldStyle(.roundedBorder)
-                                        .frame(width: 110)
+                                        .textFieldStyle(.plain)
                                         .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                                        .foregroundColor(palette.textPrimary)
+                                        .padding(.horizontal, 9)
+                                        .padding(.vertical, 5)
+                                        .frame(width: 110)
+                                        .background(palette.surfaceVariant)
+                                        .cornerRadius(6)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .stroke(palette.accentBlue, lineWidth: 1)
+                                        )
                                 }
                                 .padding(.top, 2)
                             }
@@ -182,7 +216,7 @@ struct SettingsView: View {
                             }) {
                                 Text(prefs.isAccessibilityGranted ? "Recheck" : "Grant Access")
                                     .font(.system(size: 11, weight: .bold))
-                                    .foregroundColor(.white)
+                                    .foregroundColor(prefs.isAccessibilityGranted ? palette.textPrimary : .white)
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 5)
                                     .background(prefs.isAccessibilityGranted ? palette.surfaceVariant : palette.accentBlue)
@@ -197,17 +231,26 @@ struct SettingsView: View {
 
                         rowDivider
 
-                        // Row 2: Click / Return Behavior
+                        // Row 2: Click / Return Behavior (High-contrast segmented pills)
                         settingRow(
                             title: "When Clicking or Pressing Return",
                             subtitle: "Choose whether to paste immediately or only copy to clipboard"
                         ) {
-                            Picker("", selection: $prefs.insertBehaviorMode) {
-                                Text("Auto-Paste (⌘V)").tag(InsertBehaviorMode.autoPasteIntoApp)
-                                Text("Copy to Clipboard").tag(InsertBehaviorMode.copyToClipboardOnly)
+                            HStack(spacing: 5) {
+                                segmentedPillButton(
+                                    title: "Auto-Paste (⌘V)",
+                                    isSelected: prefs.insertBehaviorMode == .autoPasteIntoApp
+                                ) {
+                                    prefs.insertBehaviorMode = .autoPasteIntoApp
+                                }
+                                segmentedPillButton(
+                                    title: "Copy Only",
+                                    isSelected: prefs.insertBehaviorMode == .copyToClipboardOnly
+                                ) {
+                                    prefs.insertBehaviorMode = .copyToClipboardOnly
+                                }
                             }
-                            .labelsHidden()
-                            .frame(width: 155)
+                            .frame(width: 210)
                         }
 
                         rowDivider
@@ -252,41 +295,50 @@ struct SettingsView: View {
                         ) {
                             HStack(spacing: 5) {
                                 ForEach(AppThemeMode.allCases) { mode in
-                                    let isSelected = prefs.themeMode == mode
-                                    Button(action: {
+                                    segmentedPillButton(
+                                        title: mode.displayName,
+                                        isSelected: prefs.themeMode == mode
+                                    ) {
                                         prefs.themeMode = mode
-                                    }) {
-                                        Text(mode.displayName)
-                                            .font(.system(size: 10.5, weight: .bold))
-                                            .foregroundColor(isSelected ? .white : palette.textPrimary)
-                                            .padding(.horizontal, 9)
-                                            .padding(.vertical, 5)
-                                            .background(isSelected ? palette.accentBlue : palette.surfaceVariant)
-                                            .cornerRadius(6)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 6)
-                                                    .stroke(isSelected ? Color.clear : palette.border, lineWidth: 1)
-                                            )
                                     }
-                                    .buttonStyle(.plain)
                                 }
                             }
+                            .frame(width: 225)
                         }
 
                         rowDivider
 
-                        // Row 3: Default Search Engine Mode
-                        settingRow(
-                            title: "Search Engine Mode",
-                            subtitle: "Hybrid combines Instant Web (⚡) with Google Images WebView (G)"
-                        ) {
-                            Picker("", selection: $prefs.engineMode) {
-                                ForEach(SearchEngineMode.allCases) { mode in
-                                    Text(mode.displayName).tag(mode)
+                        // Row 3: Default Search Engine Mode (High-contrast segmented pills)
+                        VStack(alignment: .leading, spacing: 7) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Search Engine Mode")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(palette.textPrimary)
+                                Text("Hybrid combines Instant Web (⚡) with Google Images WebView (G)")
+                                    .font(.system(size: 10.5))
+                                    .foregroundColor(palette.textSecondary)
+                            }
+
+                            HStack(spacing: 6) {
+                                segmentedPillButton(
+                                    title: "Hybrid (G + ⚡)",
+                                    isSelected: prefs.engineMode == .hybrid
+                                ) {
+                                    prefs.engineMode = .hybrid
+                                }
+                                segmentedPillButton(
+                                    title: "Google WebView (G)",
+                                    isSelected: prefs.engineMode == .googleWebView
+                                ) {
+                                    prefs.engineMode = .googleWebView
+                                }
+                                segmentedPillButton(
+                                    title: "Instant Web (⚡)",
+                                    isSelected: prefs.engineMode == .instantHttp
+                                ) {
+                                    prefs.engineMode = .instantHttp
                                 }
                             }
-                            .labelsHidden()
-                            .frame(width: 165)
                         }
 
                         rowDivider
@@ -312,17 +364,41 @@ struct SettingsView: View {
 
                         rowDivider
 
-                        VStack(alignment: .leading, spacing: 5) {
+                        VStack(alignment: .leading, spacing: 6) {
                             Text("Optional SerpApi or Brave Search API Key")
                                 .font(.system(size: 12, weight: .bold))
                                 .foregroundColor(palette.textPrimary)
                             Text("Leave blank to use the 100% free built-in Hybrid (G + ⚡) engine with unlimited searches.")
                                 .font(.system(size: 10.5))
                                 .foregroundColor(palette.textSecondary)
-                            TextField("Optional API key (leave empty for free unlimited Hybrid)...", text: $prefs.optionalApiKey)
-                                .textFieldStyle(.roundedBorder)
-                                .font(.system(size: 11.5, design: .monospaced))
-                                .padding(.top, 2)
+
+                            HStack(spacing: 6) {
+                                Image(systemName: "key.fill")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(palette.textSecondary)
+
+                                TextField("Paste optional API key (or leave empty for free Hybrid)...", text: $prefs.optionalApiKey)
+                                    .textFieldStyle(.plain)
+                                    .font(.system(size: 11.5, design: .monospaced))
+                                    .foregroundColor(palette.textPrimary)
+
+                                if !prefs.optionalApiKey.isEmpty {
+                                    Button(action: { prefs.optionalApiKey = "" }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(palette.textSecondary)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .background(palette.surfaceVariant)
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(palette.border, lineWidth: 1)
+                            )
                         }
                     }
                 }
@@ -330,16 +406,17 @@ struct SettingsView: View {
             }
         }
         .background(palette.background)
+        .preferredColorScheme(prefs.isDarkMode ? .dark : .light)
         .onAppear {
             prefs.isAccessibilityGranted = ImageCommitService.shared.isAccessibilityTrusted()
         }
     }
 
-    // MARK: - Reusable Cohesive Setting Components
+    // MARK: - Reusable High-Contrast Components (Explicit Palette Colors in Dark & Light Mode)
 
     private var rowDivider: some View {
         Divider()
-            .background(palette.border.opacity(0.65))
+            .background(palette.border.opacity(0.8))
             .padding(.vertical, 2)
     }
 
@@ -387,6 +464,7 @@ struct SettingsView: View {
         }
     }
 
+    /// Custom high-contrast switch toggle so the OFF state track & thumb never blend into Dark Mode surfaces.
     @ViewBuilder
     private func settingToggleRow(
         title: String,
@@ -394,11 +472,71 @@ struct SettingsView: View {
         isOn: Binding<Bool>
     ) -> some View {
         settingRow(title: title, subtitle: subtitle) {
-            Toggle("", isOn: isOn)
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .controlSize(.small)
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.14)) {
+                    isOn.wrappedValue.toggle()
+                }
+            }) {
+                ZStack(alignment: isOn.wrappedValue ? .trailing : .leading) {
+                    Capsule()
+                        .fill(isOn.wrappedValue ? palette.accentBlue : palette.surfaceVariant)
+                        .frame(width: 38, height: 21)
+                        .overlay(
+                            Capsule()
+                                .stroke(isOn.wrappedValue ? palette.accentBluePressed : palette.textSecondary.opacity(0.55), lineWidth: 1.2)
+                        )
+
+                    Circle()
+                        .fill(Color.white)
+                        .shadow(color: Color.black.opacity(0.25), radius: 1, x: 0, y: 1)
+                        .frame(width: 15, height: 15)
+                        .padding(.horizontal, 3)
+                }
+            }
+            .buttonStyle(.plain)
         }
+    }
+
+    @ViewBuilder
+    private func dropdownPillLabel(text: String) -> some View {
+        HStack(spacing: 8) {
+            Text(text)
+                .font(.system(size: 11.5, weight: .bold))
+                .foregroundColor(palette.textPrimary)
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 9.5, weight: .bold))
+                .foregroundColor(palette.accentBlue)
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 6)
+        .background(palette.surfaceVariant)
+        .cornerRadius(7)
+        .overlay(
+            RoundedRectangle(cornerRadius: 7)
+                .stroke(palette.border, lineWidth: 1.2)
+        )
+    }
+
+    @ViewBuilder
+    private func segmentedPillButton(
+        title: String,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 10.5, weight: .bold))
+                .foregroundColor(isSelected ? .white : palette.textPrimary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .background(isSelected ? palette.accentBlue : palette.surfaceVariant)
+                .cornerRadius(7)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7)
+                        .stroke(isSelected ? Color.clear : palette.border, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
