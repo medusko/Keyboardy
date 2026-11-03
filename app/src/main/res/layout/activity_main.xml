@@ -1,0 +1,415 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root_scroll_view"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/kb_bg"
+    android:clipToPadding="false"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:id="@+id/main_content_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="20dp"
+        android:paddingTop="48dp"
+        android:paddingBottom="36dp">
+
+        <!-- Top Header Row (Lagatron Style: Title + Light/Dark Mode Toggle) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_app_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Keyboardy"
+                    android:textColor="#FFFFFF"
+                    android:textSize="26sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tv_app_subtitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Zero-step Google Image &amp; GIF Auxiliary Keyboard"
+                    android:textColor="#B8C2D4"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
+            <!-- Light / Dark Mode Toggle Button -->
+            <Button
+                android:id="@+id/btn_toggle_theme"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:backgroundTint="#2E6BD9"
+                android:paddingHorizontal="14dp"
+                android:text="🌙 Dark"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Card 1: Setup & Switch Auxiliary Keyboard -->
+        <LinearLayout
+            android:id="@+id/card_setup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:id="@+id/tv_ime_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Step 1: Setup Auxiliary Keyboard"
+                android:textColor="#2E6BD9"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_setup_desc"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Keep Gboard as your main keyboard! Switch to Keyboardy whenever you want to search and drop an image or GIF directly into a conversation."
+                android:textColor="#B8C2D4"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btn_enable_ime"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="#2E6BD9"
+                    android:text="1. Enable in Settings"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12.5sp"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/btn_switch_ime"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:backgroundTint="#222631"
+                    android:text="2. Switch Keyboard"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textSize="12.5sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Card 2: Keyboard Scale & Bottom Bar Clearance -->
+        <LinearLayout
+            android:id="@+id/card_scale"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:id="@+id/tv_scale_header"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Keyboard Size &amp; Bottom Bar Clearance"
+                android:textColor="#2E6BD9"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_scale_desc"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Scale up the keyboard height &amp; keys, and adjust bottom spacing so the Search button sits cleanly above Android's navigation bar &amp; keyboard switcher."
+                android:textColor="#B8C2D4"
+                android:textSize="12.5sp" />
+
+            <!-- 4 Scale Option Buttons -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/btn_scale_compact"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_marginEnd="5dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="100%"
+                    android:textSize="12.5sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/btn_scale_normal"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_marginEnd="5dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="115%"
+                    android:textSize="12.5sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/btn_scale_large"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_marginEnd="5dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="130%"
+                    android:textSize="12.5sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/btn_scale_xlarge"
+                    android:layout_width="0dp"
+                    android:layout_height="38dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="145% XL"
+                    android:textSize="12.5sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Bottom Navigation Clearance Stepper -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tv_bottom_clearance_label"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Bottom Bar Offset: 54dp"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/btn_clearance_minus"
+                    android:layout_width="42dp"
+                    android:layout_height="34dp"
+                    android:layout_marginEnd="6dp"
+                    android:gravity="center"
+                    android:text="− 6"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/btn_clearance_plus"
+                    android:layout_width="42dp"
+                    android:layout_height="34dp"
+                    android:gravity="center"
+                    android:text="+ 6"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Card 3: Live Chat Test Sandbox -->
+        <LinearLayout
+            android:id="@+id/card_sandbox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:id="@+id/tv_sandbox_header"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Live Chat Test Sandbox"
+                android:textColor="#2E6BD9"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_sandbox_desc"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Tap the input box below, switch to Keyboardy, search &amp; tap an image. It will insert right here via Android's CommitContent API!"
+                android:textColor="#B8C2D4"
+                android:textSize="12.5sp" />
+
+            <LinearLayout
+                android:id="@+id/sandbox_received_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="10dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/iv_sandbox_received"
+                    android:layout_width="90dp"
+                    android:layout_height="90dp"
+                    android:contentDescription="Inserted Image"
+                    android:scaleType="centerCrop" />
+
+                <TextView
+                    android:id="@+id/tv_sandbox_received_info"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:text="Inserted via commitContent!"
+                    android:textColor="#00C853"
+                    android:textSize="12.5sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <EditText
+                android:id="@+id/et_chat_sandbox"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="10dp"
+                android:hint="Tap here to test Keyboardy..."
+                android:imeOptions="actionSend"
+                android:inputType="text"
+                android:paddingHorizontal="12dp"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <!-- Card 4: Behavior & Search Engine Preferences -->
+        <LinearLayout
+            android:id="@+id/card_settings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:id="@+id/tv_settings_header"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Search Behavior &amp; Engine Settings"
+                android:textColor="#2E6BD9"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <CheckBox
+                android:id="@+id/cb_auto_return_gboard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:checked="true"
+                android:text="Auto-switch back to Gboard after inserting image"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp" />
+
+            <CheckBox
+                android:id="@+id/cb_auto_read_chat_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:checked="false"
+                android:text="Use written chat text as auto-search when opening Keyboardy (Off = every search starts blank)"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tv_api_key_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Optional: Brave Search or SerpApi Key (Leave blank for 100% Free Hybrid Google + Instant Search)"
+                android:textColor="#B8C2D4"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/et_optional_api_key"
+                android:layout_width="match_parent"
+                android:layout_height="44dp"
+                android:layout_marginTop="6dp"
+                android:hint="Optional SerpApi or Brave API Key (Not required)"
+                android:inputType="textNoSuggestions"
+                android:paddingHorizontal="12dp"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btn_save_settings"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:backgroundTint="#2E6BD9"
+                android:text="Save Preferences"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="12.5sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Card 5: 6 App Icon Options (Tap any icon to set it as your launcher icon!) -->
+        <LinearLayout
+            android:id="@+id/card_icons"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:id="@+id/tv_icons_header"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Choose App Icon (6 Options)"
+                android:textColor="#2E6BD9"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_icons_desc"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Tap any of the 6 icons below to apply it as your Keyboardy home screen icon."
+                android:textColor="#B8C2D4"
+                android:textSize="12.5sp" />
+
+            <LinearLayout
+                android:id="@+id/icon_grid_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical" />
+        </LinearLayout>
+
+    </LinearLayout>
+</ScrollView>

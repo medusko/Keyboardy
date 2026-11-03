@@ -1,0 +1,12 @@
+<resources>
+    <color name="kb_bg">#12151C</color>
+    <color name="kb_surface">#1E2330</color>
+    <color name="kb_surface_variant">#2A3042</color>
+    <color name="kb_accent">#60A5FA</color>
+    <color name="kb_accent_dark">#2563EB</color>
+    <color name="kb_text_primary">#F8FAFC</color>
+    <color name="kb_text_secondary">#94A3B8</color>
+    <color name="kb_chip_active">#2563EB</color>
+    <color name="kb_chip_inactive">#23293A</color>
+    <color name="kb_success">#10B981</color>
+</resources>

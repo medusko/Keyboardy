@@ -1,0 +1,26 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Option 4: 2x2 Image Grid + Cobalt Spacebar -->
+    <path
+        android:fillColor="#101216"
+        android:pathData="M0,0h108v108h-108z" />
+    <path
+        android:fillColor="#2E6BD9"
+        android:pathData="M22,20h28v24h-28z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M58,20h28v24h-28z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M22,50h28v20h-28z" />
+    <path
+        android:fillColor="#2E6BD9"
+        android:pathData="M58,50h28v20h-28z" />
+    <!-- Spacebar below grid -->
+    <path
+        android:fillColor="#2E6BD9"
+        android:pathData="M22,78h64v10h-64z" />
+</vector>

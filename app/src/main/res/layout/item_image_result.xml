@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="96dp"
+    android:layout_margin="3dp"
+    android:background="@drawable/bg_key_button"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?android:attr/selectableItemBackground">
+
+    <ImageView
+        android:id="@+id/iv_thumbnail"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="Search Result Image"
+        android:scaleType="centerCrop" />
+
+    <!-- GIF Badge -->
+    <TextView
+        android:id="@+id/tv_badge_gif"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_margin="4dp"
+        android:background="@drawable/bg_badge_gif"
+        android:paddingHorizontal="5dp"
+        android:paddingVertical="1dp"
+        android:text="GIF"
+        android:textColor="#38BDF8"
+        android:textSize="9.5sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <!-- Source Badge (G = Google WebView, ⚡ = Instant, B = Brave/Serp) -->
+    <TextView
+        android:id="@+id/tv_badge_source"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="4dp"
+        android:background="@drawable/bg_badge_gif"
+        android:paddingHorizontal="4dp"
+        android:paddingVertical="1dp"
+        android:text="G"
+        android:textColor="#CBD5E1"
+        android:textSize="9sp" />
+
+    <!-- Downloading / Inserting Overlay -->
+    <FrameLayout
+        android:id="@+id/overlay_loading"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#AA0F172A"
+        android:visibility="gone">
+
+        <ProgressBar
+            style="?android:attr/progressBarStyleSmall"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_gravity="center"
+            android:indeterminateTint="#60A5FA" />
+    </FrameLayout>
+
+</FrameLayout>

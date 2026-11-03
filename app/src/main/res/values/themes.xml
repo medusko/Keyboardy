@@ -1,0 +1,7 @@
+<resources>
+    <style name="Theme.Keyboardy" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/kb_accent</item>
+        <item name="android:statusBarColor">@color/kb_bg</item>
+        <item name="android:navigationBarColor">@color/kb_bg</item>
+    </style>
+</resources>

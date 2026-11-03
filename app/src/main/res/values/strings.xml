@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Keyboardy</string>
+    <string name="ime_name">Keyboardy (Image &amp; GIF Search)</string>
+    <string name="subtype_image_search">Google Image &amp; GIF Search</string>
+</resources>
