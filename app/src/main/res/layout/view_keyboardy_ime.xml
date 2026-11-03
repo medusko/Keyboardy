@@ -6,7 +6,7 @@
     android:background="@color/kb_bg"
     android:orientation="vertical">
 
-    <!-- Top Bar: Return to Gboard + Full-Width Interactive Search Bar -->
+    <!-- Top Bar: Return to Gboard + Interactive Search Bar + History Button -->
     <LinearLayout
         android:id="@+id/top_bar_container"
         android:layout_width="match_parent"
@@ -52,7 +52,7 @@
             android:id="@+id/search_bar_container"
             android:layout_width="0dp"
             android:layout_height="40dp"
-            android:layout_marginStart="8dp"
+            android:layout_marginHorizontal="6dp"
             android:layout_weight="1"
             android:background="@drawable/bg_search_bar"
             android:clickable="true"
@@ -102,6 +102,79 @@
                 android:src="@drawable/ic_clear"
                 android:visibility="gone" />
         </LinearLayout>
+
+        <!-- Search History Button -->
+        <LinearLayout
+            android:id="@+id/btn_history"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_key_button"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/iv_history_icon"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:contentDescription="Search History"
+                android:src="@drawable/ic_history" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Copy / Cut / Paste / Select All Context Bar (Appears on Long-Press or Text Selection in Search Bar) -->
+    <LinearLayout
+        android:id="@+id/selection_action_bar"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="8dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/btn_ctx_paste"
+            android:layout_width="0dp"
+            android:layout_height="28dp"
+            android:layout_marginEnd="5dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="📋 Paste"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btn_ctx_copy"
+            android:layout_width="0dp"
+            android:layout_height="28dp"
+            android:layout_marginEnd="5dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="📄 Copy"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btn_ctx_cut"
+            android:layout_width="0dp"
+            android:layout_height="28dp"
+            android:layout_marginEnd="5dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="✂️ Cut"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btn_ctx_select_all"
+            android:layout_width="0dp"
+            android:layout_height="28dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:text="Select All"
+            android:textSize="12sp"
+            android:textStyle="bold" />
     </LinearLayout>
 
     <!-- Filter Chips & Search Engine Selector Row -->
@@ -198,7 +271,7 @@
         </LinearLayout>
     </HorizontalScrollView>
 
-    <!-- Full-Screen Main Content Area: Image Grid takes the rest of the screen! -->
+    <!-- Full-Screen Main Content Area: Image Grid + History Overlay -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -227,9 +300,60 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:gravity="center"
-                android:text="Type below to search Google Images &amp; GIFs — tap any result to insert directly into your chat!"
+                android:text="Type below to search Google Images &amp; GIFs — or tap 🕒 for your search history!"
                 android:textColor="@color/kb_text_secondary"
                 android:textSize="13.5sp" />
+        </LinearLayout>
+
+        <!-- Search History Overlay Panel (Toggled by the 🕒 button in the top bar) -->
+        <LinearLayout
+            android:id="@+id/history_panel_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:padding="10dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="4dp"
+                android:paddingBottom="6dp">
+
+                <TextView
+                    android:id="@+id/tv_history_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Recent Searches"
+                    android:textSize="13.5sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/btn_clear_history"
+                    android:layout_width="wrap_content"
+                    android:layout_height="26dp"
+                    android:gravity="center"
+                    android:paddingHorizontal="10dp"
+                    android:text="Clear All"
+                    android:textSize="11.5sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:scrollbars="vertical">
+
+                <LinearLayout
+                    android:id="@+id/history_items_list"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </ScrollView>
         </LinearLayout>
 
         <!-- Hidden 1x1 WebView container for Headless Google Images JS execution -->
@@ -252,7 +376,7 @@
         android:paddingBottom="6dp"
         android:visibility="visible" />
 
-    <!-- Dedicated Bottom Safe Clearance Spacer so keys & Search button sit ABOVE system nav bar & keyboard switcher button -->
+    <!-- Dedicated Bottom Safe Clearance Spacer controlled directly by Bottom Bar Offset! -->
     <View
         android:id="@+id/bottom_nav_spacer"
         android:layout_width="match_parent"

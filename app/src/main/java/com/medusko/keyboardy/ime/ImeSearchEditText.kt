@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.AttributeSet
 import android.view.GestureDetector
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import androidx.appcompat.widget.AppCompatEditText
 import kotlin.math.max
@@ -17,13 +18,9 @@ import kotlin.math.min
 
 /**
  * Custom EditText engineered specifically for use inside an Android InputMethodService window.
- * Because IME windows carry FLAG_NOT_FOCUSABLE (so the host chat app keeps window focus),
- * standard EditTexts do not render a blinking cursor or selection highlight inside an IME.
- *
- * ImeSearchEditText solves this by:
- * 1. Resolving exact character offsets on touch/drag/double-tap via [getOffsetForPosition].
- * 2. Rendering its own crisp blinking cursor bar and text selection highlight in [onDraw].
- * 3. Providing helper methods to insert/replace/delete text at the active cursor or selection.
+ * Supports:
+ * 1. Blinking cursor & character-accurate tap placement.
+ * 2. Drag-to-select, double-tap word selection, and long-press to invoke Copy/Cut/Paste/Select All.
  */
 class ImeSearchEditText @JvmOverloads constructor(
     context: Context,
@@ -39,6 +36,8 @@ class ImeSearchEditText @JvmOverloads constructor(
 
     var onSearchBarTapped: (() -> Unit)? = null
     var onQueryTextChanged: ((String) -> Unit)? = null
+    var onSelectionOrLongPressAction: ((hasSelection: Boolean, hasText: Boolean) -> Unit)? = null
+    var onDismissSelectionMenu: (() -> Unit)? = null
 
     private val cursorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#2E6BD9")
@@ -66,28 +65,46 @@ class ImeSearchEditText @JvmOverloads constructor(
             override fun onDoubleTap(e: MotionEvent): Boolean {
                 val txt = text?.toString().orEmpty()
                 if (txt.isNotEmpty()) {
-                    val offset = resolveOffset(e.x).coerceIn(0, txt.length)
-                    // Select the word around the double-tapped character
-                    var start = offset
-                    var end = offset
-                    while (start > 0 && !txt[start - 1].isWhitespace()) start--
-                    while (end < txt.length && !txt[end].isWhitespace()) end++
-                    if (start == end) {
-                        start = 0
-                        end = txt.length
-                    }
-                    setCursorSelection(start, end)
+                    selectWordAt(e.x)
+                    performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                    onSelectionOrLongPressAction?.invoke(hasSelection(), true)
+                } else {
+                    onSelectionOrLongPressAction?.invoke(false, false)
                 }
                 return true
+            }
+
+            override fun onLongPress(e: MotionEvent) {
+                val txt = text?.toString().orEmpty()
+                performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                if (txt.isNotEmpty() && !hasSelection()) {
+                    selectWordAt(e.x)
+                }
+                onSelectionOrLongPressAction?.invoke(hasSelection(), txt.isNotEmpty())
             }
         }
     )
 
     init {
         showSoftInputOnFocus = false
-        isCursorVisible = false // We draw our own crisp blinking cursor in onDraw
+        isCursorVisible = false
         setBackgroundColor(Color.TRANSPARENT)
         setSingleLine(true)
+    }
+
+    private fun selectWordAt(touchX: Float) {
+        val txt = text?.toString().orEmpty()
+        if (txt.isEmpty()) return
+        val offset = resolveOffset(touchX).coerceIn(0, txt.length)
+        var start = offset
+        var end = offset
+        while (start > 0 && !txt[start - 1].isWhitespace()) start--
+        while (end < txt.length && !txt[end].isWhitespace()) end++
+        if (start == end) {
+            start = 0
+            end = txt.length
+        }
+        setCursorSelection(start, end)
     }
 
     override fun onAttachedToWindow() {
@@ -121,6 +138,42 @@ class ImeSearchEditText @JvmOverloads constructor(
         }
     }
 
+    override fun hasSelection(): Boolean = cursorStart != cursorEnd
+
+    fun selectAllText() {
+        val len = text?.length ?: 0
+        setCursorSelection(0, len)
+        onSelectionOrLongPressAction?.invoke(len > 0, len > 0)
+    }
+
+    fun getSelectedOrAllText(): String {
+        val current = text?.toString().orEmpty()
+        if (current.isEmpty()) return ""
+        val s = min(cursorStart, cursorEnd).coerceIn(0, current.length)
+        val e = max(cursorStart, cursorEnd).coerceIn(0, current.length)
+        return if (s != e) current.substring(s, e) else current
+    }
+
+    fun cutSelectedOrAllText(): String {
+        val current = text?.toString().orEmpty()
+        if (current.isEmpty()) return ""
+        val s = min(cursorStart, cursorEnd).coerceIn(0, current.length)
+        val e = max(cursorStart, cursorEnd).coerceIn(0, current.length)
+        return if (s != e) {
+            val cut = current.substring(s, e)
+            val updated = current.substring(0, s) + current.substring(e)
+            super.setText(updated)
+            cursorStart = s
+            cursorEnd = s
+            restartBlink()
+            onQueryTextChanged?.invoke(updated)
+            cut
+        } else {
+            setQueryText("", placeCursorAtEnd = true)
+            current
+        }
+    }
+
     fun setQueryText(newText: String, placeCursorAtEnd: Boolean = true) {
         super.setText(newText)
         val len = newText.length
@@ -131,6 +184,7 @@ class ImeSearchEditText @JvmOverloads constructor(
             cursorStart = cursorStart.coerceIn(0, len)
             cursorEnd = cursorEnd.coerceIn(0, len)
         }
+        onDismissSelectionMenu?.invoke()
         restartBlink()
         onQueryTextChanged?.invoke(newText)
     }
@@ -153,6 +207,7 @@ class ImeSearchEditText @JvmOverloads constructor(
         val newPos = (s + str.length).coerceIn(0, updated.length)
         cursorStart = newPos
         cursorEnd = newPos
+        onDismissSelectionMenu?.invoke()
         restartBlink()
         onQueryTextChanged?.invoke(updated)
     }
@@ -166,11 +221,9 @@ class ImeSearchEditText @JvmOverloads constructor(
         val updated: String
         val newPos: Int
         if (s != e) {
-            // Delete selected range
             updated = current.substring(0, s) + current.substring(e)
             newPos = s
         } else if (s > 0) {
-            // Delete single character before cursor
             updated = current.substring(0, s - 1) + current.substring(s)
             newPos = s - 1
         } else {
@@ -180,6 +233,7 @@ class ImeSearchEditText @JvmOverloads constructor(
         super.setText(updated)
         cursorStart = newPos.coerceIn(0, updated.length)
         cursorEnd = cursorStart
+        onDismissSelectionMenu?.invoke()
         restartBlink()
         onQueryTextChanged?.invoke(updated)
         return true
@@ -187,7 +241,9 @@ class ImeSearchEditText @JvmOverloads constructor(
 
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        gestureDetector.onTouchEvent(event)
+        val handledByGesture = gestureDetector.onTouchEvent(event)
+        if (handledByGesture) return true
+
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 onSearchBarTapped?.invoke()
@@ -195,12 +251,19 @@ class ImeSearchEditText @JvmOverloads constructor(
                 val offset = resolveOffset(event.x)
                 dragAnchorOffset = offset
                 setCursorSelection(offset, offset)
+                onDismissSelectionMenu?.invoke()
             }
 
             MotionEvent.ACTION_MOVE -> {
                 val offset = resolveOffset(event.x)
                 if (offset != dragAnchorOffset) {
                     setCursorSelection(dragAnchorOffset, offset)
+                }
+            }
+
+            MotionEvent.ACTION_UP -> {
+                if (hasSelection()) {
+                    onSelectionOrLongPressAction?.invoke(true, text?.isNotEmpty() == true)
                 }
             }
         }
@@ -242,7 +305,7 @@ class ImeSearchEditText @JvmOverloads constructor(
                 max(startX, endX),
                 bottomY - dpToPx(2f)
             )
-            canvas.drawRoundRect(selectionRect, dpToPx(4f), dpToPx(4f), selectionRect.let { selectionPaint })
+            canvas.drawRoundRect(selectionRect, dpToPx(4f), dpToPx(4f), selectionPaint)
         }
 
         super.onDraw(canvas)

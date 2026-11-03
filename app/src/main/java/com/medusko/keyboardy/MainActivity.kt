@@ -3,6 +3,7 @@ package com.medusko.keyboardy
 import android.app.Dialog
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
@@ -83,18 +84,35 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvSettingsHeader: TextView
     private lateinit var cbAutoReturn: CheckBox
     private lateinit var cbAutoReadChat: CheckBox
+
+    private lateinit var cardBadges: LinearLayout
+    private lateinit var tvBadgesHeader: TextView
+    private lateinit var tvBadgesDesc: TextView
     private lateinit var badgeLegendBox: LinearLayout
-    private lateinit var tvBadgeLegendTitle: TextView
     private lateinit var tvBadgeLegendBody: TextView
+
+    private lateinit var cardQuota: LinearLayout
+    private lateinit var tvQuotaHeader: TextView
+    private lateinit var quotaStatsBox: LinearLayout
+    private lateinit var tvQuotaStats: TextView
+    private lateinit var tvQuotaTierNote: TextView
+    private lateinit var tvWhyApiTitle: TextView
     private lateinit var tvApiKeyLabel: TextView
     private lateinit var etOptionalApiKey: EditText
     private lateinit var btnSaveSettings: Button
+
+    private val prefChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+        runOnUiThread {
+            updateQuotaStatsUi()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         prefs = KeyboardyPrefs(this)
+        prefs.registerListener(prefChangeListener)
 
         rootScreenContainer = findViewById(R.id.root_screen_container)
         topAppBar = findViewById(R.id.top_app_bar)
@@ -138,9 +156,19 @@ class MainActivity : AppCompatActivity() {
         tvSettingsHeader = findViewById(R.id.tv_settings_header)
         cbAutoReturn = findViewById(R.id.cb_auto_return_gboard)
         cbAutoReadChat = findViewById(R.id.cb_auto_read_chat_text)
+
+        cardBadges = findViewById(R.id.card_badges)
+        tvBadgesHeader = findViewById(R.id.tv_badges_header)
+        tvBadgesDesc = findViewById(R.id.tv_badges_desc)
         badgeLegendBox = findViewById(R.id.badge_legend_box)
-        tvBadgeLegendTitle = findViewById(R.id.tv_badge_legend_title)
         tvBadgeLegendBody = findViewById(R.id.tv_badge_legend_body)
+
+        cardQuota = findViewById(R.id.card_quota)
+        tvQuotaHeader = findViewById(R.id.tv_quota_header)
+        quotaStatsBox = findViewById(R.id.quota_stats_box)
+        tvQuotaStats = findViewById(R.id.tv_quota_stats)
+        tvQuotaTierNote = findViewById(R.id.tv_quota_tier_note)
+        tvWhyApiTitle = findViewById(R.id.tv_why_api_title)
         tvApiKeyLabel = findViewById(R.id.tv_api_key_label)
         etOptionalApiKey = findViewById(R.id.et_optional_api_key)
         btnSaveSettings = findViewById(R.id.btn_save_settings)
@@ -192,7 +220,7 @@ class MainActivity : AppCompatActivity() {
             imm?.showInputMethodPicker()
         }
 
-        // 3. Keyboard Scale Selector Buttons (immediately updates KeyboardyImeService via SharedPreferences listener)
+        // 3. Keyboard Scale Selector Buttons
         val scaleMap = mapOf(
             KeyboardScale.COMPACT to btnScaleCompact,
             KeyboardScale.NORMAL to btnScaleNormal,
@@ -206,13 +234,13 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Bottom Navigation Clearance Stepper
+        // Bottom Navigation Clearance Stepper (− 8dp / + 8dp)
         btnClearanceMinus.setOnClickListener {
-            prefs.bottomNavClearanceDp = (prefs.bottomNavClearanceDp - 6).coerceAtLeast(0)
+            prefs.bottomNavClearanceDp = (prefs.bottomNavClearanceDp - 8).coerceAtLeast(0)
             applyThemeAndState()
         }
         btnClearancePlus.setOnClickListener {
-            prefs.bottomNavClearanceDp = (prefs.bottomNavClearanceDp + 6).coerceAtMost(120)
+            prefs.bottomNavClearanceDp = (prefs.bottomNavClearanceDp + 8).coerceAtMost(160)
             applyThemeAndState()
         }
 
@@ -260,6 +288,7 @@ class MainActivity : AppCompatActivity() {
             prefs.autoReturnToPreviousKeyboard = cbAutoReturn.isChecked
             prefs.autoReadAndReplaceChatQuery = cbAutoReadChat.isChecked
             prefs.optionalApiKey = etOptionalApiKey.text?.toString().orEmpty()
+            updateQuotaStatsUi()
             Toast.makeText(this, "Preferences saved!", Toast.LENGTH_SHORT).show()
         }
 
@@ -269,6 +298,39 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateImeStatusBanner()
+        updateQuotaStatsUi()
+    }
+
+    override fun onDestroy() {
+        prefs.unregisterListener(prefChangeListener)
+        super.onDestroy()
+    }
+
+    private fun updateQuotaStatsUi() {
+        val daySearches = prefs.searchesToday
+        val monthSearches = prefs.searchesThisMonth
+        val dayInserts = prefs.imagesInsertedToday
+        val totalInserts = prefs.imagesInsertedTotal
+        val hasApiKey = prefs.optionalApiKey.isNotBlank()
+
+        tvQuotaStats.text =
+            "Searches Today: $daySearches   •   This Month: $monthSearches\n" +
+                "Images Inserted Today: $dayInserts   •   All-Time: $totalInserts (0 quota used)"
+
+        tvQuotaTierNote.text = if (hasApiKey) {
+            val isSerp = prefs.optionalApiKey.length >= 40 && prefs.optionalApiKey.all { it.isLetterOrDigit() }
+            if (isSerp) {
+                "Active Key: SerpApi ($monthSearches / 100 free monthly searches used) + Free Hybrid Fallback.\n" +
+                    "Note: Quotas are counted strictly PER SEARCH QUERY, never per image tapped!"
+            } else {
+                "Active Key: Brave Search API ($monthSearches / 2,000 free monthly searches used) + Free Hybrid Fallback.\n" +
+                    "Note: Quotas are counted strictly PER SEARCH QUERY, never per image tapped!"
+            }
+        } else {
+            "Active Mode: Built-in Free Hybrid (G + ⚡) — Unlimited ($0)\n" +
+                "(Benchmark vs. Google Custom Search 100/day free API tier: $daySearches / 100 today)\n" +
+                "Note: Quotas are counted strictly PER SEARCH QUERY, never per image tapped! Tapping images/GIFs downloads directly from the host and uses 0 search quota."
+        }
     }
 
     /**
@@ -421,8 +483,8 @@ class MainActivity : AppCompatActivity() {
         )
         btnToggleTheme.setColorFilter(palette.accentBlue)
 
-        // Style all Cards
-        val cards = listOf(cardSetup, cardScale, cardSandbox, cardSettings)
+        // Style all 6 Cards
+        val cards = listOf(cardSetup, cardScale, cardSandbox, cardSettings, cardBadges, cardQuota)
         for (card in cards) {
             card.background = palette.createRoundedRect(
                 fillColor = palette.surface,
@@ -433,11 +495,19 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Headers & Descriptions
-        val headers = listOf(tvImeStatus, tvScaleHeader, tvSandboxHeader, tvSettingsHeader)
+        val headers = listOf(
+            tvImeStatus,
+            tvScaleHeader,
+            tvSandboxHeader,
+            tvSettingsHeader,
+            tvBadgesHeader,
+            tvQuotaHeader,
+            tvWhyApiTitle
+        )
         for (h in headers) {
             h.setTextColor(palette.accentBlue)
         }
-        val descriptions = listOf(tvSetupDesc, tvScaleDesc, tvSandboxDesc, tvApiKeyLabel)
+        val descriptions = listOf(tvSetupDesc, tvScaleDesc, tvSandboxDesc, tvBadgesDesc, tvApiKeyLabel)
         for (d in descriptions) {
             d.setTextColor(palette.textSecondary)
         }
@@ -467,7 +537,7 @@ class MainActivity : AppCompatActivity() {
 
         // Bottom Clearance Stepper
         tvBottomClearanceLabel.text =
-            "Bottom Bar Offset: ${prefs.bottomNavClearanceDp}dp (Clears nav bar & switcher)"
+            "Bottom Bar Offset: ${prefs.bottomNavClearanceDp}dp"
         tvBottomClearanceLabel.setTextColor(palette.textPrimary)
 
         for (stepBtn in listOf(btnClearanceMinus, btnClearancePlus)) {
@@ -500,15 +570,18 @@ class MainActivity : AppCompatActivity() {
             edit.setHintTextColor(palette.textSecondary)
         }
 
-        // Badge Legend Box
-        badgeLegendBox.background = palette.createRoundedRect(
-            fillColor = palette.surfaceVariant,
-            cornerRadiusPx = 12f * density,
-            strokeWidthPx = strokePx,
-            strokeColor = palette.border
-        )
-        tvBadgeLegendTitle.setTextColor(palette.accentBlue)
+        // Badge Legend Box & Quota Stats Box
+        for (innerBox in listOf(badgeLegendBox, quotaStatsBox)) {
+            innerBox.background = palette.createRoundedRect(
+                fillColor = palette.surfaceVariant,
+                cornerRadiusPx = 12f * density,
+                strokeWidthPx = strokePx,
+                strokeColor = palette.border
+            )
+        }
         tvBadgeLegendBody.setTextColor(palette.textPrimary)
+        tvQuotaStats.setTextColor(palette.textPrimary)
+        tvQuotaTierNote.setTextColor(palette.textSecondary)
 
         // Checkboxes
         for (cb in listOf(cbAutoReturn, cbAutoReadChat)) {
@@ -520,6 +593,7 @@ class MainActivity : AppCompatActivity() {
         btnSaveSettings.setTextColor(Color.WHITE)
 
         updateImeStatusBanner()
+        updateQuotaStatsUi()
     }
 
     private fun updateImeStatusBanner() {

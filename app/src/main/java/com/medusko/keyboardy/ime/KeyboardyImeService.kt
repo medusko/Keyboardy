@@ -1,6 +1,8 @@
 package com.medusko.keyboardy.ime
 
 import android.annotation.SuppressLint
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.Color
@@ -24,8 +26,6 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.medusko.keyboardy.R
@@ -73,10 +73,25 @@ class KeyboardyImeService : InputMethodService() {
     private var ivSearchIcon: ImageView? = null
     private var etSearchQuery: ImeSearchEditText? = null
     private var btnClearQuery: ImageView? = null
+    private var btnHistory: LinearLayout? = null
+    private var ivHistoryIcon: ImageView? = null
+
+    private var selectionActionBar: LinearLayout? = null
+    private var btnCtxPaste: TextView? = null
+    private var btnCtxCopy: TextView? = null
+    private var btnCtxCut: TextView? = null
+    private var btnCtxSelectAll: TextView? = null
+
     private var progressSearching: ProgressBar? = null
     private var rvImageResults: RecyclerView? = null
     private var emptyStateContainer: LinearLayout? = null
     private var tvStatusMessage: TextView? = null
+
+    private var historyPanelContainer: LinearLayout? = null
+    private var tvHistoryTitle: TextView? = null
+    private var btnClearHistory: TextView? = null
+    private var historyItemsList: LinearLayout? = null
+
     private var containerMiniQwerty: LinearLayout? = null
     private var bottomNavSpacer: View? = null
     private var chipEngineMode: TextView? = null
@@ -86,9 +101,9 @@ class KeyboardyImeService : InputMethodService() {
     private var currentFilter: SearchFilter = SearchFilter.ALL
     private var currentLayer: KeyboardLayer = KeyboardLayer.LETTERS
     private var isShiftActive: Boolean = false
+    private var isHistoryVisible: Boolean = false
     private var queryOriginatedFromHostEditor: Boolean = false
-    private var systemNavInsetBottomPx: Int = 0
-    private var systemStatusInsetTopPx: Int = 0
+    private var lastCountedSearchQuery: String = ""
 
     // Real-time preference listener so changes in MainActivity apply immediately to the keyboard
     private val prefChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
@@ -104,11 +119,7 @@ class KeyboardyImeService : InputMethodService() {
         commitHelper = ImageCommitHelper(this)
     }
 
-    override fun onEvaluateFullscreenMode(): Boolean {
-        // Keep false so Android doesn't cover our UI with a legacy ExtractEditText;
-        // our rootImeContainer itself expands to full screen height!
-        return false
-    }
+    override fun onEvaluateFullscreenMode(): Boolean = false
 
     override fun onCreateInputView(): View {
         val root = layoutInflater.inflate(R.layout.view_keyboardy_ime, null)
@@ -122,10 +133,25 @@ class KeyboardyImeService : InputMethodService() {
         ivSearchIcon = root.findViewById(R.id.iv_search_icon)
         etSearchQuery = root.findViewById(R.id.et_search_query)
         btnClearQuery = root.findViewById(R.id.btn_clear_query)
+        btnHistory = root.findViewById(R.id.btn_history)
+        ivHistoryIcon = root.findViewById(R.id.iv_history_icon)
+
+        selectionActionBar = root.findViewById(R.id.selection_action_bar)
+        btnCtxPaste = root.findViewById(R.id.btn_ctx_paste)
+        btnCtxCopy = root.findViewById(R.id.btn_ctx_copy)
+        btnCtxCut = root.findViewById(R.id.btn_ctx_cut)
+        btnCtxSelectAll = root.findViewById(R.id.btn_ctx_select_all)
+
         progressSearching = root.findViewById(R.id.progress_searching)
         rvImageResults = root.findViewById(R.id.rv_image_results)
         emptyStateContainer = root.findViewById(R.id.empty_state_container)
         tvStatusMessage = root.findViewById(R.id.tv_status_message)
+
+        historyPanelContainer = root.findViewById(R.id.history_panel_container)
+        tvHistoryTitle = root.findViewById(R.id.tv_history_title)
+        btnClearHistory = root.findViewById(R.id.btn_clear_history)
+        historyItemsList = root.findViewById(R.id.history_items_list)
+
         containerMiniQwerty = root.findViewById(R.id.container_mini_qwerty)
         bottomNavSpacer = root.findViewById(R.id.bottom_nav_spacer)
         chipEngineMode = root.findViewById(R.id.chip_engine_mode)
@@ -137,19 +163,6 @@ class KeyboardyImeService : InputMethodService() {
         filterChipViews[SearchFilter.MEME] = root.findViewById(R.id.chip_filter_meme)
         filterChipViews[SearchFilter.REACTION] = root.findViewById(R.id.chip_filter_reaction)
         filterChipViews[SearchFilter.TRANSPARENT] = root.findViewById(R.id.chip_filter_sticker)
-
-        // Listen for Android 15/16 system bar insets
-        ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
-            val bars = insets.getInsets(
-                WindowInsetsCompat.Type.systemBars() or
-                    WindowInsetsCompat.Type.navigationBars() or
-                    WindowInsetsCompat.Type.displayCutout()
-            )
-            systemNavInsetBottomPx = bars.bottom
-            systemStatusInsetTopPx = bars.top
-            applyScaleAndTheme()
-            insets
-        }
 
         // Initialize Headless Google Images WebView searcher & repository
         headlessGoogleSearcher?.destroy()
@@ -169,6 +182,7 @@ class KeyboardyImeService : InputMethodService() {
                 override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
                     if (newState == RecyclerView.SCROLL_STATE_DRAGGING) {
                         setMiniQwertyVisible(false)
+                        hideSelectionActionBar()
                     }
                 }
             })
@@ -180,18 +194,26 @@ class KeyboardyImeService : InputMethodService() {
             switchToPreviousKeyboard()
         }
 
-        // Interactive Search EditText callbacks (tap anywhere to position cursor or drag to select text!)
+        // Interactive Search EditText callbacks (tap to position cursor, long-press/select for Copy/Cut/Paste)
         etSearchQuery?.apply {
             onSearchBarTapped = {
+                setHistoryPanelVisible(false)
                 setMiniQwertyVisible(true)
             }
             onQueryTextChanged = { updatedText ->
                 btnClearQuery?.visibility = if (updatedText.isNotEmpty()) View.VISIBLE else View.GONE
             }
+            onSelectionOrLongPressAction = { _, _ ->
+                showSelectionActionBar()
+            }
+            onDismissSelectionMenu = {
+                hideSelectionActionBar()
+            }
         }
 
         searchBarContainer?.setOnClickListener { view ->
             performTapHaptic(view)
+            setHistoryPanelVisible(false)
             setMiniQwertyVisible(true)
             val len = etSearchQuery?.getQueryText()?.length ?: 0
             etSearchQuery?.setCursorSelection(len, len)
@@ -203,11 +225,64 @@ class KeyboardyImeService : InputMethodService() {
             resetToBlankSearch(showQwerty = true)
         }
 
+        // History button (🕒) toggles the Search History Panel
+        btnHistory?.setOnClickListener { view ->
+            performTapHaptic(view)
+            setHistoryPanelVisible(!isHistoryVisible)
+        }
+
+        btnClearHistory?.setOnClickListener { view ->
+            performTapHaptic(view)
+            prefs.clearSearchHistory()
+            populateHistoryPanel(ThemePalette.forMode(prefs.isDarkMode))
+        }
+
+        // Copy / Cut / Paste / Select All Context Action Bar Buttons
+        btnCtxPaste?.setOnClickListener { view ->
+            performTapHaptic(view)
+            val clipText = readClipboardText()
+            if (!clipText.isNullOrEmpty()) {
+                queryOriginatedFromHostEditor = false
+                setHistoryPanelVisible(false)
+                etSearchQuery?.insertTextAtCursor(clipText)
+                hideSelectionActionBar()
+                triggerSearch(immediate = true, hideKeyboardOnStart = false)
+            } else {
+                Toast.makeText(this, "Clipboard is empty", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        btnCtxCopy?.setOnClickListener { view ->
+            performTapHaptic(view)
+            val toCopy = etSearchQuery?.getSelectedOrAllText().orEmpty()
+            if (toCopy.isNotEmpty()) {
+                copyTextToClipboard(toCopy)
+                hideSelectionActionBar()
+                Toast.makeText(this, "Copied \"$toCopy\"", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        btnCtxCut?.setOnClickListener { view ->
+            performTapHaptic(view)
+            val cut = etSearchQuery?.cutSelectedOrAllText().orEmpty()
+            if (cut.isNotEmpty()) {
+                copyTextToClipboard(cut)
+                hideSelectionActionBar()
+                triggerSearch(immediate = false, hideKeyboardOnStart = false)
+            }
+        }
+
+        btnCtxSelectAll?.setOnClickListener { view ->
+            performTapHaptic(view)
+            etSearchQuery?.selectAllText()
+        }
+
         // Filter Chips
         for ((filter, chipView) in filterChipViews) {
             chipView.setOnClickListener { view ->
                 performTapHaptic(view)
                 currentFilter = filter
+                setHistoryPanelVisible(false)
                 applyScaleAndTheme()
                 if (getCurrentQuery().isNotBlank()) {
                     triggerSearch(immediate = true, hideKeyboardOnStart = true)
@@ -229,6 +304,11 @@ class KeyboardyImeService : InputMethodService() {
         return root
     }
 
+    override fun onWindowShown() {
+        super.onWindowShown()
+        applyScaleAndTheme()
+    }
+
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         applyScaleAndTheme()
@@ -236,6 +316,8 @@ class KeyboardyImeService : InputMethodService() {
         if (!restarting) {
             currentLayer = KeyboardLayer.LETTERS
             isShiftActive = false
+            setHistoryPanelVisible(false)
+            hideSelectionActionBar()
 
             // Optional Auto-Search from Chat Box (OFF by default so every search starts blank unless user enables it!)
             if (prefs.autoReadAndReplaceChatQuery) {
@@ -259,14 +341,115 @@ class KeyboardyImeService : InputMethodService() {
     private fun resetToBlankSearch(showQwerty: Boolean) {
         searchJob?.cancel()
         queryOriginatedFromHostEditor = false
+        lastCountedSearchQuery = ""
         progressSearching?.visibility = View.GONE
+        hideSelectionActionBar()
+        setHistoryPanelVisible(false)
         etSearchQuery?.setQueryText("", placeCursorAtEnd = true)
         gridAdapter?.submitList(emptyList())
         emptyStateContainer?.visibility = View.VISIBLE
         tvStatusMessage?.text =
-            "Type below to search Google Images & GIFs — tap any result to insert directly into your chat!"
+            "Type below to search Google Images & GIFs — or tap 🕒 for your search history!"
         if (showQwerty) {
             setMiniQwertyVisible(true)
+        }
+    }
+
+    private fun showSelectionActionBar() {
+        selectionActionBar?.visibility = View.VISIBLE
+    }
+
+    private fun hideSelectionActionBar() {
+        selectionActionBar?.visibility = View.GONE
+    }
+
+    private fun setHistoryPanelVisible(visible: Boolean) {
+        isHistoryVisible = visible
+        historyPanelContainer?.visibility = if (visible) View.VISIBLE else View.GONE
+        if (visible) {
+            populateHistoryPanel(ThemePalette.forMode(prefs.isDarkMode))
+        }
+    }
+
+    private fun populateHistoryPanel(palette: ThemePalette) {
+        val listContainer = historyItemsList ?: return
+        listContainer.removeAllViews()
+        val density = resources.displayMetrics.density
+        val strokePx = (1f * density).toInt().coerceAtLeast(1)
+
+        val history = prefs.getSearchHistory()
+        btnClearHistory?.visibility = if (history.isNotEmpty()) View.VISIBLE else View.GONE
+
+        if (history.isEmpty()) {
+            val emptyTv = TextView(this).apply {
+                text = "No recent searches yet. Your searches will appear here for 1-tap access!"
+                setTextColor(palette.textSecondary)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                gravity = Gravity.CENTER
+                setPadding(dpToPx(16), dpToPx(32), dpToPx(16), dpToPx(32))
+            }
+            listContainer.addView(emptyTv)
+            return
+        }
+
+        for (queryItem in history) {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dpToPx(12), dpToPx(8), dpToPx(8), dpToPx(8))
+                background = palette.createRoundedRect(
+                    fillColor = palette.surface,
+                    cornerRadiusPx = 10f * density,
+                    strokeWidthPx = strokePx,
+                    strokeColor = palette.border
+                )
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    bottomMargin = dpToPx(6)
+                }
+                setOnClickListener { view ->
+                    performTapHaptic(view)
+                    queryOriginatedFromHostEditor = false
+                    etSearchQuery?.setQueryText(queryItem, placeCursorAtEnd = true)
+                    setHistoryPanelVisible(false)
+                    triggerSearch(immediate = true, hideKeyboardOnStart = true)
+                }
+            }
+
+            val icon = ImageView(this).apply {
+                setImageResource(R.drawable.ic_history)
+                setColorFilter(palette.accentBlue)
+                layoutParams = LinearLayout.LayoutParams(dpToPx(16), dpToPx(16)).apply {
+                    marginEnd = dpToPx(10)
+                }
+            }
+
+            val textTv = TextView(this).apply {
+                text = queryItem
+                setTextColor(palette.textPrimary)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                typeface = Typeface.DEFAULT_BOLD
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            }
+
+            val deleteBtn = ImageView(this).apply {
+                setImageResource(R.drawable.ic_clear)
+                setColorFilter(palette.textSecondary)
+                setPadding(dpToPx(6), dpToPx(6), dpToPx(6), dpToPx(6))
+                layoutParams = LinearLayout.LayoutParams(dpToPx(28), dpToPx(28))
+                setOnClickListener { view ->
+                    performTapHaptic(view)
+                    prefs.removeSearchHistoryQuery(queryItem)
+                    populateHistoryPanel(palette)
+                }
+            }
+
+            row.addView(icon)
+            row.addView(textTv)
+            row.addView(deleteBtn)
+            listContainer.addView(row)
         }
     }
 
@@ -280,21 +463,19 @@ class KeyboardyImeService : InputMethodService() {
         val density = resources.displayMetrics.density
         val strokePx = (1f * density).toInt().coerceAtLeast(1)
 
-        // Calculate bottom safe clearance so the bottom row of keys sits cleanly above the gesture bar & keyboard switcher button
-        val configuredClearancePx = dpToPx(prefs.bottomNavClearanceDp)
-        val effectiveBottomSpacerPx = maxOf(systemNavInsetBottomPx, configuredClearancePx)
+        // Direct Bottom Bar Offset in pixels so every tap of -6 / +6 visibly moves the bottom of the keyboard!
+        val bottomOffsetPx = dpToPx(prefs.bottomNavClearanceDp)
 
-        // Full-Screen Keyboard Container:
-        // Expands to fill the screen below the status bar so the search results grid takes the rest of the screen!
+        // Use 83% of screen height so the keyboard fills the screen for browsing images
+        // while staying 100% within the visible IME window frame (preventing bottom clipping!).
         val screenHeightPx = resources.displayMetrics.heightPixels
-        val topStatusClearancePx = maxOf(systemStatusInsetTopPx, dpToPx(36))
-        val fullScreenHeightPx = (screenHeightPx - topStatusClearancePx).coerceAtLeast(dpToPx(480))
+        val targetContainerHeightPx = (screenHeightPx * 0.83f).toInt().coerceAtLeast(dpToPx(440))
 
         rootImeContainer?.let { root ->
             root.setBackgroundColor(palette.background)
             val lp = root.layoutParams
             if (lp != null) {
-                lp.height = fullScreenHeightPx
+                lp.height = targetContainerHeightPx
                 root.layoutParams = lp
             }
             root.requestLayout()
@@ -309,14 +490,15 @@ class KeyboardyImeService : InputMethodService() {
             }
         }
 
-        // Update Bottom Nav Spacer height and color
+        // Update Bottom Nav Spacer height and color directly from bottomOffsetPx
         bottomNavSpacer?.let { spacer ->
             spacer.setBackgroundColor(palette.keyboardTrayBg)
             val lp = spacer.layoutParams
             if (lp != null) {
-                lp.height = effectiveBottomSpacerPx
+                lp.height = bottomOffsetPx
                 spacer.layoutParams = lp
             }
+            spacer.requestLayout()
         }
 
         // Style Top Bar buttons & Search Bar
@@ -327,6 +509,13 @@ class KeyboardyImeService : InputMethodService() {
         )
         ivBackIcon?.setColorFilter(palette.textPrimary)
         tvBackLabel?.setTextColor(palette.textPrimary)
+
+        btnHistory?.background = palette.createKeyDrawable(
+            isAccent = isHistoryVisible,
+            cornerRadiusPx = 8f * density,
+            strokeWidthPx = strokePx
+        )
+        ivHistoryIcon?.setColorFilter(if (isHistoryVisible) Color.WHITE else palette.textPrimary)
 
         searchBarContainer?.background = palette.createRoundedRect(
             fillColor = palette.surface,
@@ -340,6 +529,34 @@ class KeyboardyImeService : InputMethodService() {
             setTextColor(palette.textPrimary)
             setHintTextColor(palette.textSecondary)
             setAccentColor(palette.accentBlue)
+        }
+
+        // Style Copy / Cut / Paste / Select All Action Bar
+        selectionActionBar?.setBackgroundColor(palette.surfaceVariant)
+        for (ctxBtn in listOf(btnCtxPaste, btnCtxCopy, btnCtxCut, btnCtxSelectAll)) {
+            ctxBtn?.background = palette.createRoundedRect(
+                fillColor = palette.surface,
+                cornerRadiusPx = 8f * density,
+                strokeWidthPx = strokePx,
+                strokeColor = palette.accentBlue
+            )
+            ctxBtn?.setTextColor(palette.textPrimary)
+        }
+
+        // Style History Panel
+        historyPanelContainer?.setBackgroundColor(palette.background)
+        tvHistoryTitle?.setTextColor(palette.accentBlue)
+        btnClearHistory?.apply {
+            background = palette.createRoundedRect(
+                fillColor = palette.surface,
+                cornerRadiusPx = 8f * density,
+                strokeWidthPx = strokePx,
+                strokeColor = palette.border
+            )
+            setTextColor(palette.textPrimary)
+        }
+        if (isHistoryVisible) {
+            populateHistoryPanel(palette)
         }
 
         // Style Filter Chips & Engine Mode Chip
@@ -375,6 +592,30 @@ class KeyboardyImeService : InputMethodService() {
         containerMiniQwerty?.let { tray ->
             tray.setBackgroundColor(palette.keyboardTrayBg)
             buildKeyboardPad(tray, scale, palette)
+        }
+
+        window?.window?.decorView?.requestLayout()
+    }
+
+    private fun readClipboardText(): String? {
+        return try {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            val clip = clipboard?.primaryClip
+            if (clip != null && clip.itemCount > 0) {
+                clip.getItemAt(0).coerceToText(this)?.toString()?.trim()
+            } else {
+                null
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun copyTextToClipboard(text: String) {
+        try {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            clipboard?.setPrimaryClip(ClipData.newPlainText("Keyboardy Search", text))
+        } catch (_: Exception) {
         }
     }
 
@@ -430,17 +671,27 @@ class KeyboardyImeService : InputMethodService() {
 
         if (hideKeyboardOnStart) {
             setMiniQwertyVisible(false)
+            setHistoryPanelVisible(false)
+            hideSelectionActionBar()
+            prefs.addSearchHistoryQuery(queryToRun)
         }
 
         searchJob?.cancel()
         searchJob = serviceScope.launch {
             if (!immediate) {
-                delay(360L)
+                delay(500L)
             }
             progressSearching?.visibility = View.VISIBLE
             if (gridAdapter?.itemCount == 0) {
                 emptyStateContainer?.visibility = View.VISIBLE
                 tvStatusMessage?.text = "Searching ${prefs.engineMode.displayName} for \"$queryToRun\"..."
+            }
+
+            // Record search execution count (once per distinct query/filter execution)
+            val countKey = "${queryToRun.lowercase()}|${currentFilter.name}|${prefs.engineMode.name}"
+            if (countKey != lastCountedSearchQuery) {
+                lastCountedSearchQuery = countKey
+                prefs.recordSearchExecuted()
             }
 
             val repo = searchRepository ?: return@launch
@@ -470,6 +721,11 @@ class KeyboardyImeService : InputMethodService() {
     }
 
     private fun onImageResultSelected(item: ImageResult) {
+        val q = getCurrentQuery().trim()
+        if (q.isNotEmpty()) {
+            prefs.addSearchHistoryQuery(q)
+        }
+
         commitJob?.cancel()
         gridAdapter?.setLoadingItem(item.id)
 
@@ -487,12 +743,14 @@ class KeyboardyImeService : InputMethodService() {
 
             when (outcome) {
                 CommitOutcome.COMMITTED_DIRECTLY -> {
+                    prefs.recordImageInserted()
                     if (prefs.autoReturnToPreviousKeyboard) {
                         switchToPreviousKeyboard()
                     }
                 }
 
                 CommitOutcome.COPIED_TO_CLIPBOARD_FALLBACK -> {
+                    prefs.recordImageInserted()
                     Toast.makeText(
                         this@KeyboardyImeService,
                         "App doesn't accept direct images — copied to clipboard! Paste in chat.",
@@ -631,6 +889,7 @@ class KeyboardyImeService : InputMethodService() {
                         setOnClickListener { view ->
                             performTapHaptic(view)
                             queryOriginatedFromHostEditor = false
+                            setHistoryPanelVisible(false)
                             when {
                                 isShift -> {
                                     isShiftActive = !isShiftActive
@@ -674,12 +933,10 @@ class KeyboardyImeService : InputMethodService() {
             )
         }
 
-        // 1. Left button: Down Arrow + Image of a Keyboard to hide typing pad
         val hideKeyboardBtn = createHideKeyboardButton(1.25f, palette) {
             setMiniQwertyVisible(false)
         }
 
-        // 2. Layer Toggle Button (?123 <-> ABC)
         val layerToggleLabel = if (currentLayer == KeyboardLayer.LETTERS) "?123" else "ABC"
         val layerToggleBtn = createActionKey(layerToggleLabel, 1.25f, false, scale, palette) {
             currentLayer = if (currentLayer == KeyboardLayer.LETTERS) {
@@ -690,27 +947,26 @@ class KeyboardyImeService : InputMethodService() {
             buildKeyboardPad(container, scale, palette)
         }
 
-        // 3. Quick Comma key
         val commaBtn = createActionKey(",", 0.75f, false, scale, palette) {
             queryOriginatedFromHostEditor = false
+            setHistoryPanelVisible(false)
             etSearchQuery?.insertTextAtCursor(",")
             triggerSearch(immediate = false, hideKeyboardOnStart = false)
         }
 
-        // 4. Spacebar
         val spaceBtn = createActionKey("space", 2.9f, false, scale, palette) {
             queryOriginatedFromHostEditor = false
+            setHistoryPanelVisible(false)
             etSearchQuery?.insertTextAtCursor(" ")
         }
 
-        // 5. Quick Period key
         val periodBtn = createActionKey(".", 0.75f, false, scale, palette) {
             queryOriginatedFromHostEditor = false
+            setHistoryPanelVisible(false)
             etSearchQuery?.insertTextAtCursor(".")
             triggerSearch(immediate = false, hideKeyboardOnStart = false)
         }
 
-        // 6. Search Action Button
         val searchBtn = createActionKey("Search 🔍", 1.85f, true, scale, palette) {
             triggerSearch(immediate = true, hideKeyboardOnStart = true)
         }

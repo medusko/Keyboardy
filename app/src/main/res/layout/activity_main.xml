@@ -192,7 +192,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
-                    android:text="Scale up the typing keys while the image results automatically fill the rest of the screen. Changes apply live!"
+                    android:text="Scale up the typing keys while the image results fill the rest of the screen. Use − 8 / + 8 to raise or lower the keyboard from the bottom edge."
                     android:textColor="#B8C2D4"
                     android:textSize="12.5sp" />
 
@@ -267,20 +267,20 @@
 
                     <TextView
                         android:id="@+id/btn_clearance_minus"
-                        android:layout_width="44dp"
+                        android:layout_width="48dp"
                         android:layout_height="36dp"
                         android:layout_marginEnd="6dp"
                         android:gravity="center"
-                        android:text="− 6"
+                        android:text="− 8"
                         android:textSize="13sp"
                         android:textStyle="bold" />
 
                     <TextView
                         android:id="@+id/btn_clearance_plus"
-                        android:layout_width="44dp"
+                        android:layout_width="48dp"
                         android:layout_height="36dp"
                         android:gravity="center"
-                        android:text="+ 6"
+                        android:text="+ 8"
                         android:textSize="13sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -354,7 +354,7 @@
                     android:textSize="14sp" />
             </LinearLayout>
 
-            <!-- Card 4: Behavior, Image Badge Legend & Search Engine Preferences -->
+            <!-- Card 4: Search Behavior Preferences -->
             <LinearLayout
                 android:id="@+id/card_settings"
                 android:layout_width="match_parent"
@@ -367,7 +367,7 @@
                     android:id="@+id/tv_settings_header"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Search Behavior &amp; Image Badges"
+                    android:text="Search Behavior"
                     android:textColor="#2E6BD9"
                     android:textSize="15sp"
                     android:textStyle="bold" />
@@ -390,42 +390,120 @@
                     android:text="Use written chat text as auto-search when opening Keyboardy (Off = every search starts blank)"
                     android:textColor="#FFFFFF"
                     android:textSize="13sp" />
+            </LinearLayout>
 
-                <!-- Legend explaining the Thunderbolt (⚡), Google (G), and GIF badges -->
+            <!-- Card 5: Dedicated Standalone Section — What the Image Badges Mean -->
+            <LinearLayout
+                android:id="@+id/card_badges"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/tv_badges_header"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="What the Image Badges Mean"
+                    android:textColor="#2E6BD9"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tv_badges_desc"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="Each thumbnail in the search grid shows a corner badge indicating its source and format:"
+                    android:textColor="#B8C2D4"
+                    android:textSize="12.5sp" />
+
                 <LinearLayout
                     android:id="@+id/badge_legend_box"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
+                    android:layout_marginTop="10dp"
                     android:orientation="vertical"
                     android:padding="12dp">
-
-                    <TextView
-                        android:id="@+id/tv_badge_legend_title"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="What the Image Badges Mean:"
-                        android:textColor="#2E6BD9"
-                        android:textSize="13sp"
-                        android:textStyle="bold" />
 
                     <TextView
                         android:id="@+id/tv_badge_legend_body"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:lineSpacingExtra="3dp"
-                        android:text="• ⚡ (Thunderbolt): Fetched via Instant Web Search — ultra-fast async HTTP engine that returns high-res images and GIFs in ~150ms.\n• G (Google): Fetched via Headless Google Images — an invisible background WebView querying Google Images directly.\n• GIF: Indicates an animated GIF that loops in the preview grid and inserts as an animation."
+                        android:lineSpacingExtra="4dp"
+                        android:text="⚡  Thunderbolt Badge (Instant Web Search)\nFetched via our ultra-fast async HTTP engine in ~150ms so high-res images &amp; Tenor/Giphy GIFs appear immediately.\n\nG  Google Badge (Headless Google WebView)\nFetched via an invisible background WebView querying Google Images (udm=2) directly on your phone.\n\nB  API Badge (Optional Brave / SerpApi)\nFetched via your custom API key if configured below.\n\nGIF  Top-Left Badge (Animated GIF)\nIndicates a looping animated GIF that plays inside the grid and inserts as an animation in your chat."
                         android:textColor="#FFFFFF"
                         android:textSize="12.5sp" />
                 </LinearLayout>
+            </LinearLayout>
+
+            <!-- Card 6: Search Quota, Usage Tracker & Optional API Key -->
+            <LinearLayout
+                android:id="@+id/card_quota"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/tv_quota_header"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Search Usage, Quotas &amp; Optional API Key"
+                    android:textColor="#2E6BD9"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <!-- Quantified Live Usage Box -->
+                <LinearLayout
+                    android:id="@+id/quota_stats_box"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:id="@+id/tv_quota_stats"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:lineSpacingExtra="3dp"
+                        android:text="Searches Today: 0  •  This Month: 0\nImages Inserted Today: 0 (0 search quota used)"
+                        android:textColor="#FFFFFF"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tv_quota_tier_note"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:lineSpacingExtra="2dp"
+                        android:text="Active Mode: Built-in Free Hybrid (G + ⚡) — Unlimited ($0)\nNote: Quotas are counted strictly PER SEARCH QUERY, never per image tapped! Tapping images/GIFs downloads directly from the host and uses 0 search quota."
+                        android:textColor="#B8C2D4"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <!-- Why Use an Optional API Key Explanation -->
+                <TextView
+                    android:id="@+id/tv_why_api_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="Why might someone want to use an API Key?"
+                    android:textColor="#2E6BD9"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/tv_api_key_label"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="Optional: Brave Search or SerpApi Key (Leave blank for 100% Free Hybrid Google + Instant Search)"
+                    android:layout_marginTop="4dp"
+                    android:lineSpacingExtra="2dp"
+                    android:text="The built-in Hybrid engine is 100% free and unlimited, so most users never need a key. However, if you use a heavy VPN or shared corporate Wi-Fi, Google's public web search can occasionally serve temporary IP CAPTCHAs. Adding a free Brave Search API key (2,000 free searches/month) or SerpApi key (100 free searches/month) bypasses web CAPTCHAs completely and fetches direct JSON in a single call."
                     android:textColor="#B8C2D4"
                     android:textSize="12sp" />
 
@@ -433,8 +511,8 @@
                     android:id="@+id/et_optional_api_key"
                     android:layout_width="match_parent"
                     android:layout_height="44dp"
-                    android:layout_marginTop="6dp"
-                    android:hint="Optional SerpApi or Brave API Key (Not required)"
+                    android:layout_marginTop="8dp"
+                    android:hint="Optional Brave or SerpApi Key (Leave blank for Free Hybrid)"
                     android:inputType="textNoSuggestions"
                     android:paddingHorizontal="12dp"
                     android:textSize="13sp" />
@@ -445,7 +523,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
                     android:backgroundTint="#2E6BD9"
-                    android:text="Save Preferences"
+                    android:text="Save API Key"
                     android:textAllCaps="false"
                     android:textColor="#FFFFFF"
                     android:textSize="12.5sp"
