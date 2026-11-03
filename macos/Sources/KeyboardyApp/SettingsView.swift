@@ -12,18 +12,18 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header Bar
+            // Top Navigation Bar
             HStack(spacing: 10) {
                 Button(action: onCloseSettings) {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 5) {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 12, weight: .bold))
-                        Text("Back to Search")
+                            .font(.system(size: 11.5, weight: .bold))
+                        Text("Back")
                             .font(.system(size: 12.5, weight: .bold))
                     }
                     .foregroundColor(palette.textPrimary)
                     .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
+                    .padding(.vertical, 5)
                     .background(palette.surfaceVariant)
                     .cornerRadius(8)
                     .overlay(
@@ -35,22 +35,29 @@ struct SettingsView: View {
 
                 Spacer()
 
-                Text("Keyboardy macOS Settings")
-                    .font(.system(size: 14, weight: .heavy))
+                Text("Keyboardy Settings")
+                    .font(.system(size: 14, weight: .black, design: .rounded))
                     .foregroundColor(palette.textPrimary)
 
                 Spacer()
 
-                Button(action: { prefs.isDarkMode.toggle() }) {
-                    Image(systemName: prefs.isDarkMode ? "sun.max.fill" : "moon.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(palette.accentBlue)
-                        .frame(width: 28, height: 28)
-                        .background(palette.surfaceVariant)
-                        .cornerRadius(8)
+                // Status Pill in Top Bar (Accessibility Ready vs Clipboard Mode)
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(prefs.isAccessibilityGranted ? palette.successGreen : Color.orange)
+                        .frame(width: 7, height: 7)
+                    Text(prefs.isAccessibilityGranted ? "AUTO-PASTE READY" : "CLIPBOARD MODE")
+                        .font(.system(size: 9.5, weight: .heavy))
+                        .foregroundColor(prefs.isAccessibilityGranted ? palette.successGreen : Color.orange)
                 }
-                .buttonStyle(.plain)
-                .help("Toggle Dark / Light Theme")
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background((prefs.isAccessibilityGranted ? palette.successGreen : Color.orange).opacity(0.14))
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke((prefs.isAccessibilityGranted ? palette.successGreen : Color.orange).opacity(0.5), lineWidth: 1)
+                )
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -59,215 +66,237 @@ struct SettingsView: View {
             Divider().background(palette.border)
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    // 1. STATUS BAR & TRIGGER CONFIGURATION CARD
-                    settingsCard(title: "1. Status Bar & Trigger Configuration") {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Menu Bar Icon Style (Updates Live):")
-                                .font(.system(size: 11.5, weight: .semibold))
-                                .foregroundColor(palette.textSecondary)
+                VStack(alignment: .leading, spacing: 16) {
 
-                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 6) {
-                                ForEach(StatusBarBadgeStyle.allCases) { style in
-                                    let isSelected = prefs.statusBarBadgeStyle == style
-                                    Button(action: { prefs.statusBarBadgeStyle = style }) {
-                                        Text(style.displayName)
-                                            .font(.system(size: 11.5, weight: .bold))
-                                            .foregroundColor(isSelected ? .white : palette.textPrimary)
-                                            .frame(maxWidth: .infinity)
-                                            .padding(.vertical, 6)
-                                            .background(isSelected ? palette.accentBlue : palette.surfaceVariant)
-                                            .cornerRadius(7)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 7)
-                                                    .stroke(isSelected ? Color.clear : palette.border, lineWidth: 1)
-                                            )
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-
-                            Divider().background(palette.border).padding(.vertical, 2)
-
-                            HStack {
-                                Text("Global Shortcut:")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(palette.textPrimary)
-                                Spacer()
-                                Picker("", selection: $prefs.hotkeyPreset) {
-                                    ForEach(HotkeyPreset.allCases) { preset in
-                                        if preset == .custom {
-                                            Text("Custom (\(prefs.customShortcutLabel))").tag(preset)
-                                        } else {
-                                            Text(preset.displayName).tag(preset)
-                                        }
+                    // =====================================================
+                    // SECTION 1: SHORTCUTS & TRIGGERS
+                    // =====================================================
+                    sectionGroup(header: "SHORTCUTS & TRIGGERS") {
+                        // Row 1: Global Shortcut Preset
+                        settingRow(
+                            title: "Global Keyboard Shortcut",
+                            subtitle: "Open or hide Keyboardy from any app"
+                        ) {
+                            Picker("", selection: $prefs.hotkeyPreset) {
+                                ForEach(HotkeyPreset.allCases) { preset in
+                                    if preset == .custom {
+                                        Text("Custom (\(prefs.customShortcutLabel))").tag(preset)
+                                    } else {
+                                        Text(preset.shortLabel == "Off" ? "Disabled" : "\(preset.shortLabel)").tag(preset)
                                     }
                                 }
-                                .labelsHidden()
-                                .frame(width: 225)
                             }
+                            .labelsHidden()
+                            .frame(width: 145)
+                        }
 
-                            HStack(spacing: 8) {
-                                Text("Or record your own key combo:")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(palette.textSecondary)
-                                Spacer()
-                                Button(action: {
-                                    prefs.isRecordingCustomShortcut.toggle()
-                                }) {
-                                    Text(prefs.isRecordingCustomShortcut
-                                         ? "Listening... Press keys now (Esc to cancel)"
-                                         : "Record Custom Shortcut (\(prefs.activeHotkeyShortLabel))")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 5)
-                                        .background(prefs.isRecordingCustomShortcut ? Color.orange : palette.accentBlue)
-                                        .cornerRadius(6)
-                                }
-                                .buttonStyle(.plain)
+                        rowDivider
+
+                        // Row 2: Custom Key Recorder
+                        settingRow(
+                            title: "Custom Shortcut Recorder",
+                            subtitle: prefs.isRecordingCustomShortcut
+                                ? "Press any modifier + key now (Esc to cancel)..."
+                                : "Active shortcut: \(prefs.activeHotkeyShortLabel)"
+                        ) {
+                            Button(action: {
+                                prefs.isRecordingCustomShortcut.toggle()
+                            }) {
+                                Text(prefs.isRecordingCustomShortcut ? "Listening..." : "Record Key Combo")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(prefs.isRecordingCustomShortcut ? Color.orange : palette.accentBlue)
+                                    .cornerRadius(6)
                             }
+                            .buttonStyle(.plain)
+                        }
 
-                            HStack {
-                                Text("Shortcut Window Mode:")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(palette.textPrimary)
-                                Spacer()
-                                Picker("", selection: $prefs.popupAnchorMode) {
-                                    ForEach(PopupAnchorMode.allCases) { mode in
-                                        Text(mode.displayName).tag(mode)
-                                    }
-                                }
-                                .labelsHidden()
-                                .frame(width: 225)
+                        rowDivider
+
+                        // Row 3: Window Position on Shortcut
+                        settingRow(
+                            title: "Shortcut Window Position",
+                            subtitle: "Where Keyboardy appears when triggered via shortcut"
+                        ) {
+                            Picker("", selection: $prefs.popupAnchorMode) {
+                                Text("Menu Bar Popover").tag(PopupAnchorMode.statusBarPopover)
+                                Text("Center Spotlight HUD").tag(PopupAnchorMode.floatingCenterHud)
+                                Text("Near Mouse Cursor").tag(PopupAnchorMode.nearMouseCursor)
                             }
+                            .labelsHidden()
+                            .frame(width: 165)
+                        }
 
-                            Toggle(isOn: $prefs.autoReadSelectedOrChatText) {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Zero-Typing Mode: Auto-Read Active Selection / Chat Input")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundColor(palette.textPrimary)
-                                    Text("When triggered via shortcut, automatically searches words you highlighted or typed in chat.")
-                                        .font(.system(size: 10.5))
+                        rowDivider
+
+                        // Row 4: Zero-Typing Mode
+                        settingToggleRow(
+                            title: "Zero-Typing Mode (Auto-Read Chat / Selection)",
+                            subtitle: "Automatically searches text highlighted or typed in your active chat box",
+                            isOn: $prefs.autoReadSelectedOrChatText
+                        )
+
+                        rowDivider
+
+                        // Row 5: Inline Text Prefix Trigger
+                        VStack(spacing: 8) {
+                            settingToggleRow(
+                                title: "Inline Text Prefix Trigger",
+                                subtitle: "Pop open Keyboardy automatically when you type a prefix anywhere",
+                                isOn: $prefs.inlineTriggerEnabled
+                            )
+
+                            if prefs.inlineTriggerEnabled {
+                                HStack {
+                                    Text("Trigger Prefix String:")
+                                        .font(.system(size: 11, weight: .medium))
                                         .foregroundColor(palette.textSecondary)
-                                }
-                            }
-                            .toggleStyle(.checkbox)
-
-                            Toggle(isOn: $prefs.inlineTriggerEnabled) {
-                                HStack(spacing: 8) {
-                                    Text("Inline Text Prefix Trigger:")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundColor(palette.textPrimary)
+                                    Spacer()
                                     TextField("//gif ", text: $prefs.inlineTriggerPrefix)
                                         .textFieldStyle(.roundedBorder)
-                                        .frame(width: 80)
-                                        .font(.system(size: 11.5, design: .monospaced))
-                                    Text("(Type anywhere to pop open)")
-                                        .font(.system(size: 10.5))
-                                        .foregroundColor(palette.textSecondary)
+                                        .frame(width: 110)
+                                        .font(.system(size: 11.5, weight: .bold, design: .monospaced))
                                 }
+                                .padding(.top, 2)
                             }
-                            .toggleStyle(.checkbox)
                         }
                     }
 
-                    // 2. IMAGE INSERTION & ACCESSIBILITY CARD
-                    settingsCard(title: "2. Image Insertion & Auto-Paste") {
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                Text("On Image Click / Return:")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(palette.textPrimary)
-                                Spacer()
-                                Picker("", selection: $prefs.insertBehaviorMode) {
-                                    ForEach(InsertBehaviorMode.allCases) { mode in
-                                        Text(mode.displayName).tag(mode)
-                                    }
-                                }
-                                .labelsHidden()
-                                .frame(width: 245)
+                    // =====================================================
+                    // SECTION 2: IMAGE INSERTION & PERMISSIONS
+                    // =====================================================
+                    sectionGroup(header: "IMAGE INSERTION & PERMISSIONS") {
+                        // Row 1: Accessibility Permission
+                        settingRow(
+                            title: prefs.isAccessibilityGranted
+                                ? "Accessibility Permission Enabled"
+                                : "Enable Accessibility for 1-Step Auto-Paste",
+                            subtitle: prefs.isAccessibilityGranted
+                                ? "Keyboardy can directly paste (⌘V) into Slack, Messages, and Discord"
+                                : "Required so Keyboardy can send ⌘V automatically into your active chat"
+                        ) {
+                            Button(action: {
+                                prefs.isAccessibilityGranted = ImageCommitService.shared.isAccessibilityTrusted(promptIfNeeded: true)
+                            }) {
+                                Text(prefs.isAccessibilityGranted ? "Recheck" : "Grant Access")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(prefs.isAccessibilityGranted ? palette.surfaceVariant : palette.accentBlue)
+                                    .cornerRadius(6)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .stroke(palette.border, lineWidth: prefs.isAccessibilityGranted ? 1 : 0)
+                                    )
                             }
-
-                            Toggle(isOn: $prefs.restoreClipboardAfterAutoPaste) {
-                                Text("Restore previous text clipboard 450ms after auto-pasting")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(palette.textPrimary)
-                            }
-                            .toggleStyle(.checkbox)
-
-                            // Accessibility Permission Status Banner
-                            HStack(spacing: 10) {
-                                Circle()
-                                    .fill(prefs.isAccessibilityGranted ? palette.successGreen : Color.orange)
-                                    .frame(width: 9, height: 9)
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(prefs.isAccessibilityGranted
-                                         ? "Accessibility Enabled — Direct Auto-Paste (⌘V) Ready"
-                                         : "Accessibility Needed for 1-Step Auto-Paste (Currently Copies to Clipboard)")
-                                        .font(.system(size: 11.5, weight: .bold))
-                                        .foregroundColor(palette.textPrimary)
-                                    Text("Allows Keyboardy to synthesize ⌘V into Slack/Messages/Discord and read selected text.")
-                                        .font(.system(size: 10.5))
-                                        .foregroundColor(palette.textSecondary)
-                                }
-
-                                Spacer()
-
-                                Button(action: {
-                                    prefs.isAccessibilityGranted = ImageCommitService.shared.isAccessibilityTrusted(promptIfNeeded: true)
-                                }) {
-                                    Text(prefs.isAccessibilityGranted ? "Recheck" : "Grant Access")
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 5)
-                                        .background(palette.accentBlue)
-                                        .cornerRadius(6)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                            .padding(10)
-                            .background(palette.surfaceVariant)
-                            .cornerRadius(8)
+                            .buttonStyle(.plain)
                         }
+
+                        rowDivider
+
+                        // Row 2: Click / Return Behavior
+                        settingRow(
+                            title: "When Clicking or Pressing Return",
+                            subtitle: "Choose whether to paste immediately or only copy to clipboard"
+                        ) {
+                            Picker("", selection: $prefs.insertBehaviorMode) {
+                                Text("Auto-Paste (⌘V)").tag(InsertBehaviorMode.autoPasteIntoApp)
+                                Text("Copy to Clipboard").tag(InsertBehaviorMode.copyToClipboardOnly)
+                            }
+                            .labelsHidden()
+                            .frame(width: 155)
+                        }
+
+                        rowDivider
+
+                        // Row 3: Restore Clipboard
+                        settingToggleRow(
+                            title: "Preserve Text Clipboard After Auto-Paste",
+                            subtitle: "Restores your previous copied text 450ms after inserting an image",
+                            isOn: $prefs.restoreClipboardAfterAutoPaste
+                        )
                     }
 
-                    // 3. SEARCH ENGINE, SAFESEARCH & USAGE STATS CARD
-                    settingsCard(title: "3. Hybrid Search Engine & Usage Quota") {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Toggle(isOn: $prefs.nsfwModeEnabled) {
-                                Text("Unfiltered / NSFW Search Mode (SafeSearch Off)")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(palette.textPrimary)
-                            }
-                            .toggleStyle(.checkbox)
+                    // =====================================================
+                    // SECTION 3: APPEARANCE & SEARCH ENGINE
+                    // =====================================================
+                    sectionGroup(header: "APPEARANCE & SEARCH ENGINE") {
+                        // Row 1: Menu Bar Icon Style (4-pill segmented bar)
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text("Menu Bar Icon Style")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(palette.textPrimary)
 
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Searches Today: \(prefs.searchesToday)   •   This Month: \(prefs.searchesThisMonth)")
-                                    .font(.system(size: 11.5, weight: .bold))
-                                    .foregroundColor(palette.textPrimary)
-                                Text("Images Inserted Today: \(prefs.imagesInsertedToday)   •   All-Time: \(prefs.imagesInsertedTotal) (0 API quota used)")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(palette.textSecondary)
-                                Text("Active Engine: \(prefs.engineMode.displayName) — 100% Free Unlimited")
-                                    .font(.system(size: 10.5, weight: .semibold))
-                                    .foregroundColor(palette.accentBlue)
+                            HStack(spacing: 6) {
+                                badgeOptionButton(.keyboardyAppIcon, label: "App Icon")
+                                badgeOptionButton(.gifBluePill, label: "Blue GiF")
+                                badgeOptionButton(.gifMonochrome, label: "Mono GiF")
+                                badgeOptionButton(.kbBluePill, label: "Blue KB")
                             }
-                            .padding(10)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(palette.surfaceVariant)
-                            .cornerRadius(8)
+                        }
 
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Optional SerpApi or Brave Search API Key (Leave blank for 100% free Hybrid):")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(palette.textSecondary)
-                                TextField("Paste optional SerpApi or Brave API key...", text: $prefs.optionalApiKey)
-                                    .textFieldStyle(.roundedBorder)
-                                    .font(.system(size: 11.5, design: .monospaced))
+                        rowDivider
+
+                        // Row 2: Dark / Light Mode
+                        settingToggleRow(
+                            title: "Dark Mode Theme",
+                            subtitle: "Switch between Lagatron Cobalt Dark and Warm Linen Light",
+                            isOn: $prefs.isDarkMode
+                        )
+
+                        rowDivider
+
+                        // Row 3: Default Search Engine Mode
+                        settingRow(
+                            title: "Search Engine Mode",
+                            subtitle: "Hybrid combines Instant Web (⚡) with Google Images WebView (G)"
+                        ) {
+                            Picker("", selection: $prefs.engineMode) {
+                                ForEach(SearchEngineMode.allCases) { mode in
+                                    Text(mode.displayName).tag(mode)
+                                }
                             }
+                            .labelsHidden()
+                            .frame(width: 165)
+                        }
+
+                        rowDivider
+
+                        // Row 4: Unfiltered / NSFW Mode
+                        settingToggleRow(
+                            title: "Unfiltered Search (SafeSearch Off)",
+                            subtitle: "Disable SafeSearch filtering on Google Images and Instant Web",
+                            isOn: $prefs.nsfwModeEnabled
+                        )
+                    }
+
+                    // =====================================================
+                    // SECTION 4: USAGE QUOTA & OPTIONAL API KEY
+                    // =====================================================
+                    sectionGroup(header: "USAGE STATS & OPTIONAL API KEY") {
+                        HStack(spacing: 8) {
+                            statMetricBox(value: "\(prefs.searchesToday)", label: "Searches Today")
+                            statMetricBox(value: "\(prefs.searchesThisMonth)", label: "This Month")
+                            statMetricBox(value: "\(prefs.imagesInsertedToday)", label: "Inserted Today")
+                            statMetricBox(value: "\(prefs.imagesInsertedTotal)", label: "All-Time")
+                        }
+
+                        rowDivider
+
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text("Optional SerpApi or Brave Search API Key")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(palette.textPrimary)
+                            Text("Leave blank to use the 100% free built-in Hybrid (G + ⚡) engine with unlimited searches.")
+                                .font(.system(size: 10.5))
+                                .foregroundColor(palette.textSecondary)
+                            TextField("Optional API key (leave empty for free unlimited Hybrid)...", text: $prefs.optionalApiKey)
+                                .textFieldStyle(.roundedBorder)
+                                .font(.system(size: 11.5, design: .monospaced))
+                                .padding(.top, 2)
                         }
                     }
                 }
@@ -280,20 +309,108 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Reusable Cohesive Setting Components
+
+    private var rowDivider: some View {
+        Divider()
+            .background(palette.border.opacity(0.65))
+            .padding(.vertical, 2)
+    }
+
     @ViewBuilder
-    private func settingsCard<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.system(size: 12.5, weight: .heavy))
+    private func sectionGroup<Content: View>(header: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(header)
+                .font(.system(size: 10.5, weight: .heavy))
+                .tracking(0.8)
                 .foregroundColor(palette.accentBlue)
-            content()
+                .padding(.leading, 4)
+
+            VStack(alignment: .leading, spacing: 10) {
+                content()
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(palette.surface)
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(palette.border, lineWidth: 1)
+            )
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(palette.surface)
-        .cornerRadius(12)
+    }
+
+    @ViewBuilder
+    private func settingRow<Control: View>(
+        title: String,
+        subtitle: String,
+        @ViewBuilder control: () -> Control
+    ) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(palette.textPrimary)
+                Text(subtitle)
+                    .font(.system(size: 10.5))
+                    .foregroundColor(palette.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            control()
+        }
+    }
+
+    @ViewBuilder
+    private func settingToggleRow(
+        title: String,
+        subtitle: String,
+        isOn: Binding<Bool>
+    ) -> some View {
+        settingRow(title: title, subtitle: subtitle) {
+            Toggle("", isOn: isOn)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+        }
+    }
+
+    @ViewBuilder
+    private func badgeOptionButton(_ style: StatusBarBadgeStyle, label: String) -> some View {
+        let isSelected = prefs.statusBarBadgeStyle == style
+        Button(action: { prefs.statusBarBadgeStyle = style }) {
+            Text(label)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(isSelected ? .white : palette.textPrimary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .background(isSelected ? palette.accentBlue : palette.surfaceVariant)
+                .cornerRadius(7)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7)
+                        .stroke(isSelected ? Color.clear : palette.border, lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func statMetricBox(value: String, label: String) -> some View {
+        VStack(spacing: 2) {
+            Text(value)
+                .font(.system(size: 15, weight: .black, design: .rounded))
+                .foregroundColor(palette.accentBlue)
+            Text(label)
+                .font(.system(size: 9.5, weight: .semibold))
+                .foregroundColor(palette.textSecondary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 7)
+        .background(palette.surfaceVariant)
+        .cornerRadius(8)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 8)
                 .stroke(palette.border, lineWidth: 1)
         )
     }

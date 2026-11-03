@@ -36,6 +36,21 @@ We publish independent per-platform releases so Android and macOS can evolve at 
 
 ---
 
+## 🗺️ Codebase Architecture & 1-to-1 Platform Mapping
+
+Both platforms live in this repository (`app/` for Android and `macos/` for macOS) and share a 1-to-1 architectural mapping:
+
+| Feature Area | Android (`app/src/main/java/com/medusko/keyboardy/...`) | macOS (`macos/Sources/...`) |
+| :--- | :--- | :--- |
+| **Search & Scrapers** | [`ImageSearchRepository.kt`](app/src/main/java/com/medusko/keyboardy/search/ImageSearchRepository.kt) & [`SearchParsers.kt`](app/src/main/java/com/medusko/keyboardy/search/SearchParsers.kt) | [`ImageSearchRepository.swift`](macos/Sources/KeyboardyCore/ImageSearchRepository.swift) & [`SearchParsers.swift`](macos/Sources/KeyboardyCore/SearchParsers.swift) |
+| **Headless Google JS** | [`HeadlessGoogleWebViewSearcher.kt`](app/src/main/java/com/medusko/keyboardy/search/HeadlessGoogleWebViewSearcher.kt) | [`HeadlessGoogleWebViewSearcher.swift`](macos/Sources/KeyboardyCore/HeadlessGoogleWebViewSearcher.swift) |
+| **Filters & Models** | [`ImageResult.kt`](app/src/main/java/com/medusko/keyboardy/search/ImageResult.kt) | [`ImageResult.swift`](macos/Sources/KeyboardyCore/ImageResult.swift) |
+| **Image Insertion** | [`ImageCommitHelper.kt`](app/src/main/java/com/medusko/keyboardy/ime/ImageCommitHelper.kt) | [`ImageCommitService.swift`](macos/Sources/KeyboardyCore/ImageCommitService.swift) |
+| **Settings & Prefs** | [`KeyboardyPrefs.kt`](app/src/main/java/com/medusko/keyboardy/prefs/KeyboardyPrefs.kt) & [`MainActivity.kt`](app/src/main/java/com/medusko/keyboardy/MainActivity.kt) | [`KeyboardyPrefs.swift`](macos/Sources/KeyboardyCore/KeyboardyPrefs.swift) & [`SettingsView.swift`](macos/Sources/KeyboardyApp/SettingsView.swift) |
+| **Picker Grid & Theme** | [`KeyboardyImeService.kt`](app/src/main/java/com/medusko/keyboardy/ime/KeyboardyImeService.kt) & [`ThemePalette.kt`](app/src/main/java/com/medusko/keyboardy/theme/ThemePalette.kt) | [`KeyboardyPickerView.swift`](macos/Sources/KeyboardyApp/KeyboardyPickerView.swift) & [`ThemePalette.swift`](macos/Sources/KeyboardyApp/ThemePalette.swift) |
+
+---
+
 ## Building From Source
 
 ### 1. Android (`app/`)

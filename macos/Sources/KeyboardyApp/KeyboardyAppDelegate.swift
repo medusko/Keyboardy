@@ -81,7 +81,7 @@ final class KeyboardyAppDelegate: NSObject, NSApplicationDelegate {
         let rootView = KeyboardyPickerView(viewModel: viewModel, prefs: prefs)
         let hostingController = NSHostingController(rootView: rootView)
 
-        popover.contentSize = NSSize(width: 480, height: 540)
+        popover.contentSize = NSSize(width: 500, height: 550)
         popover.behavior = .transient
         popover.animates = true
         popover.contentViewController = hostingController
@@ -89,7 +89,7 @@ final class KeyboardyAppDelegate: NSObject, NSApplicationDelegate {
         let panelView = KeyboardyPickerView(viewModel: viewModel, prefs: prefs)
         let panelHosting = NSHostingController(rootView: panelView)
         let panel = FloatingHudPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 540),
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: 550),
             styleMask: [.titled, .fullSizeContentView, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -244,7 +244,7 @@ final class KeyboardyAppDelegate: NSObject, NSApplicationDelegate {
         viewModel.prepareForPanelOpen(capturedApp: lastExternalApp, initialQueryOverride: initialQueryOverride)
 
         guard let panel = floatingPanel else { return }
-        let panelSize = NSSize(width: 480, height: 540)
+        let panelSize = NSSize(width: 500, height: 550)
 
         if nearCursor {
             let mouseLoc = NSEvent.mouseLocation

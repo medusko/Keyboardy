@@ -33,7 +33,7 @@ struct KeyboardyPickerView: View {
                 mainSearchContent
             }
         }
-        .frame(width: 480, height: 540)
+        .frame(width: 500, height: 550)
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 isSearchFieldFocused = true
@@ -43,17 +43,25 @@ struct KeyboardyPickerView: View {
 
     private var mainSearchContent: some View {
         VStack(spacing: 0) {
-            // 1. TOP SEARCH & ACTION BAR
+            // 1. TOP SEARCH & ACTION BAR (App Title on the Left + Search Bar + Action Buttons)
             HStack(spacing: 8) {
+                // App Title to the left of the Search Bar
+                Text("Keyboardy")
+                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .foregroundColor(palette.textPrimary)
+                    .fixedSize()
+                    .padding(.leading, 2)
+                    .padding(.trailing, 2)
+
                 // Search Bar Pill
                 HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 12.5, weight: .semibold))
                         .foregroundColor(palette.textSecondary)
 
                     TextField("Search Google Images, GIFs, Memes...", text: $viewModel.searchQuery)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 13.5, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundColor(palette.textPrimary)
                         .focused($isSearchFieldFocused)
                         .onChange(of: viewModel.searchQuery) { newValue in
@@ -66,7 +74,7 @@ struct KeyboardyPickerView: View {
                     if viewModel.isSearching {
                         ProgressView()
                             .scaleEffect(0.55)
-                            .frame(width: 16, height: 16)
+                            .frame(width: 15, height: 15)
                     }
 
                     if !viewModel.searchQuery.isEmpty {
@@ -82,7 +90,7 @@ struct KeyboardyPickerView: View {
                     }
                 }
                 .padding(.horizontal, 10)
-                .padding(.vertical, 7)
+                .padding(.vertical, 6)
                 .background(palette.surface)
                 .cornerRadius(18)
                 .overlay(
@@ -142,7 +150,7 @@ struct KeyboardyPickerView: View {
                         )
                 }
                 .buttonStyle(.plain)
-                .help("Trigger & Insertion Settings")
+                .help("Settings")
             }
             .padding(.horizontal, 12)
             .padding(.top, 10)
@@ -345,7 +353,6 @@ struct KeyboardyPickerView: View {
                     .frame(height: 116)
                     .clipped()
 
-                // Top-left shortcut badge for first 9 items (⌘1..⌘9) and Top-right GIF badge
                 VStack {
                     HStack {
                         if index < 9 {
