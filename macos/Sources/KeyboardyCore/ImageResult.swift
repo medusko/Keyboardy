@@ -101,21 +101,36 @@ public enum SearchEngineMode: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Configurable Menu Bar / Status Bar badge style
-public enum StatusBarBadgeStyle: String, CaseIterable, Identifiable, Sendable {
-    case keyboardyAppIcon = "KEYBOARDY_APP_ICON"
-    case gifBluePill = "GIF_BLUE_PILL"
-    case gifMonochrome = "GIF_MONOCHROME"
-    case kbBluePill = "KB_BLUE_PILL"
+/// App Theme Mode: follows macOS System settings or forces Dark / Light mode.
+public enum AppThemeMode: String, CaseIterable, Identifiable, Sendable {
+    case system = "SYSTEM"
+    case dark = "DARK"
+    case light = "LIGHT"
 
     public var id: String { rawValue }
 
     public var displayName: String {
         switch self {
-        case .keyboardyAppIcon: return "Keyboardy App Icon (Default)"
-        case .gifBluePill: return "Blue GiF Badge"
-        case .gifMonochrome: return "Minimal GiF Pill"
-        case .kbBluePill: return "Blue KB Badge"
+        case .system: return "System (Auto)"
+        case .dark: return "Dark"
+        case .light: return "Light"
+        }
+    }
+}
+
+/// Configurable Menu Bar / Status Bar icon style: Original Color App Icon, White Icon, or Black Icon.
+public enum StatusBarBadgeStyle: String, CaseIterable, Identifiable, Sendable {
+    case keyboardyAppIcon = "KEYBOARDY_APP_ICON"
+    case keyboardyWhiteIcon = "KEYBOARDY_WHITE_ICON"
+    case keyboardyBlackIcon = "KEYBOARDY_BLACK_ICON"
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .keyboardyAppIcon: return "App Icon"
+        case .keyboardyWhiteIcon: return "White Icon"
+        case .keyboardyBlackIcon: return "Black Icon"
         }
     }
 }

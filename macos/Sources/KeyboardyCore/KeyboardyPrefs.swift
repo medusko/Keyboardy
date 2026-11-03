@@ -1,3 +1,4 @@
+import AppKit
 import Carbon
 import Combine
 import Foundation
@@ -7,13 +8,33 @@ public final class KeyboardyPrefs: ObservableObject {
     public static let shared = KeyboardyPrefs()
 
     private let defaults: UserDefaults
+    private var isUpdatingThemeInternally = false
+
+    @Published public var themeMode: AppThemeMode {
+        didSet {
+            defaults.set(themeMode.rawValue, forKey: Keys.themeMode)
+            guard !isUpdatingThemeInternally else { return }
+            applyThemeMode(themeMode, syncIcon: true)
+        }
+    }
 
     @Published public var isDarkMode: Bool {
-        didSet { defaults.set(isDarkMode, forKey: Keys.isDarkMode) }
+        didSet {
+            defaults.set(isDarkMode, forKey: Keys.isDarkMode)
+            guard !isUpdatingThemeInternally else { return }
+            // If user toggled Dark Mode directly (e.g. via switch or top-bar button), update themeMode & sync icon
+            isUpdatingThemeInternally = true
+            themeMode = isDarkMode ? .dark : .light
+            defaults.set(themeMode.rawValue, forKey: Keys.themeMode)
+            statusBarBadgeStyle = isDarkMode ? .keyboardyWhiteIcon : .keyboardyBlackIcon
+            isUpdatingThemeInternally = false
+        }
     }
 
     @Published public var statusBarBadgeStyle: StatusBarBadgeStyle {
-        didSet { defaults.set(statusBarBadgeStyle.rawValue, forKey: Keys.statusBarBadgeStyle) }
+        didSet {
+            defaults.set(statusBarBadgeStyle.rawValue, forKey: Keys.statusBarBadgeStyle)
+        }
     }
 
     @Published public var hotkeyPreset: HotkeyPreset {
@@ -87,14 +108,31 @@ public final class KeyboardyPrefs: ObservableObject {
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
 
-        if defaults.object(forKey: Keys.isDarkMode) == nil {
-            self.isDarkMode = true
-        } else {
-            self.isDarkMode = defaults.bool(forKey: Keys.isDarkMode)
-        }
+        let systemDark = Self.detectSystemDarkMode()
+        let savedThemeRaw = defaults.string(forKey: Keys.themeMode) ?? AppThemeMode.system.rawValue
+        let initialThemeMode = AppThemeMode(rawValue: savedThemeRaw) ?? .system
+        self.themeMode = initialThemeMode
 
-        let badgeRaw = defaults.string(forKey: Keys.statusBarBadgeStyle) ?? StatusBarBadgeStyle.keyboardyAppIcon.rawValue
-        self.statusBarBadgeStyle = StatusBarBadgeStyle(rawValue: badgeRaw) ?? .keyboardyAppIcon
+        let effectiveDark: Bool
+        switch initialThemeMode {
+        case .system:
+            effectiveDark = systemDark
+        case .dark:
+            effectiveDark = true
+        case .light:
+            effectiveDark = false
+        }
+        self.isDarkMode = effectiveDark
+
+        // Select icon based on system/app mode by default (White Icon in Dark mode, Black Icon in Light mode),
+        // or restore the user's explicit choice if saved under v3.
+        let defaultIconForMode: StatusBarBadgeStyle = effectiveDark ? .keyboardyWhiteIcon : .keyboardyBlackIcon
+        if let badgeRaw = defaults.string(forKey: Keys.statusBarBadgeStyle),
+           let savedStyle = StatusBarBadgeStyle(rawValue: badgeRaw) {
+            self.statusBarBadgeStyle = savedStyle
+        } else {
+            self.statusBarBadgeStyle = defaultIconForMode
+        }
 
         // Default to ⌥⇧Space (Option + Shift + Space) so it never conflicts with Gemini (⌥Space) or Spotlight (⌘Space)
         let hotkeyRaw = defaults.string(forKey: Keys.hotkeyPreset) ?? HotkeyPreset.optShiftSpace.rawValue
@@ -141,6 +179,47 @@ public final class KeyboardyPrefs: ObservableObject {
 
         self.searchHistory = Self.loadHistory(from: defaults)
         refreshCounters()
+        observeSystemAppearanceChanges()
+    }
+
+    public static func detectSystemDarkMode() -> Bool {
+        if let style = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") {
+            return style.caseInsensitiveCompare("Dark") == .orderedSame
+        }
+        return false
+    }
+
+    public func applyThemeMode(_ mode: AppThemeMode, syncIcon: Bool) {
+        isUpdatingThemeInternally = true
+        let targetDark: Bool
+        switch mode {
+        case .system:
+            targetDark = Self.detectSystemDarkMode()
+        case .dark:
+            targetDark = true
+        case .light:
+            targetDark = false
+        }
+        isDarkMode = targetDark
+        if syncIcon {
+            statusBarBadgeStyle = targetDark ? .keyboardyWhiteIcon : .keyboardyBlackIcon
+        }
+        isUpdatingThemeInternally = false
+    }
+
+    private func observeSystemAppearanceChanges() {
+        DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("AppleInterfaceThemeChangedNotification"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self = self else { return }
+                if self.themeMode == .system {
+                    self.applyThemeMode(.system, syncIcon: true)
+                }
+            }
+        }
     }
 
     public func saveCustomRecordedShortcut(keyCode: UInt32, carbonModifiers: UInt32, displayLabel: String) {
@@ -236,8 +315,9 @@ public final class KeyboardyPrefs: ObservableObject {
     }
 
     private enum Keys {
-        static let isDarkMode = "mac_is_dark_mode"
-        static let statusBarBadgeStyle = "mac_status_bar_badge_style_v2"
+        static let themeMode = "mac_theme_mode_v3"
+        static let isDarkMode = "mac_is_dark_mode_v3"
+        static let statusBarBadgeStyle = "mac_status_bar_badge_style_v3"
         static let hotkeyPreset = "mac_hotkey_preset_v2"
         static let customKeyCode = "mac_custom_key_code"
         static let customCarbonModifiers = "mac_custom_carbon_modifiers"

@@ -1,41 +1,53 @@
 import AppKit
+import CoreGraphics
 import KeyboardyCore
 
 enum StatusBarBadgeRenderer {
 
-    /// Generates a crisp Retina menu bar image for the selected `StatusBarBadgeStyle`.
+    private static var cachedAppIcon: NSImage?
+    private static var cachedWhiteIcon: NSImage?
+    private static var cachedBlackIcon: NSImage?
+
+    /// Generates a crisp Retina 20x20 pt menu bar image for the selected `StatusBarBadgeStyle`.
     static func makeStatusBarImage(style: StatusBarBadgeStyle) -> NSImage {
         switch style {
         case .keyboardyAppIcon:
-            return drawKeyboardyAppIcon()
-        case .gifBluePill:
-            return drawPillBadge(text: "GiF", fillColor: NSColor(calibratedRed: 0.08, green: 0.51, blue: 0.94, alpha: 1.0), drawBullseyeDot: true)
-        case .gifMonochrome:
-            let img = drawMonochromePill(text: "GiF")
-            img.isTemplate = true
+            if let cached = cachedAppIcon { return cached }
+            let img = drawColorAppIcon()
+            cachedAppIcon = img
             return img
-        case .kbBluePill:
-            return drawPillBadge(text: "KB", fillColor: NSColor(calibratedRed: 0.18, green: 0.42, blue: 0.85, alpha: 1.0), drawBullseyeDot: false)
+
+        case .keyboardyWhiteIcon:
+            if let cached = cachedWhiteIcon { return cached }
+            let img = drawMonochromeKeyboardyIcon(isWhite: true)
+            cachedWhiteIcon = img
+            return img
+
+        case .keyboardyBlackIcon:
+            if let cached = cachedBlackIcon { return cached }
+            let img = drawMonochromeKeyboardyIcon(isWhite: false)
+            cachedBlackIcon = img
+            return img
         }
     }
 
-    /// Loads the selected Android Keyboardy App Icon (`StatusBarIcon.png` / `AppIcon.icns`) and renders it as a crisp 20x20 macOS Menu Bar icon.
-    private static func drawKeyboardyAppIcon() -> NSImage {
-        let sourceImage: NSImage? = {
-            if let resourceURL = Bundle.main.url(forResource: "StatusBarIcon", withExtension: "png"),
-               let img = NSImage(contentsOf: resourceURL) {
-                return img
-            }
-            if let icnsURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
-               let img = NSImage(contentsOf: icnsURL) {
-                return img
-            }
-            return NSApp?.applicationIconImage
-        }()
+    private static func loadSourcePngImage() -> NSImage? {
+        if let resourceURL = Bundle.main.url(forResource: "StatusBarIcon", withExtension: "png"),
+           let img = NSImage(contentsOf: resourceURL) {
+            return img
+        }
+        if let icnsURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+           let img = NSImage(contentsOf: icnsURL) {
+            return img
+        }
+        return NSApp?.applicationIconImage
+    }
 
+    /// Renders the original full-color Android Keyboardy App Icon (`StatusBarIcon.png`).
+    private static func drawColorAppIcon() -> NSImage {
         let targetSize = NSSize(width: 20, height: 20)
-        guard let rawIcon = sourceImage else {
-            return drawPillBadge(text: "KB", fillColor: NSColor(calibratedRed: 0.18, green: 0.42, blue: 0.85, alpha: 1.0), drawBullseyeDot: false)
+        guard let rawIcon = loadSourcePngImage() else {
+            return drawVectorKeyboardyIcon(isWhite: true)
         }
 
         let rendered = NSImage(size: targetSize, flipped: false) { rect in
@@ -54,89 +66,146 @@ enum StatusBarBadgeRenderer {
         return rendered
     }
 
-    /// Draws the bright blue "GiF" badge (complete with the stylized bullseye dot over the 'i').
-    private static func drawPillBadge(text: String, fillColor: NSColor, drawBullseyeDot: Bool) -> NSImage {
-        let size = NSSize(width: 34, height: 18)
-        let image = NSImage(size: size, flipped: false) { rect in
-            let pillRect = rect.insetBy(dx: 0.5, dy: 0.5)
-            let path = NSBezierPath(roundedRect: pillRect, xRadius: 3.5, yRadius: 3.5)
-            fillColor.setFill()
-            path.fill()
+    /// Produces a crisp White or Black version of the Keyboardy App Icon by converting the source icon's
+    /// cyan/blue hologram + keyboard artwork into a high-contrast White or Black monochrome icon
+    /// (with vector fallback if the PNG resource is unavailable).
+    private static func drawMonochromeKeyboardyIcon(isWhite: Bool) -> NSImage {
+        guard let rawIcon = loadSourcePngImage(),
+              let cgSource = rawIcon.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            return drawVectorKeyboardyIcon(isWhite: isWhite)
+        }
 
-            let font = NSFont.systemFont(ofSize: 12.5, weight: .heavy)
-            let paragraph = NSMutableParagraphStyle()
-            paragraph.alignment = .center
+        let pxWidth = 44
+        let pxHeight = 44
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
 
-            let attrs: [NSAttributedString.Key: Any] = [
-                .font: font,
-                .foregroundColor: NSColor.white,
-                .paragraphStyle: paragraph,
-                .kern: 0.3
-            ]
+        guard let ctx = CGContext(
+            data: nil,
+            width: pxWidth,
+            height: pxHeight,
+            bitsPerComponent: 8,
+            bytesPerRow: pxWidth * 4,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo
+        ), let dataPtr = ctx.data else {
+            return drawVectorKeyboardyIcon(isWhite: isWhite)
+        }
 
-            let displayStr = drawBullseyeDot ? "GıF" : text
-            let attrStr = NSAttributedString(string: displayStr, attributes: attrs)
-            let strSize = attrStr.size()
-            let textRect = NSRect(
-                x: (rect.width - strSize.width) / 2.0,
-                y: (rect.height - strSize.height) / 2.0 - 0.5,
-                width: strSize.width,
-                height: strSize.height
-            )
-            attrStr.draw(in: textRect)
+        ctx.interpolationQuality = .high
+        ctx.draw(cgSource, in: CGRect(x: 0, y: 0, width: pxWidth, height: pxHeight))
 
-            if drawBullseyeDot {
-                let centerX = rect.midX + 0.8
-                let centerY = rect.height - 4.3
-                let outerRing = NSBezierPath(
-                    ovalIn: NSRect(x: centerX - 2.2, y: centerY - 2.2, width: 4.4, height: 4.4)
-                )
-                outerRing.lineWidth = 1.0
-                NSColor.white.setStroke()
-                outerRing.stroke()
+        let pixels = dataPtr.bindMemory(to: UInt8.self, capacity: pxWidth * pxHeight * 4)
 
-                let innerDot = NSBezierPath(
-                    ovalIn: NSRect(x: centerX - 0.8, y: centerY - 0.8, width: 1.6, height: 1.6)
-                )
-                NSColor.white.setFill()
-                innerDot.fill()
+        // Transform the glowing cyan/blue foreground artwork of ic_app_option_1.png into a crisp
+        // pure White or pure Black monochrome version on a matching contrast squircle badge.
+        for i in 0..<(pxWidth * pxHeight) {
+            let offset = i * 4
+            let g = Float(pixels[offset + 1])
+            let b = Float(pixels[offset + 2])
+            let a = Float(pixels[offset + 3]) / 255.0
+
+            if a < 0.08 {
+                pixels[offset] = 0
+                pixels[offset + 1] = 0
+                pixels[offset + 2] = 0
+                pixels[offset + 3] = 0
+                continue
             }
 
+            // In ic_app_option_1.png, the dark squircle background has B ~ 18..28,
+            // while the keyboard keys and hologram picture frame have B ~ 90..255.
+            let signal = max(g, b)
+            // Normalize foreground intensity with S-curve contrast boost
+            let norm = min(max((signal - 38.0) / 155.0, 0.0), 1.0)
+            let boosted = norm * norm * (3.0 - 2.0 * norm)
+
+            if isWhite {
+                // White Version: Pure white foreground (#FFFFFF) on a sleek dark charcoal squircle (#14171F)
+                let bgR: Float = 20.0
+                let bgG: Float = 23.0
+                let bgB: Float = 31.0
+                let outR = bgR + boosted * (255.0 - bgR)
+                let outG = bgG + boosted * (255.0 - bgG)
+                let outB = bgB + boosted * (255.0 - bgB)
+
+                pixels[offset]     = UInt8(min(max(outR * a, 0), 255))
+                pixels[offset + 1] = UInt8(min(max(outG * a, 0), 255))
+                pixels[offset + 2] = UInt8(min(max(outB * a, 0), 255))
+                pixels[offset + 3] = UInt8(min(max(a * 255.0, 0), 255))
+            } else {
+                // Black Version: Pure black/charcoal foreground (#12141A) on a crisp white/silver squircle (#F4F6FA)
+                let bgR: Float = 244.0
+                let bgG: Float = 246.0
+                let bgB: Float = 250.0
+                let fgR: Float = 16.0
+                let fgG: Float = 18.0
+                let fgB: Float = 24.0
+                let outR = bgR - boosted * (bgR - fgR)
+                let outG = bgG - boosted * (bgG - fgG)
+                let outB = bgB - boosted * (bgB - fgB)
+
+                pixels[offset]     = UInt8(min(max(outR * a, 0), 255))
+                pixels[offset + 1] = UInt8(min(max(outG * a, 0), 0 + 255))
+                pixels[offset + 2] = UInt8(min(max(outB * a, 0), 255))
+                pixels[offset + 3] = UInt8(min(max(a * 255.0, 0), 255))
+            }
+        }
+
+        guard let outCg = ctx.makeImage() else {
+            return drawVectorKeyboardyIcon(isWhite: isWhite)
+        }
+
+        let targetSize = NSSize(width: 20, height: 20)
+        let finalImg = NSImage(size: targetSize, flipped: false) { rect in
+            NSGraphicsContext.current?.imageInterpolation = .high
+            let innerRect = rect.insetBy(dx: 0.5, dy: 0.5)
+            let clipPath = NSBezierPath(roundedRect: innerRect, xRadius: 4.5, yRadius: 4.5)
+            clipPath.addClip()
+
+            if let cgCtx = NSGraphicsContext.current?.cgContext {
+                cgCtx.draw(outCg, in: innerRect)
+            }
+
+            // Subtle crisp border so White and Black versions pop on any wallpaper/menu bar
+            let borderPath = NSBezierPath(roundedRect: innerRect, xRadius: 4.5, yRadius: 4.5)
+            borderPath.lineWidth = 0.8
+            if isWhite {
+                NSColor(calibratedWhite: 1.0, alpha: 0.35).setStroke()
+            } else {
+                NSColor(calibratedWhite: 0.1, alpha: 0.35).setStroke()
+            }
+            borderPath.stroke()
             return true
         }
-        image.isTemplate = false
-        return image
+        finalImg.isTemplate = false
+        return finalImg
     }
 
-    private static func drawMonochromePill(text: String) -> NSImage {
-        let size = NSSize(width: 32, height: 18)
-        let image = NSImage(size: size, flipped: false) { rect in
-            let pillRect = rect.insetBy(dx: 1.0, dy: 1.5)
-            let path = NSBezierPath(roundedRect: pillRect, xRadius: 4.0, yRadius: 4.0)
-            path.lineWidth = 1.4
-            NSColor.black.setStroke()
-            path.stroke()
+    private static func drawVectorKeyboardyIcon(isWhite: Bool) -> NSImage {
+        let size = NSSize(width: 20, height: 20)
+        let img = NSImage(size: size, flipped: false) { rect in
+            let inner = rect.insetBy(dx: 1.0, dy: 1.0)
+            let bg = NSBezierPath(roundedRect: inner, xRadius: 4.5, yRadius: 4.5)
+            (isWhite ? NSColor(calibratedWhite: 0.1, alpha: 1.0) : NSColor(calibratedWhite: 0.96, alpha: 1.0)).setFill()
+            bg.fill()
 
-            let font = NSFont.systemFont(ofSize: 10.5, weight: .bold)
-            let paragraph = NSMutableParagraphStyle()
-            paragraph.alignment = .center
-            let attrs: [NSAttributedString.Key: Any] = [
-                .font: font,
-                .foregroundColor: NSColor.black,
-                .paragraphStyle: paragraph
-            ]
-            let attrStr = NSAttributedString(string: text, attributes: attrs)
-            let strSize = attrStr.size()
-            let textRect = NSRect(
-                x: (rect.width - strSize.width) / 2.0,
-                y: (rect.height - strSize.height) / 2.0,
-                width: strSize.width,
-                height: strSize.height
-            )
-            attrStr.draw(in: textRect)
+            let fg = isWhite ? NSColor.white : NSColor(calibratedWhite: 0.1, alpha: 1.0)
+            fg.setStroke()
+            fg.setFill()
+
+            let frameRect = NSRect(x: 4.5, y: 8.5, width: 11.0, height: 8.0)
+            let framePath = NSBezierPath(roundedRect: frameRect, xRadius: 1.5, yRadius: 1.5)
+            framePath.lineWidth = 1.3
+            framePath.stroke()
+
+            let kbRect = NSRect(x: 3.0, y: 2.5, width: 14.0, height: 4.2)
+            let kbPath = NSBezierPath(roundedRect: kbRect, xRadius: 1.2, yRadius: 1.2)
+            kbPath.lineWidth = 1.2
+            kbPath.stroke()
             return true
         }
-        image.isTemplate = true
-        return image
+        img.isTemplate = false
+        return img
     }
 }

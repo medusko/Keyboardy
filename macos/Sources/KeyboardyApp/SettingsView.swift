@@ -224,28 +224,54 @@ struct SettingsView: View {
                     // SECTION 3: APPEARANCE & SEARCH ENGINE
                     // =====================================================
                     sectionGroup(header: "APPEARANCE & SEARCH ENGINE") {
-                        // Row 1: Menu Bar Icon Style (4-pill segmented bar)
+                        // Row 1: Menu Bar Icon Style (App Icon, White Icon, Black Icon)
                         VStack(alignment: .leading, spacing: 7) {
-                            Text("Menu Bar Icon Style")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundColor(palette.textPrimary)
+                            HStack {
+                                Text("Menu Bar Icon Style")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(palette.textPrimary)
+                                Spacer()
+                                Text("Auto-switches with Theme, or pick manually")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(palette.textSecondary)
+                            }
 
-                            HStack(spacing: 6) {
+                            HStack(spacing: 8) {
                                 badgeOptionButton(.keyboardyAppIcon, label: "App Icon")
-                                badgeOptionButton(.gifBluePill, label: "Blue GiF")
-                                badgeOptionButton(.gifMonochrome, label: "Mono GiF")
-                                badgeOptionButton(.kbBluePill, label: "Blue KB")
+                                badgeOptionButton(.keyboardyWhiteIcon, label: "White Icon")
+                                badgeOptionButton(.keyboardyBlackIcon, label: "Black Icon")
                             }
                         }
 
                         rowDivider
 
-                        // Row 2: Dark / Light Mode
-                        settingToggleRow(
-                            title: "Dark Mode Theme",
-                            subtitle: "Switch between Lagatron Cobalt Dark and Warm Linen Light",
-                            isOn: $prefs.isDarkMode
-                        )
+                        // Row 2: Rewired App Theme Mode (System Auto / Dark / Light)
+                        settingRow(
+                            title: "App Theme & Icon Mode",
+                            subtitle: "Follow macOS System Settings or choose Dark (White Icon) / Light (Black Icon)"
+                        ) {
+                            HStack(spacing: 5) {
+                                ForEach(AppThemeMode.allCases) { mode in
+                                    let isSelected = prefs.themeMode == mode
+                                    Button(action: {
+                                        prefs.themeMode = mode
+                                    }) {
+                                        Text(mode.displayName)
+                                            .font(.system(size: 10.5, weight: .bold))
+                                            .foregroundColor(isSelected ? .white : palette.textPrimary)
+                                            .padding(.horizontal, 9)
+                                            .padding(.vertical, 5)
+                                            .background(isSelected ? palette.accentBlue : palette.surfaceVariant)
+                                            .cornerRadius(6)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 6)
+                                                    .stroke(isSelected ? Color.clear : palette.border, lineWidth: 1)
+                                            )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
 
                         rowDivider
 
@@ -379,17 +405,23 @@ struct SettingsView: View {
     private func badgeOptionButton(_ style: StatusBarBadgeStyle, label: String) -> some View {
         let isSelected = prefs.statusBarBadgeStyle == style
         Button(action: { prefs.statusBarBadgeStyle = style }) {
-            Text(label)
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(isSelected ? .white : palette.textPrimary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
-                .background(isSelected ? palette.accentBlue : palette.surfaceVariant)
-                .cornerRadius(7)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 7)
-                        .stroke(isSelected ? Color.clear : palette.border, lineWidth: 1)
-                )
+            HStack(spacing: 6) {
+                Image(nsImage: StatusBarBadgeRenderer.makeStatusBarImage(style: style))
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 16, height: 16)
+                Text(label)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(isSelected ? .white : palette.textPrimary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .background(isSelected ? palette.accentBlue : palette.surfaceVariant)
+            .cornerRadius(7)
+            .overlay(
+                RoundedRectangle(cornerRadius: 7)
+                    .stroke(isSelected ? Color.clear : palette.border, lineWidth: 1)
+            )
         }
         .buttonStyle(.plain)
     }

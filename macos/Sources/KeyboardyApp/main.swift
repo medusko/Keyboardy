@@ -13,10 +13,12 @@ if CommandLine.arguments.contains("--verify") {
     let (mime, ext) = SearchParsers.detectImageMimeTypeAndExtension(gifHeader)
     precondition(mime == "image/gif" && ext == "gif", "GIF magic byte verification failed")
 
-    let badgeImg = StatusBarBadgeRenderer.makeStatusBarImage(style: .keyboardyAppIcon)
-    precondition(badgeImg.size.width > 0 && badgeImg.size.height > 0, "StatusBar badge render failed")
+    let appImg = StatusBarBadgeRenderer.makeStatusBarImage(style: .keyboardyAppIcon)
+    let whiteImg = StatusBarBadgeRenderer.makeStatusBarImage(style: .keyboardyWhiteIcon)
+    let blackImg = StatusBarBadgeRenderer.makeStatusBarImage(style: .keyboardyBlackIcon)
+    precondition(appImg.size.width > 0 && whiteImg.size.width > 0 && blackImg.size.width > 0, "StatusBar badge render failed")
 
-    print("✅ Keyboardy macOS verification passed (parsers, magic bytes, and Keyboardy app icon status bar badge)!")
+    print("✅ Keyboardy macOS verification passed (parsers, magic bytes, and App/White/Black status bar icons)!")
     exit(0)
 }
 
