@@ -1,12 +1,12 @@
 package com.medusko.keyboardy
 
-import android.content.ComponentName
+import android.app.Dialog
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -14,10 +14,12 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.Window
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -39,11 +41,18 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var prefs: KeyboardyPrefs
 
+    private lateinit var rootScreenContainer: LinearLayout
+    private lateinit var topAppBar: LinearLayout
+    private lateinit var topBarDivider: View
     private lateinit var rootScrollView: ScrollView
     private lateinit var mainContentContainer: LinearLayout
+
     private lateinit var tvAppTitle: TextView
-    private lateinit var tvAppSubtitle: TextView
-    private lateinit var btnToggleTheme: Button
+    private lateinit var statusPillContainer: LinearLayout
+    private lateinit var statusPillDot: View
+    private lateinit var tvStatusPillText: TextView
+    private lateinit var btnAboutInfo: ImageButton
+    private lateinit var btnToggleTheme: ImageButton
 
     private lateinit var cardSetup: LinearLayout
     private lateinit var tvImeStatus: TextView
@@ -74,30 +83,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvSettingsHeader: TextView
     private lateinit var cbAutoReturn: CheckBox
     private lateinit var cbAutoReadChat: CheckBox
+    private lateinit var badgeLegendBox: LinearLayout
+    private lateinit var tvBadgeLegendTitle: TextView
+    private lateinit var tvBadgeLegendBody: TextView
     private lateinit var tvApiKeyLabel: TextView
     private lateinit var etOptionalApiKey: EditText
     private lateinit var btnSaveSettings: Button
-
-    private lateinit var cardIcons: LinearLayout
-    private lateinit var tvIconsHeader: TextView
-    private lateinit var tvIconsDesc: TextView
-    private lateinit var iconGridContainer: LinearLayout
-
-    private data class IconOption(
-        val index: Int,
-        val title: String,
-        val drawableRes: Int,
-        val aliasClassName: String
-    )
-
-    private val iconOptions = listOf(
-        IconOption(1, "1. Neon Cyber", R.drawable.ic_app_option_1, "com.medusko.keyboardy.IconAlias1"),
-        IconOption(2, "2. Magnifying Keys", R.drawable.ic_app_option_2, "com.medusko.keyboardy.IconAlias2"),
-        IconOption(3, "3. Portal Spark", R.drawable.ic_app_option_3, "com.medusko.keyboardy.IconAlias3"),
-        IconOption(4, "4. Minimal Grid", R.drawable.ic_app_option_4, "com.medusko.keyboardy.IconAlias4"),
-        IconOption(5, "5. Pixel Bolt", R.drawable.ic_app_option_5, "com.medusko.keyboardy.IconAlias5"),
-        IconOption(6, "6. Retro Cream", R.drawable.ic_app_option_6, "com.medusko.keyboardy.IconAlias6")
-    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -105,10 +96,17 @@ class MainActivity : AppCompatActivity() {
 
         prefs = KeyboardyPrefs(this)
 
+        rootScreenContainer = findViewById(R.id.root_screen_container)
+        topAppBar = findViewById(R.id.top_app_bar)
+        topBarDivider = findViewById(R.id.top_bar_divider)
         rootScrollView = findViewById(R.id.root_scroll_view)
         mainContentContainer = findViewById(R.id.main_content_container)
+
         tvAppTitle = findViewById(R.id.tv_app_title)
-        tvAppSubtitle = findViewById(R.id.tv_app_subtitle)
+        statusPillContainer = findViewById(R.id.status_pill_container)
+        statusPillDot = findViewById(R.id.status_pill_dot)
+        tvStatusPillText = findViewById(R.id.tv_status_pill_text)
+        btnAboutInfo = findViewById(R.id.btn_about_info)
         btnToggleTheme = findViewById(R.id.btn_toggle_theme)
 
         cardSetup = findViewById(R.id.card_setup)
@@ -140,24 +138,30 @@ class MainActivity : AppCompatActivity() {
         tvSettingsHeader = findViewById(R.id.tv_settings_header)
         cbAutoReturn = findViewById(R.id.cb_auto_return_gboard)
         cbAutoReadChat = findViewById(R.id.cb_auto_read_chat_text)
+        badgeLegendBox = findViewById(R.id.badge_legend_box)
+        tvBadgeLegendTitle = findViewById(R.id.tv_badge_legend_title)
+        tvBadgeLegendBody = findViewById(R.id.tv_badge_legend_body)
         tvApiKeyLabel = findViewById(R.id.tv_api_key_label)
         etOptionalApiKey = findViewById(R.id.et_optional_api_key)
         btnSaveSettings = findViewById(R.id.btn_save_settings)
 
-        cardIcons = findViewById(R.id.card_icons)
-        tvIconsHeader = findViewById(R.id.tv_icons_header)
-        tvIconsDesc = findViewById(R.id.tv_icons_desc)
-        iconGridContainer = findViewById(R.id.icon_grid_container)
-
-        // Apply system bar & camera cutout insets so content always sits below the status bar!
-        ViewCompat.setOnApplyWindowInsetsListener(mainContentContainer) { view, insets ->
+        // Apply system bar & camera cutout insets so TopAppBar sits cleanly below the status bar!
+        ViewCompat.setOnApplyWindowInsetsListener(rootScreenContainer) { _, insets ->
             val bars = insets.getInsets(
                 WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
             )
-            val horizontalPx = dpToPx(20)
-            val topPx = bars.top + dpToPx(18)
-            val bottomPx = bars.bottom + dpToPx(28)
-            view.setPadding(horizontalPx, topPx, horizontalPx, bottomPx)
+            topAppBar.setPadding(
+                dpToPx(18),
+                bars.top + dpToPx(12),
+                dpToPx(14),
+                dpToPx(12)
+            )
+            mainContentContainer.setPadding(
+                dpToPx(18),
+                dpToPx(16),
+                dpToPx(18),
+                bars.bottom + dpToPx(28)
+            )
             insets
         }
 
@@ -166,7 +170,12 @@ class MainActivity : AppCompatActivity() {
         cbAutoReadChat.isChecked = prefs.autoReadAndReplaceChatQuery
         etOptionalApiKey.setText(prefs.optionalApiKey)
 
-        // Light / Dark Mode Toggle (Lagatron style)
+        // Info IconButton -> Open Lagatron-style "About Keyboardy" Dialog
+        btnAboutInfo.setOnClickListener {
+            showAboutKeyboardyDialog()
+        }
+
+        // Light / Dark Mode IconButton (Sun in Dark Mode, Moon in Light Mode — matching Lagatron)
         btnToggleTheme.setOnClickListener {
             prefs.isDarkMode = !prefs.isDarkMode
             applyThemeAndState()
@@ -183,7 +192,7 @@ class MainActivity : AppCompatActivity() {
             imm?.showInputMethodPicker()
         }
 
-        // 3. Keyboard Scale Selector Buttons
+        // 3. Keyboard Scale Selector Buttons (immediately updates KeyboardyImeService via SharedPreferences listener)
         val scaleMap = mapOf(
             KeyboardScale.COMPACT to btnScaleCompact,
             KeyboardScale.NORMAL to btnScaleNormal,
@@ -203,7 +212,7 @@ class MainActivity : AppCompatActivity() {
             applyThemeAndState()
         }
         btnClearancePlus.setOnClickListener {
-            prefs.bottomNavClearanceDp = (prefs.bottomNavClearanceDp + 6).coerceAtMost(100)
+            prefs.bottomNavClearanceDp = (prefs.bottomNavClearanceDp + 6).coerceAtMost(120)
             applyThemeAndState()
         }
 
@@ -262,6 +271,126 @@ class MainActivity : AppCompatActivity() {
         updateImeStatusBanner()
     }
 
+    /**
+     * Displays the "About Keyboardy" dialog matching Lagatron's exact AlertDialog layout & typography.
+     */
+    private fun showAboutKeyboardyDialog() {
+        val palette = ThemePalette.forMode(prefs.isDarkMode)
+        val density = resources.displayMetrics.density
+        val strokePx = (1f * density).toInt().coerceAtLeast(1)
+
+        val dialog = Dialog(this)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dpToPx(22), dpToPx(20), dpToPx(22), dpToPx(16))
+            background = palette.createRoundedRect(
+                fillColor = palette.surface,
+                cornerRadiusPx = 20f * density,
+                strokeWidthPx = strokePx,
+                strokeColor = palette.border
+            )
+        }
+
+        // Title Row: Info Icon + "About Keyboardy"
+        val titleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val infoIcon = ImageView(this).apply {
+            setImageResource(R.drawable.ic_info)
+            setColorFilter(palette.accentBlue)
+            layoutParams = LinearLayout.LayoutParams(dpToPx(22), dpToPx(22)).apply {
+                marginEnd = dpToPx(8)
+            }
+        }
+        val titleText = TextView(this).apply {
+            text = "About Keyboardy"
+            setTextColor(palette.textPrimary)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 19f)
+            typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+        }
+        titleRow.addView(infoIcon)
+        titleRow.addView(titleText)
+        container.addView(titleRow)
+
+        // Section Label: "About"
+        val sectionLabel = TextView(this).apply {
+            text = "About"
+            setTextColor(palette.accentBlue)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            typeface = Typeface.DEFAULT_BOLD
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dpToPx(14)
+            }
+        }
+        container.addView(sectionLabel)
+
+        // Body Description
+        val bodyText = TextView(this).apply {
+            text = "Keyboardy is a zero-step auxiliary Google Image & GIF search keyboard engineered to eliminate manual downloading and file-picking when sharing pictures in Slack, Google Messages, WhatsApp, Discord, and other chat apps.\n\nSwitch from Gboard with one tap, search full-screen across our Hybrid Google WebView + Instant Web engine, tap any image or animated GIF to insert it directly into your conversation via Android's CommitContent API, and automatically jump right back to Gboard."
+            setTextColor(palette.textPrimary)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setLineSpacing(dpToPx(3).toFloat(), 1f)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dpToPx(8)
+            }
+        }
+        container.addView(bodyText)
+
+        // Version Footer matching Lagatron
+        val footerText = TextView(this).apply {
+            text = "Keyboardy v1.0 • Built for Android 15 / Pixel"
+            setTextColor(palette.textSecondary)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            typeface = Typeface.DEFAULT_BOLD
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dpToPx(14)
+            }
+        }
+        container.addView(footerText)
+
+        // Close Button Row
+        val buttonRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dpToPx(12)
+            }
+        }
+        val closeBtn = TextView(this).apply {
+            text = "Close"
+            setTextColor(palette.accentBlue)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(dpToPx(14), dpToPx(8), dpToPx(14), dpToPx(8))
+            setOnClickListener {
+                dialog.dismiss()
+            }
+        }
+        buttonRow.addView(closeBtn)
+        container.addView(buttonRow)
+
+        dialog.setContentView(container)
+        dialog.show()
+        val width = (resources.displayMetrics.widthPixels * 0.88f).toInt()
+        dialog.window?.setLayout(width, ViewGroup.LayoutParams.WRAP_CONTENT)
+    }
+
     private fun applyThemeAndState() {
         val isDark = prefs.isDarkMode
         val palette = ThemePalette.forMode(isDark)
@@ -269,25 +398,31 @@ class MainActivity : AppCompatActivity() {
         val strokePx = (1f * density).toInt().coerceAtLeast(1)
 
         // Status & Navigation Bar Colors
-        window.statusBarColor = palette.background
+        @Suppress("DEPRECATION")
+        window.statusBarColor = palette.surface
+        @Suppress("DEPRECATION")
         window.navigationBarColor = palette.background
         WindowCompat.getInsetsController(window, window.decorView).apply {
             isAppearanceLightStatusBars = !isDark
             isAppearanceLightNavigationBars = !isDark
         }
 
+        rootScreenContainer.setBackgroundColor(palette.background)
+        topAppBar.setBackgroundColor(palette.surface)
+        topBarDivider.setBackgroundColor(palette.border)
         rootScrollView.setBackgroundColor(palette.background)
+
         tvAppTitle.setTextColor(palette.textPrimary)
-        tvAppSubtitle.setTextColor(palette.textSecondary)
 
-        btnToggleTheme.apply {
-            text = if (isDark) "☀️ Light" else "🌙 Dark"
-            backgroundTintList = ColorStateList.valueOf(palette.accentBlue)
-            setTextColor(Color.WHITE)
-        }
+        // Info Icon & Light/Dark Theme Icon matching Lagatron
+        btnAboutInfo.setColorFilter(palette.accentBlue)
+        btnToggleTheme.setImageResource(
+            if (isDark) R.drawable.ic_light_mode else R.drawable.ic_dark_mode
+        )
+        btnToggleTheme.setColorFilter(palette.accentBlue)
 
-        // Style all 5 Cards
-        val cards = listOf(cardSetup, cardScale, cardSandbox, cardSettings, cardIcons)
+        // Style all Cards
+        val cards = listOf(cardSetup, cardScale, cardSandbox, cardSettings)
         for (card in cards) {
             card.background = palette.createRoundedRect(
                 fillColor = palette.surface,
@@ -298,11 +433,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Headers & Descriptions
-        val headers = listOf(tvImeStatus, tvScaleHeader, tvSandboxHeader, tvSettingsHeader, tvIconsHeader)
+        val headers = listOf(tvImeStatus, tvScaleHeader, tvSandboxHeader, tvSettingsHeader)
         for (h in headers) {
             h.setTextColor(palette.accentBlue)
         }
-        val descriptions = listOf(tvSetupDesc, tvScaleDesc, tvSandboxDesc, tvApiKeyLabel, tvIconsDesc)
+        val descriptions = listOf(tvSetupDesc, tvScaleDesc, tvSandboxDesc, tvApiKeyLabel)
         for (d in descriptions) {
             d.setTextColor(palette.textSecondary)
         }
@@ -365,6 +500,16 @@ class MainActivity : AppCompatActivity() {
             edit.setHintTextColor(palette.textSecondary)
         }
 
+        // Badge Legend Box
+        badgeLegendBox.background = palette.createRoundedRect(
+            fillColor = palette.surfaceVariant,
+            cornerRadiusPx = 12f * density,
+            strokeWidthPx = strokePx,
+            strokeColor = palette.border
+        )
+        tvBadgeLegendTitle.setTextColor(palette.accentBlue)
+        tvBadgeLegendBody.setTextColor(palette.textPrimary)
+
         // Checkboxes
         for (cb in listOf(cbAutoReturn, cbAutoReadChat)) {
             cb.setTextColor(palette.textPrimary)
@@ -374,105 +519,7 @@ class MainActivity : AppCompatActivity() {
         btnSaveSettings.backgroundTintList = ColorStateList.valueOf(palette.accentBlue)
         btnSaveSettings.setTextColor(Color.WHITE)
 
-        // Build 6 App Icon Options Grid
-        buildIconSelectorGrid(palette)
-    }
-
-    private fun buildIconSelectorGrid(palette: ThemePalette) {
-        iconGridContainer.removeAllViews()
-        val density = resources.displayMetrics.density
-        val strokePx = (1.5f * density).toInt().coerceAtLeast(1)
-        val selectedIdx = prefs.selectedIconOption
-
-        val rows = iconOptions.chunked(3)
-        for (rowItems in rows) {
-            val rowLayout = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    bottomMargin = dpToPx(8)
-                }
-            }
-
-            for (opt in rowItems) {
-                val isSelected = opt.index == selectedIdx
-                val card = LinearLayout(this).apply {
-                    orientation = LinearLayout.VERTICAL
-                    gravity = Gravity.CENTER
-                    setPadding(dpToPx(8), dpToPx(10), dpToPx(8), dpToPx(10))
-                    background = palette.createRoundedRect(
-                        fillColor = if (isSelected) palette.surfaceVariant else palette.background,
-                        cornerRadiusPx = 12f * density,
-                        strokeWidthPx = if (isSelected) strokePx * 2 else strokePx,
-                        strokeColor = if (isSelected) palette.accentBlue else palette.border
-                    )
-                    layoutParams = LinearLayout.LayoutParams(
-                        0,
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                        1f
-                    ).apply {
-                        marginStart = dpToPx(4)
-                        marginEnd = dpToPx(4)
-                    }
-                    setOnClickListener {
-                        applyLauncherIconOption(opt)
-                    }
-                }
-
-                val iv = ImageView(this).apply {
-                    setImageResource(opt.drawableRes)
-                    scaleType = ImageView.ScaleType.FIT_CENTER
-                    layoutParams = LinearLayout.LayoutParams(dpToPx(62), dpToPx(62))
-                }
-
-                val tv = TextView(this).apply {
-                    text = if (isSelected) "✓ ${opt.title}" else opt.title
-                    gravity = Gravity.CENTER
-                    setTextColor(if (isSelected) palette.accentBlue else palette.textPrimary)
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
-                    typeface = Typeface.DEFAULT_BOLD
-                    layoutParams = LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                    ).apply {
-                        topMargin = dpToPx(6)
-                    }
-                }
-
-                card.addView(iv)
-                card.addView(tv)
-                rowLayout.addView(card)
-            }
-            iconGridContainer.addView(rowLayout)
-        }
-    }
-
-    private fun applyLauncherIconOption(selected: IconOption) {
-        prefs.selectedIconOption = selected.index
-        applyThemeAndState()
-        try {
-            val pm = packageManager
-            for (opt in iconOptions) {
-                val state = if (opt.index == selected.index) {
-                    PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-                } else {
-                    PackageManager.COMPONENT_ENABLED_STATE_DISABLED
-                }
-                pm.setComponentEnabledSetting(
-                    ComponentName(packageName, opt.aliasClassName),
-                    state,
-                    PackageManager.DONT_KILL_APP
-                )
-            }
-            Toast.makeText(
-                this,
-                "App icon switched to ${selected.title}!",
-                Toast.LENGTH_SHORT
-            ).show()
-        } catch (_: Exception) {
-        }
+        updateImeStatusBanner()
     }
 
     private fun updateImeStatusBanner() {
@@ -481,8 +528,28 @@ class MainActivity : AppCompatActivity() {
             it.packageName == packageName
         } == true
 
+        val palette = ThemePalette.forMode(prefs.isDarkMode)
+        val density = resources.displayMetrics.density
+        val strokePx = (1f * density).toInt().coerceAtLeast(1)
+
+        val pillColor = if (isEnabled) palette.successGreen else Color.parseColor("#FF1744")
+        val pillBgAlpha = Color.argb(38, Color.red(pillColor), Color.green(pillColor), Color.blue(pillColor))
+
+        statusPillContainer.background = palette.createRoundedRect(
+            fillColor = pillBgAlpha,
+            cornerRadiusPx = 20f * density,
+            strokeWidthPx = strokePx,
+            strokeColor = pillColor
+        )
+        statusPillDot.background = palette.createRoundedRect(
+            fillColor = pillColor,
+            cornerRadiusPx = 10f * density
+        )
+        tvStatusPillText.text = if (isEnabled) "ENABLED" else "SETUP NEEDED"
+        tvStatusPillText.setTextColor(pillColor)
+
         tvImeStatus.text = if (isEnabled) {
-            "Step 1: Keyboardy is ENABLED! Tap '2. Switch Keyboard' or use the keyboard icon in any chat."
+            "Auxiliary Keyboard Ready — Tap '2. Switch Keyboard' or use the keyboard icon in any chat"
         } else {
             "Step 1: Enable Keyboardy in Android Settings (Keep Gboard as your main keyboard)"
         }

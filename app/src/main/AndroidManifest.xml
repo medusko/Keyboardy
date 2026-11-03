@@ -18,92 +18,12 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:windowSoftInputMode="adjustResize" />
-
-        <!-- 6 Selectable App Icon Aliases -->
-        <activity-alias
-            android:name=".IconAlias1"
-            android:enabled="true"
-            android:exported="true"
-            android:icon="@drawable/ic_app_option_1"
-            android:label="@string/app_name"
-            android:roundIcon="@drawable/ic_app_option_1"
-            android:targetActivity=".MainActivity">
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".IconAlias2"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@drawable/ic_app_option_2"
-            android:label="@string/app_name"
-            android:roundIcon="@drawable/ic_app_option_2"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".IconAlias3"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@drawable/ic_app_option_3"
-            android:label="@string/app_name"
-            android:roundIcon="@drawable/ic_app_option_3"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".IconAlias4"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@drawable/ic_app_option_4"
-            android:label="@string/app_name"
-            android:roundIcon="@drawable/ic_app_option_4"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".IconAlias5"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@drawable/ic_app_option_5"
-            android:label="@string/app_name"
-            android:roundIcon="@drawable/ic_app_option_5"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name=".IconAlias6"
-            android:enabled="false"
-            android:exported="true"
-            android:icon="@drawable/ic_app_option_6"
-            android:label="@string/app_name"
-            android:roundIcon="@drawable/ic_app_option_6"
-            android:targetActivity=".MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
+        </activity>
 
         <!-- Auxiliary Image & GIF Search Keyboard Service -->
         <service

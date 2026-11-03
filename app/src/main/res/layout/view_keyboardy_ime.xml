@@ -2,11 +2,11 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root_ime_container"
     android:layout_width="match_parent"
-    android:layout_height="504dp"
+    android:layout_height="match_parent"
     android:background="@color/kb_bg"
     android:orientation="vertical">
 
-    <!-- Top Bar: Return to Gboard + Search Input + Scale Button + Toggle Mini Keyboard -->
+    <!-- Top Bar: Return to Gboard + Full-Width Interactive Search Bar -->
     <LinearLayout
         android:id="@+id/top_bar_container"
         android:layout_width="match_parent"
@@ -21,13 +21,13 @@
         <LinearLayout
             android:id="@+id/btn_back_keyboard"
             android:layout_width="wrap_content"
-            android:layout_height="38dp"
+            android:layout_height="40dp"
             android:background="@drawable/bg_key_button"
             android:clickable="true"
             android:focusable="true"
             android:gravity="center"
             android:orientation="horizontal"
-            android:paddingHorizontal="10dp">
+            android:paddingHorizontal="12dp">
 
             <ImageView
                 android:id="@+id/iv_back_icon"
@@ -47,12 +47,12 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- Interactive Search Bar -->
+        <!-- Interactive Search Bar with Blinking Cursor & Text Selection -->
         <LinearLayout
             android:id="@+id/search_bar_container"
             android:layout_width="0dp"
             android:layout_height="40dp"
-            android:layout_marginHorizontal="6dp"
+            android:layout_marginStart="8dp"
             android:layout_weight="1"
             android:background="@drawable/bg_search_bar"
             android:clickable="true"
@@ -68,15 +68,17 @@
                 android:contentDescription="Search"
                 android:src="@drawable/ic_search" />
 
-            <TextView
-                android:id="@+id/tv_search_query"
+            <com.medusko.keyboardy.ime.ImeSearchEditText
+                android:id="@+id/et_search_query"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_marginStart="8dp"
                 android:layout_weight="1"
-                android:ellipsize="end"
+                android:gravity="center_vertical"
                 android:hint="Search Google Images &amp; GIFs..."
                 android:maxLines="1"
+                android:paddingVertical="0dp"
+                android:singleLine="true"
                 android:textColor="@color/kb_text_primary"
                 android:textColorHint="@color/kb_text_secondary"
                 android:textSize="14.5sp" />
@@ -100,36 +102,6 @@
                 android:src="@drawable/ic_clear"
                 android:visibility="gone" />
         </LinearLayout>
-
-        <!-- Quick Scale Button (cycles Compact -> Normal -> Large -> XL) -->
-        <TextView
-            android:id="@+id/btn_cycle_scale"
-            android:layout_width="wrap_content"
-            android:layout_height="38dp"
-            android:layout_marginEnd="5dp"
-            android:background="@drawable/bg_key_button"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:paddingHorizontal="8dp"
-            android:text="↕ 115%"
-            android:textColor="@color/kb_text_primary"
-            android:textSize="11.5sp"
-            android:textStyle="bold" />
-
-        <!-- Toggle Mini QWERTY Pad Button -->
-        <TextView
-            android:id="@+id/btn_toggle_qwerty"
-            android:layout_width="wrap_content"
-            android:layout_height="38dp"
-            android:background="@drawable/bg_key_button"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:paddingHorizontal="10dp"
-            android:text="⌨️"
-            android:textColor="@color/kb_text_primary"
-            android:textSize="14sp" />
     </LinearLayout>
 
     <!-- Filter Chips & Search Engine Selector Row -->
@@ -226,7 +198,7 @@
         </LinearLayout>
     </HorizontalScrollView>
 
-    <!-- Main Content Area: Image Grid + Empty/Status Overlay -->
+    <!-- Full-Screen Main Content Area: Image Grid takes the rest of the screen! -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
@@ -247,7 +219,7 @@
             android:layout_height="match_parent"
             android:gravity="center"
             android:orientation="vertical"
-            android:padding="14dp"
+            android:padding="18dp"
             android:visibility="visible">
 
             <TextView
@@ -257,7 +229,7 @@
                 android:gravity="center"
                 android:text="Type below to search Google Images &amp; GIFs — tap any result to insert directly into your chat!"
                 android:textColor="@color/kb_text_secondary"
-                android:textSize="13sp" />
+                android:textSize="13.5sp" />
         </LinearLayout>
 
         <!-- Hidden 1x1 WebView container for Headless Google Images JS execution -->
@@ -269,7 +241,7 @@
             android:importantForAccessibility="noHideDescendants" />
     </FrameLayout>
 
-    <!-- Collapsible Mini-QWERTY Pad for direct in-keyboard typing -->
+    <!-- Scalable QWERTY / Numbers / Symbols Pad -->
     <LinearLayout
         android:id="@+id/container_mini_qwerty"
         android:layout_width="match_parent"

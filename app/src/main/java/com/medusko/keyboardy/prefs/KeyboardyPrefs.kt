@@ -16,54 +16,52 @@ enum class SearchEngineMode(val displayName: String) {
 
 enum class KeyboardScale(
     val label: String,
-    val totalHeightDp: Int,
     val keyHeightDp: Int,
     val keyTextSp: Float,
     val gridItemHeightDp: Int,
     val topBarHeightDp: Int
 ) {
     COMPACT(
-        label = "Compact",
-        totalHeightDp = 390,
+        label = "100%",
         keyHeightDp = 40,
         keyTextSp = 15f,
-        gridItemHeightDp = 104,
+        gridItemHeightDp = 112,
         topBarHeightDp = 48
     ),
     NORMAL(
-        label = "Normal (115%)",
-        totalHeightDp = 450,
+        label = "115%",
         keyHeightDp = 46,
         keyTextSp = 16.5f,
-        gridItemHeightDp = 120,
+        gridItemHeightDp = 124,
         topBarHeightDp = 52
     ),
     LARGE(
-        label = "Large (130%)",
-        totalHeightDp = 510,
+        label = "130%",
         keyHeightDp = 52,
-        keyTextSp = 18f,
+        keyTextSp = 18.5f,
         gridItemHeightDp = 138,
         topBarHeightDp = 56
     ),
     XLARGE(
-        label = "XL (145%)",
-        totalHeightDp = 570,
+        label = "145% XL",
         keyHeightDp = 58,
-        keyTextSp = 19.5f,
-        gridItemHeightDp = 156,
+        keyTextSp = 20f,
+        gridItemHeightDp = 152,
         topBarHeightDp = 60
     );
-
-    fun next(): KeyboardScale {
-        val values = entries
-        return values[(ordinal + 1) % values.size]
-    }
 }
 
 class KeyboardyPrefs(context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("keyboardy_prefs", Context.MODE_PRIVATE)
+
+    fun registerListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+    }
+
+    fun unregisterListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
+        prefs.unregisterOnSharedPreferenceChangeListener(listener)
+    }
 
     var isDarkMode: Boolean
         get() = prefs.getBoolean(KEY_DARK_MODE, true)
@@ -79,7 +77,7 @@ class KeyboardyPrefs(context: Context) {
 
     var bottomNavClearanceDp: Int
         get() = prefs.getInt(KEY_BOTTOM_CLEARANCE_DP, 54)
-        set(value) = prefs.edit().putInt(KEY_BOTTOM_CLEARANCE_DP, value.coerceIn(0, 100)).apply()
+        set(value) = prefs.edit().putInt(KEY_BOTTOM_CLEARANCE_DP, value.coerceIn(0, 120)).apply()
 
     var autoReturnToPreviousKeyboard: Boolean
         get() = prefs.getBoolean(KEY_AUTO_RETURN, true)
@@ -105,10 +103,6 @@ class KeyboardyPrefs(context: Context) {
         get() = prefs.getString(KEY_OPTIONAL_API_KEY, "")?.trim().orEmpty()
         set(value) = prefs.edit().putString(KEY_OPTIONAL_API_KEY, value.trim()).apply()
 
-    var selectedIconOption: Int
-        get() = prefs.getInt(KEY_SELECTED_ICON, 1).coerceIn(1, 6)
-        set(value) = prefs.edit().putInt(KEY_SELECTED_ICON, value.coerceIn(1, 6)).apply()
-
     companion object {
         private const val KEY_DARK_MODE = "is_dark_mode"
         private const val KEY_KEYBOARD_SCALE = "keyboard_scale"
@@ -117,6 +111,5 @@ class KeyboardyPrefs(context: Context) {
         private const val KEY_AUTO_READ_CHAT_V2 = "auto_read_chat_query_v2"
         private const val KEY_ENGINE_MODE = "engine_mode"
         private const val KEY_OPTIONAL_API_KEY = "optional_api_key"
-        private const val KEY_SELECTED_ICON = "selected_icon_option"
     }
 }
