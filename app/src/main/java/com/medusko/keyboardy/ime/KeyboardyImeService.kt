@@ -106,9 +106,12 @@ class KeyboardyImeService : InputMethodService() {
     private var lastCountedSearchQuery: String = ""
 
     // Real-time preference listener so changes in MainActivity apply immediately to the keyboard
-    private val prefChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+    private val prefChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         mainHandler.post {
             applyScaleAndTheme()
+            if (key == "nsfw_mode_enabled" && getCurrentQuery().isNotBlank()) {
+                triggerSearch(immediate = true, hideKeyboardOnStart = false)
+            }
         }
     }
 
@@ -688,7 +691,7 @@ class KeyboardyImeService : InputMethodService() {
             }
 
             // Record search execution count (once per distinct query/filter execution)
-            val countKey = "${queryToRun.lowercase()}|${currentFilter.name}|${prefs.engineMode.name}"
+            val countKey = "${queryToRun.lowercase()}|${currentFilter.name}|${prefs.engineMode.name}|${prefs.nsfwModeEnabled}"
             if (countKey != lastCountedSearchQuery) {
                 lastCountedSearchQuery = countKey
                 prefs.recordSearchExecuted()
@@ -699,6 +702,7 @@ class KeyboardyImeService : InputMethodService() {
                 query = queryToRun,
                 filter = currentFilter,
                 engineMode = prefs.engineMode,
+                nsfwMode = prefs.nsfwModeEnabled,
                 optionalApiKey = prefs.optionalApiKey,
                 onProgressiveResults = { partialResults ->
                     if (partialResults.isNotEmpty()) {
@@ -967,7 +971,7 @@ class KeyboardyImeService : InputMethodService() {
             triggerSearch(immediate = false, hideKeyboardOnStart = false)
         }
 
-        val searchBtn = createActionKey("Search 🔍", 1.85f, true, scale, palette) {
+        val searchBtn = createActionKey("Search", 1.85f, true, scale, palette) {
             triggerSearch(immediate = true, hideKeyboardOnStart = true)
         }
 

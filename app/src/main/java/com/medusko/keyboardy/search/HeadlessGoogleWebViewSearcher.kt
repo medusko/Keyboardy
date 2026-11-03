@@ -48,7 +48,8 @@ class HeadlessGoogleWebViewSearcher(
 
     suspend fun searchGoogleImages(
         query: String,
-        filter: SearchFilter
+        filter: SearchFilter,
+        nsfwMode: Boolean = false
     ): List<ImageResult> = withContext(Dispatchers.Main) {
         val effectiveQuery = filter.buildEffectiveQuery(query)
         if (effectiveQuery.isEmpty()) return@withContext emptyList()
@@ -59,7 +60,8 @@ class HeadlessGoogleWebViewSearcher(
             filter.transparentOnly -> "&tbs=ic:trans"
             else -> ""
         }
-        val targetUrl = "https://www.google.com/search?q=$encoded&udm=2&hl=en&safe=active$tbsParam"
+        val safeParam = if (nsfwMode) "off" else "active"
+        val targetUrl = "https://www.google.com/search?q=$encoded&udm=2&hl=en&safe=$safeParam$tbsParam"
 
         withTimeoutOrNull(5500L) {
             suspendCancellableCoroutine { cont ->

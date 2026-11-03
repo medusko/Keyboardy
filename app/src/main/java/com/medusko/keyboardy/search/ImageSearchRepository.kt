@@ -21,6 +21,7 @@ class ImageSearchRepository(
         query: String,
         filter: SearchFilter,
         engineMode: SearchEngineMode,
+        nsfwMode: Boolean,
         optionalApiKey: String,
         onProgressiveResults: (List<ImageResult>) -> Unit
     ): List<ImageResult> = coroutineScope {
@@ -30,7 +31,7 @@ class ImageSearchRepository(
         // 1. If user supplied an optional SerpApi or Brave Search API key, try it first in parallel
         val apiDeferred = if (optionalApiKey.isNotBlank()) {
             async(Dispatchers.IO) {
-                fetchOptionalApiResults(effectiveQuery, filter, optionalApiKey)
+                fetchOptionalApiResults(effectiveQuery, filter, nsfwMode, optionalApiKey)
             }
         } else {
             null
@@ -38,7 +39,7 @@ class ImageSearchRepository(
 
         when (engineMode) {
             SearchEngineMode.INSTANT_HTTP -> {
-                val fast = fetchInstantHttpImages(effectiveQuery, filter)
+                val fast = fetchInstantHttpImages(effectiveQuery, filter, nsfwMode)
                 val apiItems = apiDeferred?.await().orEmpty()
                 val merged = mergeUnique(apiItems, fast)
                 onProgressiveResults(merged)
@@ -46,12 +47,11 @@ class ImageSearchRepository(
             }
 
             SearchEngineMode.GOOGLE_WEBVIEW -> {
-                val googleItems = headlessGoogleSearcher.searchGoogleImages(query, filter)
+                val googleItems = headlessGoogleSearcher.searchGoogleImages(query, filter, nsfwMode)
                 val finalItems = if (googleItems.isNotEmpty()) {
                     googleItems
                 } else {
-                    // Automatic safety net so user is never left with 0 results if WebView is blocked
-                    fetchInstantHttpImages(effectiveQuery, filter)
+                    fetchInstantHttpImages(effectiveQuery, filter, nsfwMode)
                 }
                 onProgressiveResults(finalItems)
                 finalItems
@@ -59,10 +59,10 @@ class ImageSearchRepository(
 
             SearchEngineMode.HYBRID -> {
                 val instantDeferred = async(Dispatchers.IO) {
-                    fetchInstantHttpImages(effectiveQuery, filter)
+                    fetchInstantHttpImages(effectiveQuery, filter, nsfwMode)
                 }
                 val googleDeferred = async {
-                    headlessGoogleSearcher.searchGoogleImages(query, filter)
+                    headlessGoogleSearcher.searchGoogleImages(query, filter, nsfwMode)
                 }
 
                 // Emit instant results (~150ms) right away so the grid populates immediately!
@@ -87,7 +87,8 @@ class ImageSearchRepository(
 
     private suspend fun fetchInstantHttpImages(
         effectiveQuery: String,
-        filter: SearchFilter
+        filter: SearchFilter,
+        nsfwMode: Boolean
     ): List<ImageResult> = withContext(Dispatchers.IO) {
         try {
             val encoded = URLEncoder.encode(effectiveQuery, "UTF-8")
@@ -96,9 +97,15 @@ class ImageSearchRepository(
                 filter.transparentOnly -> "&qft=+filterui:photo-transparent"
                 else -> ""
             }
+            val adltParam = if (nsfwMode) "off" else "moderate"
+            val headers = if (nsfwMode) {
+                mapOf("Cookie" to "SRCHHPGUSR=ADLT=OFF")
+            } else {
+                emptyMap()
+            }
             val url =
-                "https://www.bing.com/images/async?q=$encoded&first=0&count=35&adlt=moderate$qftFilter"
-            val html = httpGetString(url)
+                "https://www.bing.com/images/async?q=$encoded&first=0&count=35&adlt=$adltParam$qftFilter"
+            val html = httpGetString(url, extraHeaders = headers)
             SearchParsers.parseBingAsyncImagesHtml(html, forceGifHint = filter.animatedOnly)
         } catch (_: Exception) {
             emptyList()
@@ -108,20 +115,23 @@ class ImageSearchRepository(
     private fun fetchOptionalApiResults(
         effectiveQuery: String,
         filter: SearchFilter,
+        nsfwMode: Boolean,
         apiKey: String
     ): List<ImageResult> {
         val encoded = URLEncoder.encode(effectiveQuery, "UTF-8")
-        // Try SerpApi format if key is 64-char hex, otherwise try Brave Search header
         return try {
             if (apiKey.length >= 40 && apiKey.all { it.isLetterOrDigit() }) {
                 val tbs = if (filter.animatedOnly) "&tbs=itp:animated" else ""
+                val safe = if (nsfwMode) "off" else "active"
                 val serpUrl =
-                    "https://serpapi.com/search.json?engine=google_images&q=$encoded$tbs&api_key=$apiKey"
+                    "https://serpapi.com/search.json?engine=google_images&q=$encoded&safe=$safe$tbs&api_key=$apiKey"
                 val json = httpGetString(serpUrl)
                 val parsed = SearchParsers.parseSerpApiImagesJson(json, filter.animatedOnly)
                 if (parsed.isNotEmpty()) return parsed
             }
-            val braveUrl = "https://api.search.brave.com/res/v1/images/search?q=$encoded&count=30"
+            val braveSafe = if (nsfwMode) "off" else "moderate"
+            val braveUrl =
+                "https://api.search.brave.com/res/v1/images/search?q=$encoded&safesearch=$braveSafe&count=30"
             val json = httpGetString(
                 braveUrl,
                 extraHeaders = mapOf("X-Subscription-Token" to apiKey)

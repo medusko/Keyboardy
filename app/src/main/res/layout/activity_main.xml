@@ -110,7 +110,7 @@
             android:paddingTop="16dp"
             android:paddingBottom="36dp">
 
-            <!-- Card 1: Setup & Switch Auxiliary Keyboard -->
+            <!-- Card 1: Setup Auxiliary Keyboard -->
             <LinearLayout
                 android:id="@+id/card_setup"
                 android:layout_width="match_parent"
@@ -132,41 +132,21 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
-                    android:text="Keep Gboard as your main keyboard! Switch to Keyboardy whenever you want to search full-screen and drop an image or GIF directly into a conversation."
+                    android:text="Keep your default keyboard as your main keyboard! Enable Keyboardy in Android Settings so it is available whenever you want to search and insert images or GIFs."
                     android:textColor="#B8C2D4"
                     android:textSize="13sp" />
 
-                <LinearLayout
+                <Button
+                    android:id="@+id/btn_enable_ime"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
-                    android:orientation="horizontal">
-
-                    <Button
-                        android:id="@+id/btn_enable_ime"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="8dp"
-                        android:layout_weight="1"
-                        android:backgroundTint="#2E6BD9"
-                        android:text="1. Enable in Settings"
-                        android:textAllCaps="false"
-                        android:textColor="#FFFFFF"
-                        android:textSize="12.5sp"
-                        android:textStyle="bold" />
-
-                    <Button
-                        android:id="@+id/btn_switch_ime"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:backgroundTint="#222631"
-                        android:text="2. Switch Keyboard"
-                        android:textAllCaps="false"
-                        android:textColor="#FFFFFF"
-                        android:textSize="12.5sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
+                    android:backgroundTint="#2E6BD9"
+                    android:text="Enable in Settings"
+                    android:textAllCaps="false"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <!-- Card 2: Keyboard Scale & Bottom Bar Clearance -->
@@ -378,7 +358,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:checked="true"
-                    android:text="Auto-switch back to Gboard after inserting image"
+                    android:text="Auto-switch back to default keyboard after inserting image"
                     android:textColor="#FFFFFF"
                     android:textSize="13sp" />
 
@@ -388,6 +368,15 @@
                     android:layout_height="wrap_content"
                     android:checked="false"
                     android:text="Use written chat text as auto-search when opening Keyboardy (Off = every search starts blank)"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp" />
+
+                <CheckBox
+                    android:id="@+id/cb_nsfw_mode"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:checked="false"
+                    android:text="Enable NSFW mode (turns off SafeSearch filtering for adult-themed images &amp; GIFs)"
                     android:textColor="#FFFFFF"
                     android:textSize="13sp" />
             </LinearLayout>

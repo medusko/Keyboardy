@@ -90,6 +90,10 @@ class KeyboardyPrefs(context: Context) {
         get() = prefs.getBoolean(KEY_AUTO_READ_CHAT_V2, false)
         set(value) = prefs.edit().putBoolean(KEY_AUTO_READ_CHAT_V2, value).apply()
 
+    var nsfwModeEnabled: Boolean
+        get() = prefs.getBoolean(KEY_NSFW_MODE, false)
+        set(value) = prefs.edit().putBoolean(KEY_NSFW_MODE, value).apply()
+
     var engineMode: SearchEngineMode
         get() {
             val raw = prefs.getString(KEY_ENGINE_MODE, SearchEngineMode.HYBRID.name)
@@ -216,6 +220,7 @@ class KeyboardyPrefs(context: Context) {
         private const val KEY_BOTTOM_CLEARANCE_DP = "bottom_clearance_dp"
         private const val KEY_AUTO_RETURN = "auto_return_gboard"
         private const val KEY_AUTO_READ_CHAT_V2 = "auto_read_chat_query_v2"
+        private const val KEY_NSFW_MODE = "nsfw_mode_enabled"
         private const val KEY_ENGINE_MODE = "engine_mode"
         private const val KEY_OPTIONAL_API_KEY = "optional_api_key"
         private const val KEY_SEARCH_HISTORY_JSON = "search_history_json"

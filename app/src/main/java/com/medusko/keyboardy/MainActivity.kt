@@ -59,7 +59,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvImeStatus: TextView
     private lateinit var tvSetupDesc: TextView
     private lateinit var btnEnableIme: Button
-    private lateinit var btnSwitchIme: Button
 
     private lateinit var cardScale: LinearLayout
     private lateinit var tvScaleHeader: TextView
@@ -84,6 +83,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvSettingsHeader: TextView
     private lateinit var cbAutoReturn: CheckBox
     private lateinit var cbAutoReadChat: CheckBox
+    private lateinit var cbNsfwMode: CheckBox
 
     private lateinit var cardBadges: LinearLayout
     private lateinit var tvBadgesHeader: TextView
@@ -131,7 +131,6 @@ class MainActivity : AppCompatActivity() {
         tvImeStatus = findViewById(R.id.tv_ime_status)
         tvSetupDesc = findViewById(R.id.tv_setup_desc)
         btnEnableIme = findViewById(R.id.btn_enable_ime)
-        btnSwitchIme = findViewById(R.id.btn_switch_ime)
 
         cardScale = findViewById(R.id.card_scale)
         tvScaleHeader = findViewById(R.id.tv_scale_header)
@@ -156,6 +155,7 @@ class MainActivity : AppCompatActivity() {
         tvSettingsHeader = findViewById(R.id.tv_settings_header)
         cbAutoReturn = findViewById(R.id.cb_auto_return_gboard)
         cbAutoReadChat = findViewById(R.id.cb_auto_read_chat_text)
+        cbNsfwMode = findViewById(R.id.cb_nsfw_mode)
 
         cardBadges = findViewById(R.id.card_badges)
         tvBadgesHeader = findViewById(R.id.tv_badges_header)
@@ -196,6 +196,7 @@ class MainActivity : AppCompatActivity() {
         // Load saved preferences
         cbAutoReturn.isChecked = prefs.autoReturnToPreviousKeyboard
         cbAutoReadChat.isChecked = prefs.autoReadAndReplaceChatQuery
+        cbNsfwMode.isChecked = prefs.nsfwModeEnabled
         etOptionalApiKey.setText(prefs.optionalApiKey)
 
         // Info IconButton -> Open Lagatron-style "About Keyboardy" Dialog
@@ -209,15 +210,9 @@ class MainActivity : AppCompatActivity() {
             applyThemeAndState()
         }
 
-        // 1. Open Android Keyboard Settings
+        // Open Android Keyboard Settings
         btnEnableIme.setOnClickListener {
             startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
-        }
-
-        // 2. Show System Keyboard Switcher Dialog
-        btnSwitchIme.setOnClickListener {
-            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-            imm?.showInputMethodPicker()
         }
 
         // 3. Keyboard Scale Selector Buttons
@@ -284,9 +279,13 @@ class MainActivity : AppCompatActivity() {
         cbAutoReadChat.setOnCheckedChangeListener { _, isChecked ->
             prefs.autoReadAndReplaceChatQuery = isChecked
         }
+        cbNsfwMode.setOnCheckedChangeListener { _, isChecked ->
+            prefs.nsfwModeEnabled = isChecked
+        }
         btnSaveSettings.setOnClickListener {
             prefs.autoReturnToPreviousKeyboard = cbAutoReturn.isChecked
             prefs.autoReadAndReplaceChatQuery = cbAutoReadChat.isChecked
+            prefs.nsfwModeEnabled = cbNsfwMode.isChecked
             prefs.optionalApiKey = etOptionalApiKey.text?.toString().orEmpty()
             updateQuotaStatsUi()
             Toast.makeText(this, "Preferences saved!", Toast.LENGTH_SHORT).show()
@@ -395,7 +394,7 @@ class MainActivity : AppCompatActivity() {
 
         // Body Description
         val bodyText = TextView(this).apply {
-            text = "Keyboardy is a zero-step auxiliary Google Image & GIF search keyboard engineered to eliminate manual downloading and file-picking when sharing pictures in Slack, Google Messages, WhatsApp, Discord, and other chat apps.\n\nSwitch from Gboard with one tap, search full-screen across our Hybrid Google WebView + Instant Web engine, tap any image or animated GIF to insert it directly into your conversation via Android's CommitContent API, and automatically jump right back to Gboard."
+            text = "Keyboardy is a zero-step auxiliary Google Image & GIF search keyboard engineered to eliminate manual downloading and file-picking when sharing pictures in Slack, Google Messages, WhatsApp, Discord, and other chat apps.\n\nSwitch from your default keyboard with one tap, search full-screen across our Hybrid Google WebView + Instant Web engine, tap any image or animated GIF to insert it directly into your conversation via Android's CommitContent API, and automatically jump right back to your default keyboard."
             setTextColor(palette.textPrimary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             setLineSpacing(dpToPx(3).toFloat(), 1f)
@@ -514,8 +513,6 @@ class MainActivity : AppCompatActivity() {
 
         btnEnableIme.backgroundTintList = ColorStateList.valueOf(palette.accentBlue)
         btnEnableIme.setTextColor(Color.WHITE)
-        btnSwitchIme.backgroundTintList = ColorStateList.valueOf(palette.surfaceVariant)
-        btnSwitchIme.setTextColor(palette.textPrimary)
 
         // Scale Option Buttons
         val scaleButtons = mapOf(
@@ -584,7 +581,7 @@ class MainActivity : AppCompatActivity() {
         tvQuotaTierNote.setTextColor(palette.textSecondary)
 
         // Checkboxes
-        for (cb in listOf(cbAutoReturn, cbAutoReadChat)) {
+        for (cb in listOf(cbAutoReturn, cbAutoReadChat, cbNsfwMode)) {
             cb.setTextColor(palette.textPrimary)
             cb.buttonTintList = ColorStateList.valueOf(palette.accentBlue)
         }
@@ -623,9 +620,9 @@ class MainActivity : AppCompatActivity() {
         tvStatusPillText.setTextColor(pillColor)
 
         tvImeStatus.text = if (isEnabled) {
-            "Auxiliary Keyboard Ready — Tap '2. Switch Keyboard' or use the keyboard icon in any chat"
+            "Auxiliary Keyboard Enabled & Ready"
         } else {
-            "Step 1: Enable Keyboardy in Android Settings (Keep Gboard as your main keyboard)"
+            "Enable Keyboardy in Android Settings (Keep your default keyboard as your main keyboard)"
         }
     }
 
