@@ -167,15 +167,12 @@ enum StatusBarBadgeRenderer {
                 cgCtx.draw(outCg, in: innerRect)
             }
 
-            // Subtle crisp border so White and Black versions pop on any wallpaper/menu bar
-            let borderPath = NSBezierPath(roundedRect: innerRect, xRadius: 4.5, yRadius: 4.5)
-            borderPath.lineWidth = 0.8
-            if isWhite {
-                NSColor(calibratedWhite: 1.0, alpha: 0.35).setStroke()
-            } else {
+            if !isWhite {
+                let borderPath = NSBezierPath(roundedRect: innerRect, xRadius: 4.5, yRadius: 4.5)
+                borderPath.lineWidth = 0.8
                 NSColor(calibratedWhite: 0.1, alpha: 0.35).setStroke()
+                borderPath.stroke()
             }
-            borderPath.stroke()
             return true
         }
         finalImg.isTemplate = false

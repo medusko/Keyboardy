@@ -58,17 +58,17 @@ struct AnimatedRemoteImageView: NSViewRepresentable {
     @MainActor
     final class Coordinator {
         weak var imageView: NSImageView?
-        private var currentItemId: String?
+        private var currentFullUrl: String?
+        private var currentThumbUrl: String?
         private var loadTask: Task<Void, Never>?
 
         func load(item: ImageResult) {
-            guard currentItemId != item.id else { return }
-            currentItemId = item.id
+            guard currentFullUrl != item.fullImageUrl || currentThumbUrl != item.thumbnailUrl else { return }
+            currentFullUrl = item.fullImageUrl
+            currentThumbUrl = item.thumbnailUrl
             loadTask?.cancel()
             imageView?.image = nil
 
-            // For animated GIFs, prefer loading the full GIF URL if it's a direct .gif so it animates in the grid,
-            // while immediately showing the fast thumbnail first!
             let thumbUrl = item.thumbnailUrl
             let fullUrl = item.fullImageUrl
 
@@ -91,7 +91,7 @@ struct AnimatedRemoteImageView: NSViewRepresentable {
                    let thumbData = await Self.fetchData(urlStr: thumbUrl) {
                     RemoteImageCache.shared.store(thumbData, for: thumbUrl)
                     guard !Task.isCancelled else { return }
-                    if let self = self, self.currentItemId == item.id, let img = NSImage(data: thumbData) {
+                    if let self = self, self.currentFullUrl == item.fullImageUrl, let img = NSImage(data: thumbData) {
                         self.imageView?.image = img
                         self.imageView?.animates = true
                     }
@@ -104,7 +104,7 @@ struct AnimatedRemoteImageView: NSViewRepresentable {
                        gifData.count < 12 * 1024 * 1024 {
                         RemoteImageCache.shared.store(gifData, for: fullUrl)
                         guard !Task.isCancelled else { return }
-                        if let self = self, self.currentItemId == item.id, let animImg = NSImage(data: gifData) {
+                        if let self = self, self.currentFullUrl == item.fullImageUrl, let animImg = NSImage(data: gifData) {
                             self.imageView?.image = animImg
                             self.imageView?.animates = true
                         }

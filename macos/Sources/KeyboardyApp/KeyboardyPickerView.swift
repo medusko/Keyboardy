@@ -290,8 +290,7 @@ struct KeyboardyPickerView: View {
                         HStack(spacing: 6) {
                             ForEach(prefs.searchHistory.prefix(4), id: \.self) { recent in
                                 Button(action: {
-                                    viewModel.searchQuery = recent
-                                    viewModel.triggerSearch(immediate: true)
+                                    viewModel.selectHistoryQuery(recent)
                                 }) {
                                     HStack(spacing: 4) {
                                         Image(systemName: "clock")
@@ -324,16 +323,20 @@ struct KeyboardyPickerView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVGrid(columns: gridColumns, spacing: 8) {
-                    ForEach(Array(viewModel.results.enumerated()), id: \.element.id) { index, item in
+                    ForEach(Array(viewModel.results.enumerated()), id: \.element.fullImageUrl) { index, item in
                         resultTile(item: item, index: index)
-                            .id(index)
+                            .id(item.fullImageUrl)
                     }
                 }
+                .id(viewModel.searchGeneration)
                 .padding(10)
             }
             .onChange(of: viewModel.selectedIndex) { newIdx in
-                withAnimation(.easeInOut(duration: 0.12)) {
-                    proxy.scrollTo(newIdx, anchor: .center)
+                if viewModel.results.indices.contains(newIdx) {
+                    let targetId = viewModel.results[newIdx].fullImageUrl
+                    withAnimation(.easeInOut(duration: 0.12)) {
+                        proxy.scrollTo(targetId, anchor: .center)
+                    }
                 }
             }
         }
@@ -442,9 +445,7 @@ struct KeyboardyPickerView: View {
                         ForEach(prefs.searchHistory, id: \.self) { queryItem in
                             HStack {
                                 Button(action: {
-                                    viewModel.searchQuery = queryItem
-                                    viewModel.isShowingHistory = false
-                                    viewModel.triggerSearch(immediate: true)
+                                    viewModel.selectHistoryQuery(queryItem)
                                 }) {
                                     HStack(spacing: 8) {
                                         Image(systemName: "clock.arrow.circlepath")
