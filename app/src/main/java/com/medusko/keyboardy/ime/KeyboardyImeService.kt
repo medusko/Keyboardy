@@ -11,6 +11,9 @@ import android.inputmethodservice.InputMethodService
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
@@ -100,7 +103,10 @@ class KeyboardyImeService : InputMethodService() {
     private var containerMiniQwerty: LinearLayout? = null
     private var bottomNavSpacer: View? = null
     private var chipEngineMode: TextView? = null
+    private var chipGridScale: TextView? = null
     private val filterChipViews = mutableMapOf<SearchFilter, TextView>()
+    private var gridLayoutManager: GridLayoutManager? = null
+    private var vibrator: Vibrator? = null
 
     // State
     private var currentFilter: SearchFilter = SearchFilter.ALL
@@ -128,6 +134,14 @@ class KeyboardyImeService : InputMethodService() {
         prefs = KeyboardyPrefs(this)
         prefs.registerListener(prefChangeListener)
         commitHelper = ImageCommitHelper(this)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vm = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+            vibrator = vm?.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+        }
     }
 
     override fun onEvaluateFullscreenMode(): Boolean = false
@@ -168,6 +182,7 @@ class KeyboardyImeService : InputMethodService() {
         containerMiniQwerty = root.findViewById(R.id.container_mini_qwerty)
         bottomNavSpacer = root.findViewById(R.id.bottom_nav_spacer)
         chipEngineMode = root.findViewById(R.id.chip_engine_mode)
+        chipGridScale = root.findViewById(R.id.chip_grid_scale)
 
         val webViewHolder: FrameLayout = root.findViewById(R.id.headless_webview_holder)
 
@@ -183,13 +198,15 @@ class KeyboardyImeService : InputMethodService() {
         headlessGoogleSearcher = googleSearcher
         searchRepository = ImageSearchRepository(googleSearcher)
 
-        // Setup 3-Column Image & GIF RecyclerView
+        // Setup Scalable Image & GIF RecyclerView (1x, 2x, 3x, or 4x columns)
         val adapter = ImageGridAdapter(this) { selectedItem ->
             onImageResultSelected(selectedItem)
         }
         gridAdapter = adapter
+        val glm = GridLayoutManager(this@KeyboardyImeService, prefs.gridColumns)
+        gridLayoutManager = glm
         rvImageResults?.apply {
-            layoutManager = GridLayoutManager(this@KeyboardyImeService, 3)
+            layoutManager = glm
             this.adapter = adapter
             addOnScrollListener(object : RecyclerView.OnScrollListener() {
                 override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
@@ -199,6 +216,13 @@ class KeyboardyImeService : InputMethodService() {
                     }
                 }
             })
+        }
+
+        // Grid Scale Switcher Chip (cycles 3x -> 4x -> 1x -> 2x -> 3x)
+        chipGridScale?.setOnClickListener { view ->
+            performTapHaptic(view)
+            prefs.cycleGridColumns()
+            applyScaleAndTheme()
         }
 
         // Back to Gboard / Previous Keyboard button
@@ -599,11 +623,24 @@ class KeyboardyImeService : InputMethodService() {
             text = "Engine: ${prefs.engineMode.displayName}"
         }
 
+        chipGridScale?.apply {
+            background = palette.createRoundedRect(
+                fillColor = palette.chipInactiveBg,
+                cornerRadiusPx = 14f * density,
+                strokeWidthPx = strokePx,
+                strokeColor = palette.accentBlue
+            )
+            setTextColor(palette.accentBlue)
+            text = "⊞ ${prefs.gridColumns}x Grid"
+        }
+
         // Empty State Text
         tvStatusMessage?.setTextColor(palette.textSecondary)
 
-        // Update Image Grid Adapter scale & palette
-        gridAdapter?.updateStyle(dpToPx(scale.gridItemHeightDp), palette)
+        // Update Image Grid columns and calculated thumbnail height
+        gridLayoutManager?.spanCount = prefs.gridColumns
+        val dynamicHeightDp = prefs.getGridItemHeightDp(prefs.gridColumns)
+        gridAdapter?.updateStyle(dpToPx(dynamicHeightDp), palette)
 
         // Rebuild Scalable QWERTY / Numbers / Symbols Pad
         suggestionBarScroll?.setBackgroundColor(palette.keyboardTrayBg)
@@ -1228,7 +1265,22 @@ class KeyboardyImeService : InputMethodService() {
     }
 
     private fun performTapHaptic(view: View) {
-        view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+        view.performHapticFeedback(
+            HapticFeedbackConstants.KEYBOARD_TAP,
+            HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING or HapticFeedbackConstants.FLAG_IGNORE_VIEW_SETTING
+        )
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                @Suppress("DEPRECATION")
+                vibrator?.vibrate(VibrationEffect.createOneShot(25L, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator?.vibrate(25L)
+            }
+        } catch (_: Exception) {
+        }
     }
 
     private fun dpToPx(dp: Int): Int {

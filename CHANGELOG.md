@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [android-v1.02] - 2026-11-04
+
+### Added
+- **Tactile Physical Haptic Feedback:**
+  - Integrated Android hardware `Vibrator` / `VibratorManager` with `VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK)` on key touch, guaranteeing crisp tactile physical vibration across Pixel and Android devices regardless of system-wide touch feedback settings.
+- **Dynamic Thumbnail Scaling & Grid Column Setting (Break 3x Grid):**
+  - Added real-time Grid Scale switcher chip (`⊞ 3x Grid`) directly in the keyboard IME filter bar. Tapping it cycles dynamically between `1x Feed (Full Width)` $\rightarrow$ `2x Large` $\rightarrow$ `3x Grid` $\rightarrow$ `4x Compact` with live layout updates.
+  - Added dedicated "Thumbnail Scale & Columns (Break 3x Grid)" settings section in `MainActivity` allowing users to configure default grid density and break free from the 3-column constraint.
+  - Dynamically calculates thumbnail heights (up to 210dp for 1x feed) so full images can be viewed with high detail.
+- **Full Aspect-Ratio Uncropped Preview Loading:**
+  - Updated thumbnail loader to prefer original full-resolution URLs and clean uncropped Tenor/Bing streams (`normalizeTenorGifUrls` + stripped Bing `&c=7` square crop flags).
+  - Prevents Google/Bing CDN server-side square crops, allowing wide and tall images/GIFs to zoom out completely to their authentic proportions.
+
+---
+
 ## [macos-v1.0.1-beta.4] - 2026-11-04
 
 ### Fixed

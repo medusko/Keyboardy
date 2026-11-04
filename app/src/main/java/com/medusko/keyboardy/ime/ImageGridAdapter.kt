@@ -105,20 +105,20 @@ class ImageGridAdapter(
             overlayLoading.visibility = if (isLoading) View.VISIBLE else View.GONE
             ivThumbnail.scaleType = ImageView.ScaleType.FIT_CENTER
 
-            val previewUrl = if (item.isAnimatedGif && item.fullImageUrl.lowercase().endsWith(".gif")) {
-                item.fullImageUrl
-            } else {
-                item.thumbnailUrl
-            }
+            val primaryUrl = item.fullImageUrl.takeIf { it.isNotBlank() && it.startsWith("http") }
+            val fallbackUrl = item.thumbnailUrl.takeIf { it.isNotBlank() && it.startsWith("http") }
+            // Prefer full uncropped image or uncropped Tenor/Bing stream so cropped thumbnails never crop the preview
+            val initialUrl = primaryUrl ?: fallbackUrl ?: ""
 
             val request = ImageRequest.Builder(itemView.context)
-                .data(previewUrl)
+                .data(initialUrl)
                 .target(ivThumbnail)
+                .crossfade(true)
                 .listener(
                     onError = { _, _ ->
-                        if (previewUrl != item.thumbnailUrl) {
+                        if (initialUrl != fallbackUrl && !fallbackUrl.isNullOrEmpty()) {
                             val fallbackReq = ImageRequest.Builder(itemView.context)
-                                .data(item.thumbnailUrl)
+                                .data(fallbackUrl)
                                 .target(ivThumbnail)
                                 .build()
                             imageLoader.enqueue(fallbackReq)

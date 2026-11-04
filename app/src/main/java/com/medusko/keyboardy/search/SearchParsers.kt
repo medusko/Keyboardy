@@ -6,12 +6,28 @@ import org.json.JSONObject
 object SearchParsers {
 
     private val BING_M_ATTR_REGEX = Regex("""m="(\{[^"]+\})"""")
+    private val TENOR_URL_ID_REGEX = Regex(
+        """https://media[0-9]*\.tenor\.com/(?:m/)?([A-Za-z0-9_\-]{11})AAAA[A-Za-z]/([^\s"<>]+?\.gif)"""
+    )
     private val GOOGLE_SCRIPT_PAIR_REGEX = Regex(
         """\["(https://encrypted-tbn0\.gstatic\.com/images\?q=tbn:[^"]+)",\d+,\d+\]\s*,\s*\["(https?://[^"]+)",\d+,\d+\]"""
     )
     private val GOOGLE_THUMB_ONLY_REGEX = Regex(
         """https://encrypted-tbn0\.gstatic\.com/images\?q=tbn:[A-Za-z0-9_\-:]+"""
     )
+
+    /**
+     * Converts any Tenor GIF URL into its fast ~100KB animated preview URL (`AAAAM`) and full HD URL (`AAAAC`).
+     */
+    fun normalizeTenorGifUrls(url: String): Pair<String, String>? {
+        val match = TENOR_URL_ID_REGEX.find(url) ?: return null
+        if (match.groupValues.size < 3) return null
+        val tenorId = match.groupValues[1]
+        val slug = match.groupValues[2]
+        val thumb = "https://media.tenor.com/${tenorId}AAAAM/$slug"
+        val full = "https://media1.tenor.com/m/${tenorId}AAAAC/$slug"
+        return Pair(thumb, full)
+    }
 
     /**
      * Parses the HTML fragment returned by https://www.bing.com/images/async?q=...
@@ -34,17 +50,25 @@ object SearchParsers {
                 val title = obj.optString("t", "Image").trim()
 
                 if (fullUrl.startsWith("http") && seenUrls.add(fullUrl)) {
-                    val effectiveThumb = thumbUrl.ifEmpty { fullUrl }
+                    val tenorPair = normalizeTenorGifUrls(fullUrl)
+                    val effectiveThumb = when {
+                        tenorPair != null -> tenorPair.first
+                        thumbUrl.isNotEmpty() -> thumbUrl
+                            .replace("&amp;c=7", "&amp;c=0")
+                            .replace("&c=7", "&c=0")
+                        else -> fullUrl
+                    }
+                    val effectiveFull = tenorPair?.second ?: fullUrl
                     val isGif = forceGifHint ||
-                        fullUrl.lowercase().contains(".gif") ||
+                        effectiveFull.lowercase().contains(".gif") ||
                         title.lowercase().contains("gif")
 
                     results.add(
                         ImageResult(
-                            id = "inst_${results.size}_${fullUrl.hashCode()}",
+                            id = "inst_${results.size}_${effectiveFull.hashCode()}",
                             title = title,
                             thumbnailUrl = effectiveThumb,
-                            fullImageUrl = fullUrl,
+                            fullImageUrl = effectiveFull,
                             isAnimatedGif = isGif,
                             sourceLabel = "⚡"
                         )

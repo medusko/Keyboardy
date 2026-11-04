@@ -79,6 +79,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnClearanceMinus: TextView
     private lateinit var btnClearancePlus: TextView
 
+    private lateinit var cardGridScale: LinearLayout
+    private lateinit var tvGridScaleHeader: TextView
+    private lateinit var tvGridScaleDesc: TextView
+    private lateinit var btnGrid1Col: TextView
+    private lateinit var btnGrid2Col: TextView
+    private lateinit var btnGrid3Col: TextView
+    private lateinit var btnGrid4Col: TextView
+
     private lateinit var cardSandbox: LinearLayout
     private lateinit var tvSandboxHeader: TextView
     private lateinit var tvSandboxDesc: TextView
@@ -157,6 +165,14 @@ class MainActivity : AppCompatActivity() {
         tvBottomClearanceLabel = findViewById(R.id.tv_bottom_clearance_label)
         btnClearanceMinus = findViewById(R.id.btn_clearance_minus)
         btnClearancePlus = findViewById(R.id.btn_clearance_plus)
+
+        cardGridScale = findViewById(R.id.card_grid_scale)
+        tvGridScaleHeader = findViewById(R.id.tv_grid_scale_header)
+        tvGridScaleDesc = findViewById(R.id.tv_grid_scale_desc)
+        btnGrid1Col = findViewById(R.id.btn_grid_1col)
+        btnGrid2Col = findViewById(R.id.btn_grid_2col)
+        btnGrid3Col = findViewById(R.id.btn_grid_3col)
+        btnGrid4Col = findViewById(R.id.btn_grid_4col)
 
         cardSandbox = findViewById(R.id.card_sandbox)
         tvSandboxHeader = findViewById(R.id.tv_sandbox_header)
@@ -258,6 +274,20 @@ class MainActivity : AppCompatActivity() {
         btnClearancePlus.setOnClickListener {
             prefs.bottomNavClearanceDp = (prefs.bottomNavClearanceDp + 4).coerceAtMost(160)
             applyThemeAndState()
+        }
+
+        // Thumbnail Scale & Grid Columns Buttons (1x, 2x, 3x, 4x)
+        val gridColMap = mapOf(
+            1 to btnGrid1Col,
+            2 to btnGrid2Col,
+            3 to btnGrid3Col,
+            4 to btnGrid4Col
+        )
+        for ((cols, btnView) in gridColMap) {
+            btnView.setOnClickListener {
+                prefs.gridColumns = cols
+                applyThemeAndState()
+            }
         }
 
         // Configure Live Chat Sandbox EditText to accept rich images & GIFs via CommitContent API!
@@ -430,7 +460,7 @@ class MainActivity : AppCompatActivity() {
 
         // Version Footer matching Lagatron
         val footerText = TextView(this).apply {
-            text = "Keyboardy v1.01 • Built for Android 15 / Pixel"
+            text = "Keyboardy v1.02 • Built for Android 15 / Pixel"
             setTextColor(palette.textSecondary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
             typeface = Typeface.DEFAULT_BOLD
@@ -508,8 +538,8 @@ class MainActivity : AppCompatActivity() {
             sec.setTextColor(palette.accentBlue)
         }
 
-        // Style all 6 Cards
-        val cards = listOf(cardSetup, cardScale, cardSandbox, cardSettings, cardBadges, cardQuota)
+        // Style all 7 Cards
+        val cards = listOf(cardSetup, cardScale, cardGridScale, cardSandbox, cardSettings, cardBadges, cardQuota)
         for (card in cards) {
             card.background = palette.createRoundedRect(
                 fillColor = palette.surface,
@@ -523,6 +553,7 @@ class MainActivity : AppCompatActivity() {
         val headers = listOf(
             tvImeStatus,
             tvScaleHeader,
+            tvGridScaleHeader,
             tvSandboxHeader,
             tvSettingsHeader,
             tvBadgesHeader,
@@ -532,7 +563,7 @@ class MainActivity : AppCompatActivity() {
         for (h in headers) {
             h.setTextColor(palette.accentBlue)
         }
-        val descriptions = listOf(tvSetupDesc, tvScaleDesc, tvSandboxDesc, tvBadgesDesc, tvApiKeyLabel)
+        val descriptions = listOf(tvSetupDesc, tvScaleDesc, tvGridScaleDesc, tvSandboxDesc, tvBadgesDesc, tvApiKeyLabel)
         for (d in descriptions) {
             d.setTextColor(palette.textSecondary)
         }
@@ -550,6 +581,24 @@ class MainActivity : AppCompatActivity() {
         )
         for ((scaleOpt, btn) in scaleButtons) {
             val selected = prefs.keyboardScale == scaleOpt
+            btn.background = palette.createRoundedRect(
+                fillColor = if (selected) palette.accentBlue else palette.surfaceVariant,
+                cornerRadiusPx = 10f * density,
+                strokeWidthPx = if (selected) 0 else strokePx,
+                strokeColor = palette.border
+            )
+            btn.setTextColor(if (selected) Color.WHITE else palette.textPrimary)
+        }
+
+        // Thumbnail & Grid Column Buttons (1x, 2x, 3x, 4x)
+        val gridColButtons = mapOf(
+            1 to btnGrid1Col,
+            2 to btnGrid2Col,
+            3 to btnGrid3Col,
+            4 to btnGrid4Col
+        )
+        for ((cols, btn) in gridColButtons) {
+            val selected = prefs.gridColumns == cols
             btn.background = palette.createRoundedRect(
                 fillColor = if (selected) palette.accentBlue else palette.surfaceVariant,
                 cornerRadiusPx = 10f * density,

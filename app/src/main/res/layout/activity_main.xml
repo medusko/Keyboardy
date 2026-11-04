@@ -388,6 +388,85 @@
                 </LinearLayout>
             </LinearLayout>
 
+            <!-- Card 3B: Thumbnail & Grid Density Scale -->
+            <LinearLayout
+                android:id="@+id/card_grid_scale"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/tv_grid_scale_header"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Thumbnail Scale &amp; Columns (Break 3x Grid)"
+                    android:textColor="#2E6BD9"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tv_grid_scale_desc"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="Scale thumbnails up to view full-width uncropped images, or scale down for compact browsing. Break out of the rigid 3-column grid anytime."
+                    android:textColor="#B8C2D4"
+                    android:textSize="12.5sp" />
+
+                <!-- 4 Column Option Buttons: 1x, 2x, 3x, 4x -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/btn_grid_1col"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_marginEnd="5dp"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:text="1x Feed"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/btn_grid_2col"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_marginEnd="5dp"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:text="2x Large"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/btn_grid_3col"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_marginEnd="5dp"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:text="3x Grid"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/btn_grid_4col"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1"
+                        android:gravity="center"
+                        android:text="4x Compact"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+
             <!-- Card 4: Search Behavior Preferences -->
             <LinearLayout
                 android:id="@+id/card_settings"

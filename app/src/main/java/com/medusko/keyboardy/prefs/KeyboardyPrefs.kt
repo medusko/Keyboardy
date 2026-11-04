@@ -106,6 +106,33 @@ class KeyboardyPrefs(context: Context) {
         get() = prefs.getString(KEY_OPTIONAL_API_KEY, "")?.trim().orEmpty()
         set(value) = prefs.edit().putString(KEY_OPTIONAL_API_KEY, value.trim()).apply()
 
+    var gridColumns: Int
+        get() = prefs.getInt(KEY_GRID_COLUMNS, 3).coerceIn(1, 4)
+        set(value) = prefs.edit().putInt(KEY_GRID_COLUMNS, value.coerceIn(1, 4)).apply()
+
+    fun cycleGridColumns(): Int {
+        val next = when (gridColumns) {
+            3 -> 4
+            4 -> 1
+            1 -> 2
+            2 -> 3
+            else -> 3
+        }
+        gridColumns = next
+        return next
+    }
+
+    fun getGridItemHeightDp(columns: Int = gridColumns): Int {
+        val baseScale = keyboardScale
+        return when (columns) {
+            1 -> (baseScale.gridItemHeightDp * 1.65f).toInt()
+            2 -> (baseScale.gridItemHeightDp * 1.30f).toInt()
+            3 -> baseScale.gridItemHeightDp
+            4 -> (baseScale.gridItemHeightDp * 0.82f).toInt()
+            else -> baseScale.gridItemHeightDp
+        }
+    }
+
     // --- Search History (up to 25 recent queries) ---
 
     fun getSearchHistory(): List<String> {
@@ -222,6 +249,7 @@ class KeyboardyPrefs(context: Context) {
         private const val KEY_AUTO_READ_CHAT_V2 = "auto_read_chat_query_v2"
         private const val KEY_NSFW_MODE = "nsfw_mode_enabled"
         private const val KEY_ENGINE_MODE = "engine_mode"
+        private const val KEY_GRID_COLUMNS = "grid_columns"
         private const val KEY_OPTIONAL_API_KEY = "optional_api_key"
         private const val KEY_SEARCH_HISTORY_JSON = "search_history_json"
 
