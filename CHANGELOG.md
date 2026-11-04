@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [macos-v1.0.1-beta.4] - 2026-11-04
+
+### Fixed
+- **Eliminated Repetitive System Permission Popups on Every Click:**
+  - **Root Cause:** In earlier builds, if `isAccessibilityTrusted()` returned false, `downloadAndInsertImage` was actively calling `requestAccessibilityPermission()` on *every single image click*, triggering the macOS modal dialog (*"Keyboardy would like to control this Mac..."*) and opening System Settings while aborting the paste action.
+  - **Fix:** Removed the blocking permission check and modal prompt from the insertion path. Keyboardy now seamlessly copies to the clipboard, activates the target app, and executes `⌘V` paste without interruption. Permission prompts are restricted to explicit user actions (clicking "Grant" in Settings).
+- **Persistent TCC Code Signing Identity:**
+  - Code-signed the bundle with an explicit designated requirement (`designated => identifier "com.medusko.keyboardy.macos"`). macOS Privacy & Security (TCC) now anchors permission to the bundle ID rather than ephemeral binary hashes (`cdhash`), keeping permission persistent across rebuilds and updates.
+- **Clarified System Settings Toggle Guidance:**
+  - Added visual in-app banner guidance reminding users to toggle the switch next to Keyboardy to the **ON (blue)** position in `System Settings > Privacy & Security > Accessibility`.
+
+---
+
 ## [macos-v1.0.1-beta.3] - 2026-11-03
 
 ### Fixed

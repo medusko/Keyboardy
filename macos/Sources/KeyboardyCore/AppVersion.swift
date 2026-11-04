@@ -1,9 +1,9 @@
 import Foundation
 
 public enum KeyboardyVersion {
-    public static let versionName = "1.0.1-beta.3"
-    public static let buildNumber = "4"
-    public static let releaseDate = "2026-11-03"
+    public static let versionName = "1.0.1-beta.4"
+    public static let buildNumber = "5"
+    public static let releaseDate = "2026-11-04"
 
     public static var displayString: String {
         "v\(versionName)"
@@ -14,6 +14,14 @@ public enum KeyboardyVersion {
     }
 
     public static let recentImprovements: [(title: String, detail: String)] = [
+        (
+            "🛡️ Non-Intrusive Auto-Paste Execution",
+            "Eliminated recurring system permission popups on image click; Keyboardy always executes auto-paste without interrupting your typing workflow."
+        ),
+        (
+            "🔑 Stable Bundle ID Code Signing",
+            "Signed with fixed designated requirement identifier so macOS remembers your permission toggle across builds."
+        ),
         (
             "🖱️ 1-Click Image Click Auto-Paste Fixed",
             "Wired direct onSelect handler from image preview layers to selection flow, eliminating swallowed mouse clicks."

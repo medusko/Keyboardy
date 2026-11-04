@@ -10,7 +10,7 @@ if [[ -z "${VERSION:-}" ]] && [[ -f "$VERSION_FILE" ]]; then
     VERSION="$(cat "$VERSION_FILE" | tr -d '[:space:]')"
 fi
 VERSION="${VERSION:-1.0.1-beta.1}"
-BUILD_NUMBER="${BUILD_NUMBER:-4}"
+BUILD_NUMBER="${BUILD_NUMBER:-5}"
 
 echo "==> Building Keyboardy for macOS v${VERSION} (Build ${BUILD_NUMBER}) [Release]..."
 swift build -c release
@@ -83,7 +83,7 @@ cat > "$CONTENTS_DIR/Info.plist" << EOF
 </plist>
 EOF
 
-codesign --force --deep --sign - "$APP_BUNDLE" >/dev/null 2>&1 || true
+codesign --force --deep --sign - --requirements '=designated => identifier "com.medusko.keyboardy.macos"' "$APP_BUNDLE" >/dev/null 2>&1 || true
 echo "==> Built macOS App Bundle at: $APP_BUNDLE"
 
 if [[ "${1:-}" == "--package" ]]; then

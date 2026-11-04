@@ -8,7 +8,7 @@
 
 We publish independent per-platform releases so Android and macOS can evolve at their own pace. All minor improvements and beta updates are tracked in detail in our [**CHANGELOG.md**](CHANGELOG.md):
 
-- 💻 **[Download Keyboardy for macOS Beta (`Keyboardy-macOS-v1.0.1-beta.3.dmg` / `.zip`)](https://github.com/medusko/Keyboardy/releases/tag/macos-v1.0.1-beta.3)** *(Latest macOS Beta — includes 1-click image click fix, hardware ⌘V simulation, multi-format pasteboard payloads, and test studio)*
+- 💻 **[Download Keyboardy for macOS Beta (`Keyboardy-macOS-v1.0.1-beta.4.dmg` / `.zip`)](https://github.com/medusko/Keyboardy/releases/tag/macos-v1.0.1-beta.4)** *(Latest macOS Beta — includes non-intrusive auto-paste without permission popups, stable bundle ID code signing, 1-click image click fix, and test studio)*
 - 📱 **[Download Keyboardy for Android (`Keyboardy-Android-v1.01.apk`)](https://github.com/medusko/Keyboardy/releases/tag/android-v1.01)** *(Latest Android update — instant ACTION_DOWN typing with zero lag, 550ms search debounce, real-time spell-check & word suggestion strip, and aspect-fit GIF scaling)*
 - 📋 **[View All Releases & Full Changelog](CHANGELOG.md)**
 

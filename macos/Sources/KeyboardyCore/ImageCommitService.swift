@@ -114,15 +114,6 @@ public final class ImageCommitService {
 
         let appName = app.localizedName ?? "chat app"
 
-        // Check Accessibility permission: strictly required on macOS to synthesize ⌘V keystrokes into other apps
-        let trusted = isAccessibilityTrusted(promptIfNeeded: false)
-        guard trusted else {
-            requestAccessibilityPermission()
-            return .copiedToClipboard(
-                reason: "Copied! Please enable Accessibility in macOS Settings for 1-step Auto-Paste into \(appName)."
-            )
-        }
-
         // Hide the Keyboardy popover/panel and return focus to the target chat app
         onPanelShouldHideBeforePaste()
         app.activate(options: [.activateIgnoringOtherApps])
@@ -136,7 +127,9 @@ public final class ImageCommitService {
         }
         try? await Task.sleep(nanoseconds: 60_000_000)
 
-        if clearTargetQueryBeforePaste {
+        let trusted = isAccessibilityTrusted(promptIfNeeded: false)
+
+        if clearTargetQueryBeforePaste && trusted {
             // Select all & delete the temporary query text in the focused chat input before pasting
             Self.synthesizeSelectAllAndDelete(targetPid: app.processIdentifier)
             try? await Task.sleep(nanoseconds: 40_000_000)
@@ -153,7 +146,13 @@ public final class ImageCommitService {
             pb.setString(previousText, forType: .string)
         }
 
-        return .autoPastedIntoApp(appName: appName)
+        if trusted {
+            return .autoPastedIntoApp(appName: appName)
+        } else {
+            return .copiedToClipboard(
+                reason: "Copied! Toggle switch ON next to Keyboardy in System Settings for 1-step auto-paste."
+            )
+        }
     }
 
     /// Downloads image bytes for drag-and-drop or local preview caching.
