@@ -24,6 +24,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [android-v1.0.1-RC1] - 2026-11-04
+
+### Added & Enhanced
+- **Release Candidate 1 (RC1) Milestone:**
+  - Transitioned versioning to **Release Candidate 1 (`v1.0.1-RC1`, Build 8)**.
+- **Enhanced About Keyboardy Dialog:**
+  - Added recent improvements and What's New release details inside the About dialog.
+  - Added direct link to the Full Changelog.
+  - Dynamically displays active Release Candidate build info.
+
+---
+
 ## [android-v1.06] - 2026-11-04
 
 ### Changed
