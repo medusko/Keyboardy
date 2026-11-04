@@ -6,11 +6,11 @@
 
 ## 📥 Downloads (GitHub Releases)
 
-We publish independent per-platform releases so Android and macOS can evolve at their own pace:
+We publish independent per-platform releases so Android and macOS can evolve at their own pace. All minor improvements and beta updates are tracked in detail in our [**CHANGELOG.md**](CHANGELOG.md):
 
+- 💻 **[Download Keyboardy for macOS Beta (`Keyboardy-macOS-v1.0.1-beta.1.dmg` / `.zip`)](https://github.com/medusko/Keyboardy/releases/tag/macos-v1.0.1-beta.1)** *(Latest macOS Beta — includes Tenor fast GIFs, continuous looping, 1-step auto-paste, and native drag-and-drop)*
 - 📱 **[Download Keyboardy for Android (`Keyboardy-Android-v1.0.0.apk`)](https://github.com/medusko/Keyboardy/releases/tag/android-v1.0.0)**
-- 💻 **[Download Keyboardy for macOS (`Keyboardy-macOS-v1.0.0.dmg` / `.zip`)](https://github.com/medusko/Keyboardy/releases/tag/macos-v1.0.0)**
-- 📦 **[View All Releases](https://github.com/medusko/Keyboardy/releases)**
+- 📋 **[View All Releases & Full Changelog](CHANGELOG.md)**
 
 ---
 

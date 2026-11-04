@@ -401,6 +401,109 @@ struct SettingsView: View {
                             )
                         }
                     }
+
+                    // =====================================================
+                    // SECTION 5: BETA VERSION & IMPROVEMENTS TRACKER
+                    // =====================================================
+                    sectionGroup(header: "BETA VERSION & WHAT'S NEW") {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Keyboardy for macOS")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundColor(palette.textPrimary)
+                                Text("Active Beta Build")
+                                    .font(.system(size: 10.5))
+                                    .foregroundColor(palette.textSecondary)
+                            }
+
+                            Spacer()
+
+                            Text(KeyboardyVersion.detailedDisplayString)
+                                .font(.system(size: 10.5, weight: .black, design: .monospaced))
+                                .foregroundColor(palette.accentBlue)
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 4)
+                                .background(palette.accentBlue.opacity(0.12))
+                                .cornerRadius(8)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(palette.accentBlue.opacity(0.4), lineWidth: 1)
+                                )
+                        }
+
+                        rowDivider
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Recent Improvements in this Beta:")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(palette.textPrimary)
+
+                            ForEach(KeyboardyVersion.recentImprovements, id: \.title) { item in
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(item.title)
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundColor(palette.textPrimary)
+                                    Text(item.detail)
+                                        .font(.system(size: 10))
+                                        .foregroundColor(palette.textSecondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                .padding(.vertical, 1)
+                            }
+                        }
+
+                        rowDivider
+
+                        HStack {
+                            Button(action: {
+                                if let url = URL(string: "https://github.com/medusko/Keyboardy/blob/main/CHANGELOG.md") {
+                                    NSWorkspace.shared.open(url)
+                                }
+                            }) {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "doc.text.magnifyingglass")
+                                        .font(.system(size: 11, weight: .bold))
+                                    Text("Full Changelog")
+                                        .font(.system(size: 11, weight: .bold))
+                                }
+                                .foregroundColor(palette.accentBlue)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(palette.surfaceVariant)
+                                .cornerRadius(7)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 7)
+                                        .stroke(palette.border, lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
+
+                            Spacer()
+
+                            Button(action: {
+                                if let url = URL(string: "https://github.com/medusko/Keyboardy/releases") {
+                                    NSWorkspace.shared.open(url)
+                                }
+                            }) {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "arrow.down.circle")
+                                        .font(.system(size: 11, weight: .bold))
+                                    Text("All Releases")
+                                        .font(.system(size: 11, weight: .bold))
+                                }
+                                .foregroundColor(palette.textSecondary)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(palette.surfaceVariant)
+                                .cornerRadius(7)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 7)
+                                        .stroke(palette.border, lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                 }
                 .padding(14)
             }

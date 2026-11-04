@@ -120,7 +120,7 @@ final class KeyboardyAppDelegate: NSObject, NSApplicationDelegate {
             button.target = self
             button.action = #selector(onStatusBarClicked(_:))
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
-            button.toolTip = "Keyboardy — Search & Insert Google Images & GIFs (\(prefs.hotkeyPreset.shortLabel))"
+            button.toolTip = "Keyboardy \(KeyboardyVersion.displayString) — Search & Insert Google Images & GIFs (\(prefs.hotkeyPreset.shortLabel))"
         }
     }
 
@@ -187,7 +187,7 @@ final class KeyboardyAppDelegate: NSObject, NSApplicationDelegate {
             .sink { [weak self] _, _, _ in
                 TriggerManager.shared.applyCurrentHotkeyFromPrefs()
                 let label = self?.prefs.activeHotkeyShortLabel ?? "⌥⇧Space"
-                self?.statusItem?.button?.toolTip = "Keyboardy — Search & Insert Google Images & GIFs (\(label))"
+                self?.statusItem?.button?.toolTip = "Keyboardy \(KeyboardyVersion.displayString) — Search & Insert Google Images & GIFs (\(label))"
             }
             .store(in: &cancellables)
 

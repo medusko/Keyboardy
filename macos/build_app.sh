@@ -5,9 +5,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$SCRIPT_DIR"
 
-VERSION="${VERSION:-1.0.0}"
+VERSION_FILE="$SCRIPT_DIR/VERSION"
+if [[ -z "${VERSION:-}" ]] && [[ -f "$VERSION_FILE" ]]; then
+    VERSION="$(cat "$VERSION_FILE" | tr -d '[:space:]')"
+fi
+VERSION="${VERSION:-1.0.1-beta.1}"
+BUILD_NUMBER="${BUILD_NUMBER:-2}"
 
-echo "==> Building Keyboardy for macOS v${VERSION} (Release)..."
+echo "==> Building Keyboardy for macOS v${VERSION} (Build ${BUILD_NUMBER}) [Release]..."
 swift build -c release
 
 APP_NAME="Keyboardy"
@@ -63,7 +68,7 @@ cat > "$CONTENTS_DIR/Info.plist" << EOF
     <key>CFBundleShortVersionString</key>
     <string>${VERSION}</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>${BUILD_NUMBER}</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>LSUIElement</key>
