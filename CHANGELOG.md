@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [android-v1.04] - 2026-11-04
+
+### Changed & Fixed
+- **Auto-Lower Keyboard on Settings Transition:**
+  - Configured the top bar's Settings button (`⚙️`) to immediately dismiss and lower the IME window (`requestHideSelf(0)`), ensuring the settings screen and sandbox are unobstructed when switching to settings.
+- **Removed Slider-Style Gray Line:**
+  - Eliminated the gray slider handle bar at the top of the keyboard to streamline the interface and remove visual clutter.
+- **Modern Rounded Blue Bar & Transparent Curved Sheet:**
+  - In standard (non-full screen) mode, the blue boundary indicator is now a sleek, centered rounded capsule (56dp wide x 4dp height with 3dp corner radius) with transparent padding.
+  - Set the IME dialog window to transparent and shaped the keyboard's top with 18dp rounded corners, creating a modern floating bottom-sheet aesthetic that blends smoothly with the active host app.
+
+---
+
 ## [android-v1.03] - 2026-11-04
 
 ### Added

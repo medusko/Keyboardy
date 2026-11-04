@@ -8,6 +8,8 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
 import android.inputmethodservice.InputMethodService
 import android.os.Build
 import android.os.Handler
@@ -87,7 +89,6 @@ class KeyboardyImeService : InputMethodService() {
     private var ivSettingsIcon: ImageView? = null
     private var imeTopBoundary: LinearLayout? = null
     private var imeTopLine: View? = null
-    private var imeTopHandle: View? = null
 
     private var selectionActionBar: LinearLayout? = null
     private var btnCtxPaste: TextView? = null
@@ -172,7 +173,6 @@ class KeyboardyImeService : InputMethodService() {
         ivSettingsIcon = root.findViewById(R.id.iv_settings_icon)
         imeTopBoundary = root.findViewById(R.id.ime_top_boundary)
         imeTopLine = root.findViewById(R.id.ime_top_line)
-        imeTopHandle = root.findViewById(R.id.ime_top_handle)
 
         selectionActionBar = root.findViewById(R.id.selection_action_bar)
         btnCtxPaste = root.findViewById(R.id.btn_ctx_paste)
@@ -246,9 +246,10 @@ class KeyboardyImeService : InputMethodService() {
             applyScaleAndTheme()
         }
 
-        // Settings Button (⚙️) opens Keyboardy Settings
+        // Settings Button (⚙️) opens Keyboardy Settings and lowers the keyboard
         btnSettings?.setOnClickListener { view ->
             performTapHaptic(view)
+            requestHideSelf(0)
             try {
                 val intent = Intent(this, MainActivity::class.java).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
@@ -540,25 +541,64 @@ class KeyboardyImeService : InputMethodService() {
 
         // Direct Bottom Bar Offset in pixels so every tap of -6 / +6 visibly moves the bottom of the keyboard!
         val bottomOffsetPx = dpToPx(prefs.bottomNavClearanceDp)
+        val isFull = prefs.isFullScreenMode
 
         // Height: standard mode (~74% screen) leaves clear room to see and scroll host app content,
         // while Full Screen Mode (~96% screen) maximizes search & thumbnail viewing area.
         val screenHeightPx = resources.displayMetrics.heightPixels
-        val targetContainerHeightPx = if (prefs.isFullScreenMode) {
+        val targetContainerHeightPx = if (isFull) {
             (screenHeightPx * 0.96f).toInt()
         } else {
             (screenHeightPx * 0.74f).toInt().coerceAtLeast(dpToPx(420))
         }
 
-        // Top Boundary Line & Indicator (denotes top boundary between host app and keyboard)
-        imeTopLine?.setBackgroundColor(palette.accentBlue)
-        imeTopHandle?.background = palette.createRoundedRect(
-            fillColor = if (palette.isDark) Color.parseColor("#475569") else Color.parseColor("#94A3B8"),
-            cornerRadiusPx = 3f * density
-        )
+        // Set IME dialog window background to transparent for seamless rounded corner cutout
+        window?.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+
+        // Top Blue Bar: in non-full screen mode, modern rounded capsule with transparency behind it
+        imeTopLine?.let { line ->
+            val lp = line.layoutParams as? LinearLayout.LayoutParams
+            if (lp != null) {
+                if (isFull) {
+                    lp.width = LinearLayout.LayoutParams.MATCH_PARENT
+                    lp.height = dpToPx(2)
+                    lp.setMargins(0, 0, 0, 0)
+                    line.layoutParams = lp
+                    line.background = palette.createRoundedRect(
+                        fillColor = palette.accentBlue,
+                        cornerRadiusPx = 0f
+                    )
+                } else {
+                    lp.width = dpToPx(56)
+                    lp.height = dpToPx(4)
+                    lp.setMargins(0, dpToPx(7), 0, dpToPx(3))
+                    line.layoutParams = lp
+                    line.background = palette.createRoundedRect(
+                        fillColor = palette.accentBlue,
+                        cornerRadiusPx = dpToPx(3).toFloat()
+                    )
+                }
+            }
+        }
 
         rootImeContainer?.let { root ->
-            root.setBackgroundColor(palette.background)
+            if (isFull) {
+                root.setBackgroundColor(palette.background)
+            } else {
+                // Modern rounded top sheet corners with transparency behind them
+                val topRadius = dpToPx(18).toFloat()
+                val bgDrawable = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    setColor(palette.background)
+                    cornerRadii = floatArrayOf(
+                        topRadius, topRadius, // top-left
+                        topRadius, topRadius, // top-right
+                        0f, 0f,               // bottom-right
+                        0f, 0f                // bottom-left
+                    )
+                }
+                root.background = bgDrawable
+            }
             val lp = root.layoutParams
             if (lp != null) {
                 lp.height = targetContainerHeightPx
