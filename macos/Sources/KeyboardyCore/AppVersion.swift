@@ -1,8 +1,8 @@
 import Foundation
 
 public enum KeyboardyVersion {
-    public static let versionName = "1.0.1-beta.2"
-    public static let buildNumber = "3"
+    public static let versionName = "1.0.1-beta.3"
+    public static let buildNumber = "4"
     public static let releaseDate = "2026-11-03"
 
     public static var displayString: String {
@@ -14,6 +14,22 @@ public enum KeyboardyVersion {
     }
 
     public static let recentImprovements: [(title: String, detail: String)] = [
+        (
+            "🖱️ 1-Click Image Click Auto-Paste Fixed",
+            "Wired direct onSelect handler from image preview layers to selection flow, eliminating swallowed mouse clicks."
+        ),
+        (
+            "⌨️ Hardware-Accurate ⌘V Key Dispatch",
+            "Synthesizes Command key-down, V key-down, 35ms hold, V key-up, and Command key-up posted directly to target application PID and system HID tap."
+        ),
+        (
+            "📋 Multi-Format Pasteboard Payloads",
+            "Populates NSPasteboard with public.file-url, NSFilenamesPboardType, image/gif, com.compuserve.gif, image/png, and public.tiff for universal browser & desktop app compatibility."
+        ),
+        (
+            "🧪 Interactive Insertion Test Studio",
+            "Included a live web testing studio (test_site/index.html) with real-time pasteboard event logs and instant GIF/image verification."
+        ),
         (
             "🔐 macOS Accessibility Permission Onboarding",
             "Automatic detection, prompt, and direct System Settings navigation for Accessibility permission required for 1-click Auto-Paste into chat apps."

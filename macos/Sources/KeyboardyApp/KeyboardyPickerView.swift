@@ -396,9 +396,15 @@ struct KeyboardyPickerView: View {
             ZStack {
                 palette.surfaceVariant
 
-                AnimatedRemoteImageView(item: item)
-                    .frame(height: 116)
-                    .padding(4)
+                AnimatedRemoteImageView(
+                    item: item,
+                    onSelect: {
+                        viewModel.selectedIndex = index
+                        viewModel.selectImageResult(item)
+                    }
+                )
+                .frame(height: 116)
+                .padding(4)
 
                 VStack {
                     HStack {

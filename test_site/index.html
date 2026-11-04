@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Keyboardy Image Insertion Test Studio</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --card-bg: #181b24;
+      --card-border: #282d3d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #3b82f6;
+      --accent-glow: rgba(59, 130, 246, 0.35);
+      --success: #10b981;
+      --success-bg: rgba(16, 185, 129, 0.15);
+      --warning: #f59e0b;
+      --code-bg: #090b10;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--card-border);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo-area {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .logo-badge {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #2563eb, #3b82f6);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 16px;
+      color: white;
+      box-shadow: 0 2px 8px var(--accent-glow);
+    }
+    h1 {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--success-bg);
+      color: var(--success);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      transition: all 0.2s ease;
+    }
+    .status-badge.inactive {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--warning);
+      border-color: rgba(245, 158, 11, 0.3);
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 20px;
+      padding: 20px 24px;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    .chat-section {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 120px);
+      overflow: hidden;
+    }
+    .chat-header {
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .instructions-callout {
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.25);
+      padding: 12px 16px;
+      margin: 14px 18px 0;
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .instructions-callout strong {
+      color: var(--accent);
+    }
+    .chat-feed {
+      flex: 1;
+      padding: 18px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .message {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 14px;
+      line-height: 1.4;
+      animation: fadeIn 0.25s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .message.received {
+      align-self: flex-start;
+      background: #212634;
+      border: 1px solid var(--card-border);
+      color: var(--text);
+    }
+    .message.sent {
+      align-self: flex-end;
+      background: #1e3a8a;
+      color: white;
+    }
+    .message.image-message {
+      align-self: flex-end;
+      background: transparent;
+      padding: 0;
+      border: none;
+    }
+    .image-card {
+      background: #1e2433;
+      border: 1px solid #323b52;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      display: flex;
+      flex-direction: column;
+    }
+    .image-card img {
+      max-width: 320px;
+      max-height: 240px;
+      object-fit: contain;
+      background: #090b10;
+      display: block;
+    }
+    .image-card-meta {
+      padding: 8px 12px;
+      font-size: 11.5px;
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-muted);
+      border-top: 1px solid var(--card-border);
+    }
+    .tag {
+      background: var(--accent);
+      color: white;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: 10px;
+    }
+    .composer {
+      padding: 14px 18px;
+      border-top: 1px solid var(--card-border);
+      background: rgba(255, 255, 255, 0.02);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .editable-input {
+      min-height: 48px;
+      max-height: 120px;
+      overflow-y: auto;
+      background: var(--code-bg);
+      border: 2px solid var(--card-border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 14px;
+      color: var(--text);
+      outline: none;
+      transition: all 0.2s ease;
+    }
+    .editable-input:focus, .editable-input.focused {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    .editable-input[empty]:before {
+      content: attr(data-placeholder);
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+    .drop-zone {
+      border: 2px dashed #374151;
+      border-radius: 10px;
+      padding: 14px;
+      text-align: center;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      transition: all 0.2s ease;
+      background: rgba(0,0,0,0.2);
+    }
+    .drop-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(59, 130, 246, 0.1);
+      color: var(--text);
+    }
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      height: calc(100vh - 120px);
+    }
+    .panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .panel-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .log-container {
+      flex: 1;
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11.5px;
+      overflow-y: auto;
+      max-height: 380px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .log-item {
+      line-height: 1.4;
+      word-break: break-all;
+    }
+    .log-item .time {
+      color: var(--text-muted);
+      margin-right: 6px;
+    }
+    .log-item.paste {
+      color: var(--success);
+      font-weight: 600;
+    }
+    .log-item.key {
+      color: var(--accent);
+    }
+    .log-item.focus {
+      color: #a78bfa;
+    }
+    .btn {
+      background: var(--card-border);
+      color: var(--text);
+      border: none;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .btn:hover {
+      background: #3a4256;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo-area">
+      <div class="logo-badge">K</div>
+      <div>
+        <h1>Keyboardy Insertion Test Studio</h1>
+        <div style="font-size: 11.5px; color: var(--text-muted);">macOS 1-Click Auto-Paste (⌘V) & Drag-and-Drop Verification Lab</div>
+      </div>
+    </div>
+    <div id="target-status" class="status-badge inactive">
+      <div class="dot"></div>
+      <span id="target-status-text">Click chat input below to focus</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="chat-section">
+      <div class="chat-header">
+        <span style="font-weight: 600; font-size: 13.5px;">💬 Active Test Chat Feed</span>
+        <button id="clear-chat-btn" class="btn">Clear Messages</button>
+      </div>
+
+      <div class="instructions-callout">
+        <strong>🧪 How to Test 1-Click Auto-Paste:</strong>
+        <ol style="margin-left: 18px; margin-top: 6px; display: flex; flex-direction: column; gap: 4px;">
+          <li>Click inside the <strong>Message Input box</strong> below (the status in the top right will turn <strong>GREEN</strong>).</li>
+          <li>Press <strong>⌥ ⇧ Space</strong> (or click the Keyboardy icon in the macOS menu bar).</li>
+          <li>Search for anything (e.g. <code>cat gif</code> or <code>thumbs up</code>).</li>
+          <li><strong>Click any image in Keyboardy</strong>: Keyboardy closes, returns focus to this tab, and pastes the image automatically!</li>
+          <li>You can also click and <strong>drag</strong> any image from Keyboardy and drop it into the chat or drop zone.</li>
+        </ol>
+      </div>
+
+      <div id="chat-feed" class="chat-feed">
+        <div class="message received">
+          👋 Welcome to the Keyboardy test chat! Click in the message box below, trigger Keyboardy with <strong>⌥⇧Space</strong>, and click or drag an image/GIF.
+        </div>
+      </div>
+
+      <div class="composer">
+        <div id="chat-input" class="editable-input" contenteditable="true" data-placeholder="Click here to focus chat input, then trigger Keyboardy..." empty></div>
+        
+        <div id="drop-zone" class="drop-zone">
+          🖱️ Or Drag & Drop an image / animated GIF from Keyboardy anywhere in this box
+        </div>
+      </div>
+    </section>
+
+    <aside class="sidebar">
+      <div class="panel" style="flex: 1;">
+        <div class="panel-title">
+          <span>⚡ Live Event Inspector</span>
+          <button id="clear-log-btn" class="btn">Clear</button>
+        </div>
+        <div id="log-container" class="log-container">
+          <div class="log-item"><span class="time">[00:00:00]</span> Diagnostic log initialized. Ready for events.</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">📋 Target Detection</div>
+        <div style="font-size: 12px; color: var(--text-muted); line-height: 1.5;">
+          When you click into the message box, this window becomes frontmost. Keyboardy detects it as the active chat target and routes <strong>⌘V</strong> directly into this document.
+        </div>
+        <div style="margin-top: 6px; display: flex; gap: 6px;">
+          <button id="focus-btn" class="btn" style="background: var(--accent); color: white; width: 100%;">Click to Focus Chat Box</button>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    const chatFeed = document.getElementById('chat-feed');
+    const chatInput = document.getElementById('chat-input');
+    const dropZone = document.getElementById('drop-zone');
+    const statusBadge = document.getElementById('target-status');
+    const statusText = document.getElementById('target-status-text');
+    const logContainer = document.getElementById('log-container');
+    const clearChatBtn = document.getElementById('clear-chat-btn');
+    const clearLogBtn = document.getElementById('clear-log-btn');
+    const focusBtn = document.getElementById('focus-btn');
+
+    function log(message, type = '') {
+      const time = new Date().toTimeString().split(' ')[0];
+      const item = document.createElement('div');
+      item.className = 'log-item ' + type;
+      item.innerHTML = `<span class="time">[${time}]</span> ${message}`;
+      logContainer.appendChild(item);
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    function updateFocusState(isFocused) {
+      if (isFocused) {
+        statusBadge.className = 'status-badge';
+        statusText.innerText = '🟢 Chat Focused (Ready for Keyboardy Paste)';
+        chatInput.classList.add('focused');
+      } else {
+        statusBadge.className = 'status-badge inactive';
+        statusText.innerText = '⚠️ Chat Unfocused (Click message box)';
+        chatInput.classList.remove('focused');
+      }
+    }
+
+    chatInput.addEventListener('focus', () => {
+      updateFocusState(true);
+      log('Chat input gained focus — ready for ⌘V paste', 'focus');
+    });
+
+    chatInput.addEventListener('blur', () => {
+      // Don't mark inactive immediately so Keyboardy activation can paste seamlessly
+      setTimeout(() => {
+        if (document.activeElement !== chatInput) {
+          updateFocusState(false);
+          log('Chat input blurred', 'focus');
+        }
+      }, 150);
+    });
+
+    focusBtn.addEventListener('click', () => {
+      chatInput.focus();
+    });
+
+    // Handle placeholder attribute for contenteditable
+    chatInput.addEventListener('input', () => {
+      if (chatInput.innerText.trim().length === 0 && chatInput.querySelectorAll('img').length === 0) {
+        chatInput.setAttribute('empty', '');
+      } else {
+        chatInput.removeAttribute('empty');
+      }
+    });
+
+    // Monitor raw key combinations (⌘V, etc.)
+    window.addEventListener('keydown', (e) => {
+      if (e.metaKey && e.key.toLowerCase() === 'v') {
+        log(`🎹 Keydown: ⌘V (Command + V) intercepted on window!`, 'key');
+      }
+    }, true);
+
+    // Universal Paste Handler (works when chatInput is focused or on document)
+    document.addEventListener('paste', (e) => {
+      log('📥 Paste event received!', 'paste');
+      const clipboardData = e.clipboardData || window.clipboardData;
+      if (!clipboardData) {
+        log('❌ No clipboard data available on paste event');
+        return;
+      }
+
+      const types = Array.from(clipboardData.types || []);
+      log(`Pasteboard types: [${types.join(', ')}]`);
+
+      let inserted = false;
+
+      // 1. Check for image files in clipboard
+      const files = clipboardData.files;
+      if (files && files.length > 0) {
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          if (file.type.startsWith('image/')) {
+            insertImageIntoFeed(file, 'Pasted via ⌘V');
+            inserted = true;
+          }
+        }
+      }
+
+      // 2. Check clipboard items for image blob
+      if (!inserted && clipboardData.items) {
+        for (let i = 0; i < clipboardData.items.length; i++) {
+          const item = clipboardData.items[i];
+          if (item.type.startsWith('image/')) {
+            const blob = item.getAsFile();
+            if (blob) {
+              insertImageIntoFeed(blob, 'Pasted via ⌘V (Blob)');
+              inserted = true;
+              break;
+            }
+          }
+        }
+      }
+
+      // 3. Fallback: text or file URL in clipboard
+      if (!inserted) {
+        const text = clipboardData.getData('text/plain');
+        if (text) {
+          log(`Pasted plain text: "${text.substring(0, 100)}"`);
+          if (text.startsWith('http') && (text.includes('.gif') || text.includes('.png') || text.includes('.jpg') || text.includes('.webp'))) {
+            insertImageUrlIntoFeed(text, 'Pasted Image URL');
+          } else {
+            insertTextMessageIntoFeed(text);
+          }
+        }
+      }
+
+      e.preventDefault();
+    });
+
+    // Drag and Drop Handling
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+      });
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      log('🎯 Drop event received on Drop Zone!', 'paste');
+      handleDropData(e.dataTransfer);
+    });
+
+    document.addEventListener('dragover', (e) => e.preventDefault());
+    document.addEventListener('drop', (e) => {
+      if (e.target !== dropZone && !dropZone.contains(e.target)) {
+        e.preventDefault();
+        log('🎯 Drop event received on window!', 'paste');
+        handleDropData(e.dataTransfer);
+      }
+    });
+
+    function handleDropData(dataTransfer) {
+      if (!dataTransfer) return;
+      if (dataTransfer.files && dataTransfer.files.length > 0) {
+        for (let i = 0; i < dataTransfer.files.length; i++) {
+          const file = dataTransfer.files[i];
+          insertImageIntoFeed(file, 'Dropped via Native Drag');
+        }
+      }
+    }
+
+    function insertImageIntoFeed(file, sourceLabel) {
+      const url = URL.createObjectURL(file);
+      const isGif = file.type === 'image/gif' || file.name.endsWith('.gif');
+      const sizeStr = (file.size / 1024).toFixed(1) + ' KB';
+
+      log(`✅ Successfully extracted image: <strong>${file.name || 'Image'}</strong> (${file.type}, ${sizeStr})`, 'paste');
+
+      const messageDiv = document.createElement('div');
+      messageDiv.className = 'message image-message sent';
+
+      messageDiv.innerHTML = `
+        <div class="image-card">
+          <img src="${url}" alt="Inserted image">
+          <div class="image-card-meta">
+            <span><span class="tag">${isGif ? 'GIF' : 'IMAGE'}</span> ${sourceLabel}</span>
+            <span>${sizeStr}</span>
+          </div>
+        </div>
+      `;
+
+      chatFeed.appendChild(messageDiv);
+      chatFeed.scrollTop = chatFeed.scrollHeight;
+
+      // Clear input
+      chatInput.innerHTML = '';
+      chatInput.setAttribute('empty', '');
+      chatInput.focus();
+    }
+
+    function insertImageUrlIntoFeed(url, sourceLabel) {
+      log(`✅ Inserting image from URL: ${url}`, 'paste');
+      const messageDiv = document.createElement('div');
+      messageDiv.className = 'message image-message sent';
+      messageDiv.innerHTML = `
+        <div class="image-card">
+          <img src="${url}" alt="Inserted image">
+          <div class="image-card-meta">
+            <span><span class="tag">WEB</span> ${sourceLabel}</span>
+          </div>
+        </div>
+      `;
+      chatFeed.appendChild(messageDiv);
+      chatFeed.scrollTop = chatFeed.scrollHeight;
+    }
+
+    function insertTextMessageIntoFeed(text) {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = 'message sent';
+      messageDiv.innerText = text;
+      chatFeed.appendChild(messageDiv);
+      chatFeed.scrollTop = chatFeed.scrollHeight;
+    }
+
+    clearChatBtn.addEventListener('click', () => {
+      chatFeed.innerHTML = '';
+      log('Chat feed cleared');
+    });
+
+    clearLogBtn.addEventListener('click', () => {
+      logContainer.innerHTML = '';
+    });
+
+    // Auto-focus the chat input on initial page load
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        chatInput.focus();
+      }, 200);
+    });
+  </script>
+</body>
+</html>

@@ -103,44 +103,47 @@ public final class ImageCommitService {
 
         Self.writeToPasteboard(fileURL: fileURL, data: prepared.data, mimeType: prepared.mimeType, ext: prepared.ext)
 
-        guard insertMode == .autoPasteIntoApp, let app = targetApp else {
+        let myPid = ProcessInfo.processInfo.processIdentifier
+        let resolvedApp: NSRunningApplication? = targetApp ?? NSWorkspace.shared.runningApplications.first(where: {
+            $0.processIdentifier != myPid && $0.activationPolicy == .regular && !$0.isTerminated
+        })
+
+        guard insertMode == .autoPasteIntoApp, let app = resolvedApp else {
             return .copiedToClipboard(reason: "Copied to Clipboard — press ⌘V in any app!")
         }
 
         let appName = app.localizedName ?? "chat app"
 
+        // Check Accessibility permission: strictly required on macOS to synthesize ⌘V keystrokes into other apps
+        let trusted = isAccessibilityTrusted(promptIfNeeded: false)
+        guard trusted else {
+            requestAccessibilityPermission()
+            return .copiedToClipboard(
+                reason: "Copied! Please enable Accessibility in macOS Settings for 1-step Auto-Paste into \(appName)."
+            )
+        }
+
         // Hide the Keyboardy popover/panel and return focus to the target chat app
         onPanelShouldHideBeforePaste()
         app.activate(options: [.activateIgnoringOtherApps])
 
-        // Wait until the target application actually becomes frontmost (up to 450ms) + 80ms settle delay
-        for _ in 0..<18 {
+        // Wait until the target application actually becomes frontmost (up to 400ms) + 60ms settle delay
+        for _ in 0..<20 {
             if NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier {
                 break
             }
-            try? await Task.sleep(nanoseconds: 25_000_000)
+            try? await Task.sleep(nanoseconds: 20_000_000)
         }
-        try? await Task.sleep(nanoseconds: 85_000_000)
+        try? await Task.sleep(nanoseconds: 60_000_000)
 
-        let trusted = isAccessibilityTrusted(promptIfNeeded: false)
-        if !trusted {
-            // Prompt macOS to grant Accessibility permission for the current binary
-            _ = isAccessibilityTrusted(promptIfNeeded: true)
-        }
-
-        if clearTargetQueryBeforePaste && trusted {
+        if clearTargetQueryBeforePaste {
             // Select all & delete the temporary query text in the focused chat input before pasting
-            Self.synthesizeKeyStroke(keyCode: CGKeyCode(kVK_ANSI_A), flags: .maskCommand)
-            try? await Task.sleep(nanoseconds: 40_000_000)
-            Self.synthesizeKeyStroke(keyCode: CGKeyCode(kVK_Delete), flags: [])
+            Self.synthesizeSelectAllAndDelete(targetPid: app.processIdentifier)
             try? await Task.sleep(nanoseconds: 40_000_000)
         }
 
-        // Synthesize Cmd+V (Paste) via CGEvent (and AppleScript System Events fallback if needed)
-        Self.synthesizeKeyStroke(keyCode: CGKeyCode(kVK_ANSI_V), flags: .maskCommand)
-        if !trusted {
-            Self.tryAppleScriptPasteFallback()
-        }
+        // Synthesize Cmd+V (Paste) with full modifier + key hold sequence delivered to HID tap and target PID
+        Self.synthesizePasteKeystroke(targetPid: app.processIdentifier)
 
         if restoreClipboardAfterPaste, let previousText = savedTextClipboard {
             // Wait 3.0s before restoring old text clipboard so Slack/Discord/Messages/browsers finish reading the pasted image/GIF
@@ -219,41 +222,116 @@ public final class ImageCommitService {
         let pb = NSPasteboard.general
         pb.clearContents()
 
-        let gifPasteboardType = NSPasteboard.PasteboardType("com.compuserve.gif")
+        // 1. File URL (standard modern macOS pasteboard object)
+        pb.writeObjects([fileURL as NSURL])
+
+        // 2. Legacy filenames array for desktop apps (Slack, Discord desktop)
+        pb.setPropertyList([fileURL.path], forType: NSPasteboard.PasteboardType("NSFilenamesPboardType"))
 
         if ext == "gif" {
-            // Write file URL AND com.compuserve.gif raw bytes (avoiding flattened NSImage bitmap representation)
-            pb.writeObjects([fileURL as NSURL])
-            pb.setData(data, forType: gifPasteboardType)
+            // 3. Raw animated GIF bytes
+            pb.setData(data, forType: NSPasteboard.PasteboardType("com.compuserve.gif"))
+            pb.setData(data, forType: NSPasteboard.PasteboardType("image/gif"))
         } else {
-            // Static PNG / JPEG: write both file URL and native NSImage / PNG pasteboard types
-            pb.writeObjects([fileURL as NSURL])
-            if ext == "png" {
-                pb.setData(data, forType: .png)
-            } else if let nsImage = NSImage(data: data),
-                      let tiff = nsImage.tiffRepresentation,
-                      let rep = NSBitmapImageRep(data: tiff),
-                      let pngData = rep.representation(using: .png, properties: [:]) {
-                pb.setData(pngData, forType: .png)
+            // 4. Static PNG / JPEG
+            pb.setData(data, forType: .png)
+            pb.setData(data, forType: NSPasteboard.PasteboardType("image/png"))
+            if let nsImage = NSImage(data: data),
+               let tiff = nsImage.tiffRepresentation {
+                pb.setData(tiff, forType: .tiff)
             }
         }
     }
 
-    private nonisolated static func synthesizeKeyStroke(keyCode: CGKeyCode, flags: CGEventFlags) {
-        let src = CGEventSource(stateID: .hidSystemState)
-        if let keyDown = CGEvent(keyboardEventSource: src, virtualKey: keyCode, keyDown: true),
-           let keyUp = CGEvent(keyboardEventSource: src, virtualKey: keyCode, keyDown: false) {
-            keyDown.flags = flags
-            keyUp.flags = flags
-            keyDown.post(tap: .cghidEventTap)
-            keyUp.post(tap: .cghidEventTap)
+    /// Synthesizes a true hardware-like ⌘V keystroke sequence (Cmd down -> V down -> 35ms hold -> V up -> Cmd up)
+    /// dispatched to both the system HID tap and directly to the target application's PID.
+    public nonisolated static func synthesizePasteKeystroke(targetPid: pid_t? = nil) {
+        guard let src = CGEventSource(stateID: .combinedSessionState) else { return }
+
+        let cmdKeyCode = CGKeyCode(55) // kVK_Command
+        let vKeyCode = CGKeyCode(kVK_ANSI_V) // 9
+
+        // 1. Command down
+        if let cmdDown = CGEvent(keyboardEventSource: src, virtualKey: cmdKeyCode, keyDown: true) {
+            cmdDown.flags = .maskCommand
+            cmdDown.post(tap: .cghidEventTap)
+            if let pid = targetPid { cmdDown.postToPid(pid) }
+        }
+
+        usleep(15_000) // 15ms delay
+
+        // 2. 'V' down
+        if let vDown = CGEvent(keyboardEventSource: src, virtualKey: vKeyCode, keyDown: true) {
+            vDown.flags = .maskCommand
+            vDown.post(tap: .cghidEventTap)
+            if let pid = targetPid { vDown.postToPid(pid) }
+        }
+
+        usleep(35_000) // 35ms hold so the target app's event loop registers the keypress
+
+        // 3. 'V' up
+        if let vUp = CGEvent(keyboardEventSource: src, virtualKey: vKeyCode, keyDown: false) {
+            vUp.flags = .maskCommand
+            vUp.post(tap: .cghidEventTap)
+            if let pid = targetPid { vUp.postToPid(pid) }
+        }
+
+        usleep(15_000) // 15ms delay
+
+        // 4. Command up
+        if let cmdUp = CGEvent(keyboardEventSource: src, virtualKey: cmdKeyCode, keyDown: false) {
+            cmdUp.flags = []
+            cmdUp.post(tap: .cghidEventTap)
+            if let pid = targetPid { cmdUp.postToPid(pid) }
         }
     }
 
-    private nonisolated static func tryAppleScriptPasteFallback() {
-        let script = NSAppleScript(source: #"tell application "System Events" to keystroke "v" using command down"#)
-        var err: NSDictionary?
-        script?.executeAndReturnError(&err)
+    /// Synthesizes ⌘A (Select All) followed by Delete with reliable hold delays to clear temporary query text.
+    private nonisolated static func synthesizeSelectAllAndDelete(targetPid: pid_t? = nil) {
+        guard let src = CGEventSource(stateID: .combinedSessionState) else { return }
+
+        let cmdKeyCode = CGKeyCode(55) // kVK_Command
+        let aKeyCode = CGKeyCode(kVK_ANSI_A) // 0
+        let deleteKeyCode = CGKeyCode(kVK_Delete) // 51
+
+        // ⌘A
+        if let cmdDown = CGEvent(keyboardEventSource: src, virtualKey: cmdKeyCode, keyDown: true) {
+            cmdDown.flags = .maskCommand
+            cmdDown.post(tap: .cghidEventTap)
+            if let pid = targetPid { cmdDown.postToPid(pid) }
+        }
+        usleep(10_000)
+        if let aDown = CGEvent(keyboardEventSource: src, virtualKey: aKeyCode, keyDown: true) {
+            aDown.flags = .maskCommand
+            aDown.post(tap: .cghidEventTap)
+            if let pid = targetPid { aDown.postToPid(pid) }
+        }
+        usleep(25_000)
+        if let aUp = CGEvent(keyboardEventSource: src, virtualKey: aKeyCode, keyDown: false) {
+            aUp.flags = .maskCommand
+            aUp.post(tap: .cghidEventTap)
+            if let pid = targetPid { aUp.postToPid(pid) }
+        }
+        usleep(10_000)
+        if let cmdUp = CGEvent(keyboardEventSource: src, virtualKey: cmdKeyCode, keyDown: false) {
+            cmdUp.flags = []
+            cmdUp.post(tap: .cghidEventTap)
+            if let pid = targetPid { cmdUp.postToPid(pid) }
+        }
+        usleep(25_000)
+
+        // Delete
+        if let delDown = CGEvent(keyboardEventSource: src, virtualKey: deleteKeyCode, keyDown: true) {
+            delDown.flags = []
+            delDown.post(tap: .cghidEventTap)
+            if let pid = targetPid { delDown.postToPid(pid) }
+        }
+        usleep(25_000)
+        if let delUp = CGEvent(keyboardEventSource: src, virtualKey: deleteKeyCode, keyDown: false) {
+            delUp.flags = []
+            delUp.post(tap: .cghidEventTap)
+            if let pid = targetPid { delUp.postToPid(pid) }
+        }
     }
 
     private nonisolated static func downloadBytes(urlStr: String) async -> Data? {

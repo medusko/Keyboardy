@@ -36,6 +36,7 @@ final class KeyboardyViewModel: ObservableObject {
     private var lastCountedSearchKey: String = ""
     private var queryOriginatedFromTargetField: Bool = false
     private var lastSessionIncrementalHistoryQuery: String? = nil
+    private var lastSelectTimestamp: TimeInterval = 0
 
     func prepareForPanelOpen(capturedApp: NSRunningApplication?, initialQueryOverride: String? = nil) {
         self.targetApp = capturedApp
@@ -231,6 +232,10 @@ final class KeyboardyViewModel: ObservableObject {
     }
 
     func selectImageResult(_ item: ImageResult) {
+        let now = ProcessInfo.processInfo.systemUptime
+        guard now - lastSelectTimestamp > 0.35 else { return }
+        lastSelectTimestamp = now
+
         let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         if !q.isEmpty {
             recordQueryInHistory(q, lockSession: true)

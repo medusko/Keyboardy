@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [macos-v1.0.1-beta.3] - 2026-11-03
+
+### Fixed
+- **Image Click Selection Execution (`onSelect`):**
+  - **Root Cause:** When clicking on an image tile, `AspectFitImageContainerView` intercepted the `mouseDown` and `mouseUp` events before SwiftUI's outer `Button` could fire. Because `AnimatedRemoteImageView` was constructed without passing `onSelect`, `AspectFitImageContainerView.mouseUp` called `nil`, discarding the user's click completely.
+  - **Fix:** Wired `onSelect: { viewModel.selectedIndex = index; viewModel.selectImageResult(item) }` directly into `AnimatedRemoteImageView`, ensuring clicking on any image result immediately triggers download and insertion.
+  - Added a 350ms debounce guard on `selectImageResult` to ensure rapid double-clicks never create duplicate insertion tasks.
+- **Hardware-Accurate ⌘V Keypress Simulation:**
+  - Re-engineered synthetic keystrokes into a complete, authentic hardware event sequence: `Command` key-down (`.maskCommand`), 15ms delay, `V` key-down, 35ms key hold, `V` key-up, 15ms delay, and `Command` key-up.
+  - Posted events to both the system HID event tap (`.cghidEventTap`) and directly to the target application's PID (`postToPid`), ensuring Chrome, Safari, Electron apps (Slack, Discord), and native macOS text fields capture the paste command every single time.
+- **Universal Multi-Format Pasteboard Payloads:**
+  - Expanded `NSPasteboard` payload writing to populate `public.file-url`, legacy `NSFilenamesPboardType`, `image/gif`, `com.compuserve.gif`, `image/png`, and `public.tiff` so web browsers and desktop chat apps can read image files and raw bytes seamlessly.
+
+### Added
+- **Interactive Insertion Test Studio (`test_site/index.html`):**
+  - Created a local test studio with a focused chat input, drag-and-drop zone, live event inspector logging pasteboard MIME types and keystrokes, and real-time animated GIF rendering.
+
+---
+
 ## [macos-v1.0.1-beta.2] - 2026-11-03
 
 ### Added
