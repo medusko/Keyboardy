@@ -47,17 +47,24 @@ jobs:
           ./gradlew assembleDebug testDebugUnitTest
           cp app/build/outputs/apk/debug/app-debug.apk "Keyboardy-Android-v${{ steps.meta.outputs.version }}.apk"
 
+      - name: Extract Changelog from CHANGELOG.md
+        id: changelog
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          if [[ -f "CHANGELOG.md" ]] && grep -q "## \[$TAG\]" CHANGELOG.md; then
+            awk "/## \[$TAG\]/{flag=1; next} /## \[/{flag=0} flag" CHANGELOG.md > release_notes.md
+          else
+            cat > release_notes.md << EOF
+          ## 📱 Keyboardy for Android v${{ steps.meta.outputs.version }}
+          Zero-step auxiliary Google Image & GIF keyboard for Android.
+          EOF
+          fi
+
       - name: Create GitHub Release (Android)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: "Keyboardy for Android v${{ steps.meta.outputs.version }}"
-          body: |
-            ## 📱 Keyboardy for Android v${{ steps.meta.outputs.version }}
-            Zero-step auxiliary Google Image & GIF keyboard for Android.
-
-            ### Installation
-            1. Download **`Keyboardy-Android-v${{ steps.meta.outputs.version }}.apk`** below on your Android phone.
-            2. Open the APK to install, then enable **Keyboardy** in *Settings → System → Keyboard → On-screen keyboard*.
+          body_path: release_notes.md
           files: |
             Keyboardy-Android-v${{ steps.meta.outputs.version }}.apk

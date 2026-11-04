@@ -41,19 +41,25 @@ jobs:
           VERSION="${{ steps.meta.outputs.version }}" ./build_app.sh --package
           ./build/Keyboardy.app/Contents/MacOS/Keyboardy --verify
 
+      - name: Extract Changelog from CHANGELOG.md
+        id: changelog
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          if [[ -f "CHANGELOG.md" ]] && grep -q "## \[$TAG\]" CHANGELOG.md; then
+            awk "/## \[$TAG\]/{flag=1; next} /## \[/{flag=0} flag" CHANGELOG.md > release_notes.md
+          else
+            cat > release_notes.md << EOF
+          ## 💻 Keyboardy for macOS v${{ steps.meta.outputs.version }}
+          Zero-step Status Bar & Global Shortcut (\`⌥⇧Space\`) Google Image & Animated GIF picker for macOS.
+          EOF
+          fi
+
       - name: Create GitHub Release (macOS)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: "Keyboardy for macOS v${{ steps.meta.outputs.version }}"
-          body: |
-            ## 💻 Keyboardy for macOS v${{ steps.meta.outputs.version }}
-            Zero-step Status Bar & Global Shortcut (`⌥⇧Space`) Google Image & Animated GIF picker for macOS.
-
-            ### Installation
-            1. Download **`Keyboardy-macOS-v${{ steps.meta.outputs.version }}.dmg`** (or `.zip`) below.
-            2. Drag **`Keyboardy.app`** into your `/Applications` folder and launch it.
-            3. Click the **Keyboardy** icon in your macOS Menu Bar or press **`⌥ ⇧ Space`** from any app!
+          body_path: release_notes.md
           files: |
             macos/build/Keyboardy-macOS-v${{ steps.meta.outputs.version }}.dmg
             macos/build/Keyboardy-macOS-v${{ steps.meta.outputs.version }}.zip
