@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [android-v1.01] - 2026-11-03
+
+### Added
+- **Word Suggestion & Real-Time Spell Check Bar:**
+  - Added a responsive suggestion strip positioned directly above the typing pad (`container_mini_qwerty`).
+  - Integrated `SpellAndSuggestionEngine` providing:
+    - 0ms instant local typo corrections for frequent typing mistakes (e.g., `reciept` -> `receipt`, `dancin` -> `dancing`, `exicted` -> `excited`, `definately` -> `definitely`, `teh` -> `the`, `haply` -> `happily`, `congrats` -> `congratulations`, etc.).
+    - Levenshtein distance fuzzy spell-checking (edit distance 1–2) for arbitrary misspelled words.
+    - Curated GIF, reaction, emotion, and meme vocabulary.
+    - Real-time prefix-matching autocomplete.
+    - Fast async online completions via Google Suggest (~40ms) for internet slang, trending memes, and multi-word queries.
+    - Default trending search chips (`excited`, `dancing`, `happy`, `crying`, `facepalm`, `mind blown`, `applause`, etc.) when the search bar is empty.
+  - One-tap chip replacement: Tapping any chip immediately replaces the misspelled/partial word in the search box, positions the cursor, and triggers the search.
+
+### Fixed
+- **Typing Lag & Dropped Keystrokes:**
+  - Replaced standard view click listeners (`setOnClickListener`) on keyboard keys with instantaneous `MotionEvent.ACTION_DOWN` touch handlers. Every character is registered on contact with immediate haptic and visual pressed feedback, completely resolving dropped keystrokes during rapid two-thumb typing and accidental touch-slop cancellations.
+  - Implemented a 550ms search debounce delay during typing so background search computations and network queries never compete with the user's keystrokes.
+  - Added `stopActiveLoading()` in `HeadlessGoogleWebViewSearcher` and cancellation hooks: in-flight WebView script execution and HTTP requests are immediately aborted on key-down to keep the Android UI thread 100% responsive.
+  - Suppressed automatic web searches for 1-character queries, preventing heavy background DOM hydration for incomplete terms.
+  - Optimized Shift state toggle: shifts letter case dynamically in-place on existing TextViews rather than tearing down and reconstructing the 35+ view hierarchy.
+- **Image & Animated GIF Preview Scaling (Aspect-Fit / Zero Cropping):**
+  - Updated grid preview thumbnail scale from `centerCrop` to `fitCenter` with 2dp inner padding inside `item_image_result.xml` and `ImageGridAdapter.kt`.
+  - Wide horizontal GIFs and tall vertical images zoom out to fit entirely within the 3-column tile bounds with zero pixel cutoff on left, right, top, or bottom.
+
+---
+
 ## [macos-v1.0.1-beta.1] - 2026-11-03
 
 ### Added

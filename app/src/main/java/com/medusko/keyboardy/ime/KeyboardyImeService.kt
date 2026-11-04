@@ -21,6 +21,7 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InputMethodManager
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -35,6 +36,8 @@ import com.medusko.keyboardy.search.HeadlessGoogleWebViewSearcher
 import com.medusko.keyboardy.search.ImageResult
 import com.medusko.keyboardy.search.ImageSearchRepository
 import com.medusko.keyboardy.search.SearchFilter
+import com.medusko.keyboardy.suggest.SpellAndSuggestionEngine
+import com.medusko.keyboardy.suggest.SuggestionItem
 import com.medusko.keyboardy.theme.ThemePalette
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -92,6 +95,8 @@ class KeyboardyImeService : InputMethodService() {
     private var btnClearHistory: TextView? = null
     private var historyItemsList: LinearLayout? = null
 
+    private var suggestionBarScroll: HorizontalScrollView? = null
+    private var suggestionBarContainer: LinearLayout? = null
     private var containerMiniQwerty: LinearLayout? = null
     private var bottomNavSpacer: View? = null
     private var chipEngineMode: TextView? = null
@@ -104,6 +109,9 @@ class KeyboardyImeService : InputMethodService() {
     private var isHistoryVisible: Boolean = false
     private var queryOriginatedFromHostEditor: Boolean = false
     private var lastCountedSearchQuery: String = ""
+    private var suggestJob: Job? = null
+    private val letterKeyViews = mutableListOf<Pair<TextView, String>>()
+    private var shiftKeyView: TextView? = null
 
     // Real-time preference listener so changes in MainActivity apply immediately to the keyboard
     private val prefChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
@@ -155,6 +163,8 @@ class KeyboardyImeService : InputMethodService() {
         btnClearHistory = root.findViewById(R.id.btn_clear_history)
         historyItemsList = root.findViewById(R.id.history_items_list)
 
+        suggestionBarScroll = root.findViewById(R.id.suggestion_bar_scroll)
+        suggestionBarContainer = root.findViewById(R.id.suggestion_bar_container)
         containerMiniQwerty = root.findViewById(R.id.container_mini_qwerty)
         bottomNavSpacer = root.findViewById(R.id.bottom_nav_spacer)
         chipEngineMode = root.findViewById(R.id.chip_engine_mode)
@@ -205,6 +215,7 @@ class KeyboardyImeService : InputMethodService() {
             }
             onQueryTextChanged = { updatedText ->
                 btnClearQuery?.visibility = if (updatedText.isNotEmpty()) View.VISIBLE else View.GONE
+                updateWordSuggestions(updatedText)
             }
             onSelectionOrLongPressAction = { _, _ ->
                 showSelectionActionBar()
@@ -343,6 +354,8 @@ class KeyboardyImeService : InputMethodService() {
 
     private fun resetToBlankSearch(showQwerty: Boolean) {
         searchJob?.cancel()
+        suggestJob?.cancel()
+        headlessGoogleSearcher?.stopActiveLoading()
         queryOriginatedFromHostEditor = false
         lastCountedSearchQuery = ""
         progressSearching?.visibility = View.GONE
@@ -353,6 +366,7 @@ class KeyboardyImeService : InputMethodService() {
         emptyStateContainer?.visibility = View.VISIBLE
         tvStatusMessage?.text =
             "Type below to search Google Images & GIFs — or tap 🕒 for your search history!"
+        updateWordSuggestions("")
         if (showQwerty) {
             setMiniQwertyVisible(true)
         }
@@ -592,6 +606,8 @@ class KeyboardyImeService : InputMethodService() {
         gridAdapter?.updateStyle(dpToPx(scale.gridItemHeightDp), palette)
 
         // Rebuild Scalable QWERTY / Numbers / Symbols Pad
+        suggestionBarScroll?.setBackgroundColor(palette.keyboardTrayBg)
+        updateWordSuggestions(getCurrentQuery())
         containerMiniQwerty?.let { tray ->
             tray.setBackgroundColor(palette.keyboardTrayBg)
             buildKeyboardPad(tray, scale, palette)
@@ -661,13 +677,79 @@ class KeyboardyImeService : InputMethodService() {
 
     private fun setMiniQwertyVisible(visible: Boolean) {
         containerMiniQwerty?.visibility = if (visible) View.VISIBLE else View.GONE
+        suggestionBarScroll?.visibility = if (visible) View.VISIBLE else View.GONE
         etSearchQuery?.setCursorActive(visible)
+    }
+
+    private fun updateWordSuggestions(query: String) {
+        val palette = ThemePalette.forMode(prefs.isDarkMode)
+        // 1. Instant local suggestions & spell check (0ms latency on Main thread)
+        val instantList = SpellAndSuggestionEngine.getInstantSuggestions(query)
+        renderSuggestions(instantList, palette)
+
+        // 2. Enhanced async Google completions
+        suggestJob?.cancel()
+        val trimmed = query.trim()
+        if (trimmed.isNotEmpty()) {
+            suggestJob = serviceScope.launch {
+                val enhanced = SpellAndSuggestionEngine.fetchEnhancedSuggestions(trimmed)
+                renderSuggestions(enhanced, palette)
+            }
+        }
+    }
+
+    private fun renderSuggestions(items: List<SuggestionItem>, palette: ThemePalette) {
+        val container = suggestionBarContainer ?: return
+        container.removeAllViews()
+        if (items.isEmpty()) return
+
+        val density = resources.displayMetrics.density
+        val strokePx = (1f * density).toInt().coerceAtLeast(1)
+
+        for (item in items) {
+            val chipTv = TextView(this).apply {
+                val displayLabel = when {
+                    item.isSpellCorrection -> "✓ ${item.text}"
+                    item.isDefaultKeyword -> "✨ ${item.text}"
+                    else -> item.text
+                }
+                text = displayLabel
+                gravity = Gravity.CENTER
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f)
+                typeface = if (item.isSpellCorrection) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+                setTextColor(if (item.isSpellCorrection) palette.accentBlue else palette.textPrimary)
+                background = palette.createRoundedRect(
+                    fillColor = if (item.isSpellCorrection) palette.surfaceVariant else palette.surface,
+                    cornerRadiusPx = 14f * density,
+                    strokeWidthPx = strokePx,
+                    strokeColor = if (item.isSpellCorrection) palette.accentBlue else palette.border
+                )
+                setPadding(dpToPx(12), dpToPx(3), dpToPx(12), dpToPx(3))
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    dpToPx(28)
+                ).apply {
+                    marginEnd = dpToPx(6)
+                }
+            }
+
+            attachKeyTouchHandler(chipTv) {
+                queryOriginatedFromHostEditor = false
+                setHistoryPanelVisible(false)
+                etSearchQuery?.replaceCurrentWord(item.text)
+                updateWordSuggestions(getCurrentQuery())
+                triggerSearch(immediate = true, hideKeyboardOnStart = false)
+            }
+
+            container.addView(chipTv)
+        }
     }
 
     private fun triggerSearch(immediate: Boolean, hideKeyboardOnStart: Boolean) {
         val queryToRun = getCurrentQuery().trim()
         if (queryToRun.isEmpty()) {
             searchJob?.cancel()
+            headlessGoogleSearcher?.stopActiveLoading()
             progressSearching?.visibility = View.GONE
             return
         }
@@ -679,10 +761,18 @@ class KeyboardyImeService : InputMethodService() {
             prefs.addSearchHistoryQuery(queryToRun)
         }
 
+        // Cancel previous search and abort ongoing WebView activity immediately
         searchJob?.cancel()
+        headlessGoogleSearcher?.stopActiveLoading()
+        progressSearching?.visibility = View.GONE
+
         searchJob = serviceScope.launch {
             if (!immediate) {
-                delay(500L)
+                // Debounce search while typing by ~550ms so typing is silky smooth
+                delay(550L)
+                if (queryToRun.length < 2) {
+                    return@launch
+                }
             }
             progressSearching?.visibility = View.VISIBLE
             if (gridAdapter?.itemCount == 0) {
@@ -795,33 +885,42 @@ class KeyboardyImeService : InputMethodService() {
         }
     }
 
+    private fun updateShiftState(palette: ThemePalette) {
+        val density = resources.displayMetrics.density
+        val strokePx = (1f * density).toInt().coerceAtLeast(1)
+        val cornerRadiusPx = 7f * density
+
+        for ((tv, base) in letterKeyViews) {
+            tv.text = if (isShiftActive) base.uppercase() else base.lowercase()
+        }
+        shiftKeyView?.let { shiftTv ->
+            shiftTv.setTextColor(if (isShiftActive) Color.WHITE else palette.keyText)
+            shiftTv.background = palette.createKeyDrawable(
+                isAccent = isShiftActive,
+                cornerRadiusPx = cornerRadiusPx,
+                strokeWidthPx = strokePx
+            )
+        }
+    }
+
     private fun buildKeyboardPad(
         container: LinearLayout,
         scale: KeyboardScale,
         palette: ThemePalette
     ) {
         container.removeAllViews()
+        letterKeyViews.clear()
+        shiftKeyView = null
         val density = resources.displayMetrics.density
         val strokePx = (1f * density).toInt().coerceAtLeast(1)
         val cornerRadiusPx = 7f * density
 
         val rows: List<List<String>> = when (currentLayer) {
-            KeyboardLayer.LETTERS -> {
-                val baseRows = listOf(
-                    listOf("q", "w", "e", "r", "t", "y", "u", "i", "o", "p"),
-                    listOf("a", "s", "d", "f", "g", "h", "j", "k", "l"),
-                    listOf("⇧", "z", "x", "c", "v", "b", "n", "m", "⌫")
-                )
-                if (isShiftActive) {
-                    baseRows.map { row ->
-                        row.map { key ->
-                            if (key.length == 1 && key[0].isLetter()) key.uppercase() else key
-                        }
-                    }
-                } else {
-                    baseRows
-                }
-            }
+            KeyboardLayer.LETTERS -> listOf(
+                listOf("q", "w", "e", "r", "t", "y", "u", "i", "o", "p"),
+                listOf("a", "s", "d", "f", "g", "h", "j", "k", "l"),
+                listOf("⇧", "z", "x", "c", "v", "b", "n", "m", "⌫")
+            )
 
             KeyboardLayer.NUMBERS_PUNCTUATION -> listOf(
                 listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0"),
@@ -852,6 +951,7 @@ class KeyboardyImeService : InputMethodService() {
                 val isBackspace = keyLabel == "⌫"
                 val isShift = keyLabel == "⇧"
                 val isLayerSwitch = keyLabel == "=\\<" || keyLabel == "?123"
+                val isLetterKey = keyLabel.length == 1 && keyLabel[0].isLetter()
                 val weight = when {
                     isBackspace -> 1.5f
                     isShift || isLayerSwitch -> 1.45f
@@ -859,7 +959,7 @@ class KeyboardyImeService : InputMethodService() {
                 }
 
                 val keyView = TextView(this).apply {
-                    text = keyLabel
+                    text = if (isLetterKey && isShiftActive) keyLabel.uppercase() else keyLabel
                     gravity = Gravity.CENTER
                     setTextColor(
                         if (isShift && isShiftActive) Color.WHITE else palette.keyText
@@ -890,14 +990,19 @@ class KeyboardyImeService : InputMethodService() {
                     if (isBackspace) {
                         attachRepeatingBackspace(this)
                     } else {
-                        setOnClickListener { view ->
-                            performTapHaptic(view)
+                        if (isShift) {
+                            shiftKeyView = this
+                        }
+                        if (isLetterKey) {
+                            letterKeyViews.add(Pair(this, keyLabel.lowercase()))
+                        }
+                        attachKeyTouchHandler(this) {
                             queryOriginatedFromHostEditor = false
                             setHistoryPanelVisible(false)
                             when {
                                 isShift -> {
                                     isShiftActive = !isShiftActive
-                                    buildKeyboardPad(container, scale, palette)
+                                    updateShiftState(palette)
                                 }
 
                                 keyLabel == "=\\<" -> {
@@ -911,11 +1016,13 @@ class KeyboardyImeService : InputMethodService() {
                                 }
 
                                 else -> {
-                                    etSearchQuery?.insertTextAtCursor(keyLabel)
+                                    val charToInsert = this.text.toString()
+                                    etSearchQuery?.insertTextAtCursor(charToInsert)
                                     if (isShiftActive) {
                                         isShiftActive = false
-                                        buildKeyboardPad(container, scale, palette)
+                                        updateShiftState(palette)
                                     }
+                                    updateWordSuggestions(getCurrentQuery())
                                     triggerSearch(immediate = false, hideKeyboardOnStart = false)
                                 }
                             }
@@ -937,12 +1044,14 @@ class KeyboardyImeService : InputMethodService() {
             )
         }
 
-        val hideKeyboardBtn = createHideKeyboardButton(1.25f, palette) {
+        val hideKeyboardBtn = createHideKeyboardButton(1.25f, palette)
+        attachKeyTouchHandler(hideKeyboardBtn) {
             setMiniQwertyVisible(false)
         }
 
         val layerToggleLabel = if (currentLayer == KeyboardLayer.LETTERS) "?123" else "ABC"
-        val layerToggleBtn = createActionKey(layerToggleLabel, 1.25f, false, scale, palette) {
+        val layerToggleBtn = createActionKey(layerToggleLabel, 1.25f, false, scale, palette)
+        attachKeyTouchHandler(layerToggleBtn) {
             currentLayer = if (currentLayer == KeyboardLayer.LETTERS) {
                 KeyboardLayer.NUMBERS_PUNCTUATION
             } else {
@@ -951,27 +1060,34 @@ class KeyboardyImeService : InputMethodService() {
             buildKeyboardPad(container, scale, palette)
         }
 
-        val commaBtn = createActionKey(",", 0.75f, false, scale, palette) {
+        val commaBtn = createActionKey(",", 0.75f, false, scale, palette)
+        attachKeyTouchHandler(commaBtn) {
             queryOriginatedFromHostEditor = false
             setHistoryPanelVisible(false)
             etSearchQuery?.insertTextAtCursor(",")
+            updateWordSuggestions(getCurrentQuery())
             triggerSearch(immediate = false, hideKeyboardOnStart = false)
         }
 
-        val spaceBtn = createActionKey("Space", 2.9f, false, scale, palette) {
+        val spaceBtn = createActionKey("Space", 2.9f, false, scale, palette)
+        attachKeyTouchHandler(spaceBtn) {
             queryOriginatedFromHostEditor = false
             setHistoryPanelVisible(false)
             etSearchQuery?.insertTextAtCursor(" ")
+            updateWordSuggestions(getCurrentQuery())
         }
 
-        val periodBtn = createActionKey(".", 0.75f, false, scale, palette) {
+        val periodBtn = createActionKey(".", 0.75f, false, scale, palette)
+        attachKeyTouchHandler(periodBtn) {
             queryOriginatedFromHostEditor = false
             setHistoryPanelVisible(false)
             etSearchQuery?.insertTextAtCursor(".")
+            updateWordSuggestions(getCurrentQuery())
             triggerSearch(immediate = false, hideKeyboardOnStart = false)
         }
 
-        val searchBtn = createActionKey("Search", 1.85f, true, scale, palette) {
+        val searchBtn = createActionKey("Search", 1.85f, true, scale, palette)
+        attachKeyTouchHandler(searchBtn) {
             triggerSearch(immediate = true, hideKeyboardOnStart = true)
         }
 
@@ -985,6 +1101,28 @@ class KeyboardyImeService : InputMethodService() {
     }
 
     @SuppressLint("ClickableViewAccessibility")
+    private fun attachKeyTouchHandler(
+        view: View,
+        onDown: () -> Unit
+    ) {
+        view.setOnTouchListener { v, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.isPressed = true
+                    performTapHaptic(v)
+                    onDown()
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.isPressed = false
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
     private fun attachRepeatingBackspace(view: View) {
         val repeatRunnable = object : Runnable {
             override fun run() {
@@ -992,6 +1130,7 @@ class KeyboardyImeService : InputMethodService() {
                 val deleted = etSearchQuery?.backspaceAtCursor() == true
                 if (deleted) {
                     performTapHaptic(view)
+                    updateWordSuggestions(getCurrentQuery())
                     triggerSearch(immediate = false, hideKeyboardOnStart = false)
                     mainHandler.postDelayed(this, 65L)
                 }
@@ -1005,6 +1144,7 @@ class KeyboardyImeService : InputMethodService() {
                     performTapHaptic(v)
                     queryOriginatedFromHostEditor = false
                     if (etSearchQuery?.backspaceAtCursor() == true) {
+                        updateWordSuggestions(getCurrentQuery())
                         triggerSearch(immediate = false, hideKeyboardOnStart = false)
                     }
                     mainHandler.removeCallbacks(repeatRunnable)
@@ -1025,8 +1165,7 @@ class KeyboardyImeService : InputMethodService() {
 
     private fun createHideKeyboardButton(
         weight: Float,
-        palette: ThemePalette,
-        onClick: () -> Unit
+        palette: ThemePalette
     ): LinearLayout {
         val density = resources.displayMetrics.density
         val strokePx = (1f * density).toInt().coerceAtLeast(1)
@@ -1054,11 +1193,6 @@ class KeyboardyImeService : InputMethodService() {
                 layoutParams = LinearLayout.LayoutParams(dpToPx(32), dpToPx(18))
             }
             addView(iconView)
-
-            setOnClickListener { view ->
-                performTapHaptic(view)
-                onClick()
-            }
         }
     }
 
@@ -1067,8 +1201,7 @@ class KeyboardyImeService : InputMethodService() {
         weight: Float,
         isAccent: Boolean,
         scale: KeyboardScale,
-        palette: ThemePalette,
-        onClick: () -> Unit
+        palette: ThemePalette
     ): TextView {
         val density = resources.displayMetrics.density
         val strokePx = (1f * density).toInt().coerceAtLeast(1)
@@ -1091,10 +1224,6 @@ class KeyboardyImeService : InputMethodService() {
                 marginStart = dpToPx(2)
                 marginEnd = dpToPx(2)
             }
-            setOnClickListener { view ->
-                performTapHaptic(view)
-                onClick()
-            }
         }
     }
 
@@ -1110,6 +1239,7 @@ class KeyboardyImeService : InputMethodService() {
         prefs.unregisterListener(prefChangeListener)
         mainHandler.removeCallbacksAndMessages(null)
         searchJob?.cancel()
+        suggestJob?.cancel()
         commitJob?.cancel()
         headlessGoogleSearcher?.destroy()
         serviceScope.cancel()

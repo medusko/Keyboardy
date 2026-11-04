@@ -365,6 +365,23 @@
             android:importantForAccessibility="noHideDescendants" />
     </FrameLayout>
 
+    <!-- Word Suggestion & Spell Check Strip (Appears directly above typing pad) -->
+    <HorizontalScrollView
+        android:id="@+id/suggestion_bar_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:scrollbars="none"
+        android:visibility="visible">
+
+        <LinearLayout
+            android:id="@+id/suggestion_bar_container"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="6dp" />
+    </HorizontalScrollView>
+
     <!-- Scalable QWERTY / Numbers / Symbols Pad -->
     <LinearLayout
         android:id="@+id/container_mini_qwerty"

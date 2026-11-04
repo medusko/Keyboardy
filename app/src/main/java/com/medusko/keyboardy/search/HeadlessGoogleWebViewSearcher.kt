@@ -122,16 +122,24 @@ class HeadlessGoogleWebViewSearcher(
                 }
 
                 cont.invokeOnCancellation {
-                    mainHandler.removeCallbacksAndMessages(null)
-                    try {
-                        wv.stopLoading()
-                    } catch (_: Exception) {
-                    }
+                    stopActiveLoading()
                 }
 
                 wv.loadUrl(targetUrl)
             }
         } ?: emptyList()
+    }
+
+    /**
+     * Immediately aborts any ongoing webpage loading, script timers, and parsing on the UI thread
+     * so that typing and UI operations are never stalled.
+     */
+    fun stopActiveLoading() {
+        mainHandler.removeCallbacksAndMessages(null)
+        try {
+            webView?.stopLoading()
+        } catch (_: Exception) {
+        }
     }
 
     fun destroy() {

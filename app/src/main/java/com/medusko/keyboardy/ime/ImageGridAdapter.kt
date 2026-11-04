@@ -103,6 +103,7 @@ class ImageGridAdapter(
             tvBadgeGif.visibility = if (item.isAnimatedGif) View.VISIBLE else View.GONE
             tvBadgeSource.text = item.sourceLabel
             overlayLoading.visibility = if (isLoading) View.VISIBLE else View.GONE
+            ivThumbnail.scaleType = ImageView.ScaleType.FIT_CENTER
 
             val previewUrl = if (item.isAnimatedGif && item.fullImageUrl.lowercase().endsWith(".gif")) {
                 item.fullImageUrl

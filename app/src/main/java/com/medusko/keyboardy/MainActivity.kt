@@ -430,7 +430,7 @@ class MainActivity : AppCompatActivity() {
 
         // Version Footer matching Lagatron
         val footerText = TextView(this).apply {
-            text = "Keyboardy v1.0 • Built for Android 15 / Pixel"
+            text = "Keyboardy v1.01 • Built for Android 15 / Pixel"
             setTextColor(palette.textSecondary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
             typeface = Typeface.DEFAULT_BOLD

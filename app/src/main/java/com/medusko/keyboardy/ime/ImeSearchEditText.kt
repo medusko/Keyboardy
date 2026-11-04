@@ -212,6 +212,36 @@ class ImeSearchEditText @JvmOverloads constructor(
         onQueryTextChanged?.invoke(updated)
     }
 
+    fun replaceCurrentWord(suggestedWord: String) {
+        val current = text?.toString().orEmpty()
+        if (current.isEmpty()) {
+            setQueryText("$suggestedWord ", placeCursorAtEnd = true)
+            return
+        }
+        val pos = cursorStart.coerceIn(0, current.length)
+        var start = pos
+        while (start > 0 && !current[start - 1].isWhitespace()) {
+            start--
+        }
+        var end = pos
+        while (end < current.length && !current[end].isWhitespace()) {
+            end++
+        }
+
+        val prefix = current.substring(0, start)
+        val suffix = current.substring(end)
+        val replacementWithSpace = if (suffix.startsWith(" ")) suggestedWord else "$suggestedWord "
+        val updated = prefix + replacementWithSpace + suffix.trimStart()
+
+        super.setText(updated)
+        val newCursor = (prefix.length + replacementWithSpace.length).coerceIn(0, updated.length)
+        cursorStart = newCursor
+        cursorEnd = newCursor
+        onDismissSelectionMenu?.invoke()
+        restartBlink()
+        onQueryTextChanged?.invoke(updated)
+    }
+
     fun backspaceAtCursor(): Boolean {
         val current = text?.toString().orEmpty()
         if (current.isEmpty()) return false
