@@ -1,8 +1,8 @@
 import Foundation
 
 public enum KeyboardyVersion {
-    public static let versionName = "1.0.1-beta.4"
-    public static let buildNumber = "5"
+    public static let versionName = "1.0.1-beta.5"
+    public static let buildNumber = "6"
     public static let releaseDate = "2026-11-04"
 
     public static var displayString: String {
@@ -14,6 +14,14 @@ public enum KeyboardyVersion {
     }
 
     public static let recentImprovements: [(title: String, detail: String)] = [
+        (
+            "🔇 Zero-Modal Permission Flow",
+            "Completely eliminated unprompted system alert dialogs on startup and in settings; directly opens System Settings without modal interruptions."
+        ),
+        (
+            "🔄 Stale TCC Cache Recovery",
+            "Added guidance and automated tccutil reset support to recover from macOS desynchronized permission caches when switches are displayed as ON."
+        ),
         (
             "🛡️ Non-Intrusive Auto-Paste Execution",
             "Eliminated recurring system permission popups on image click; Keyboardy always executes auto-paste without interrupting your typing workflow."

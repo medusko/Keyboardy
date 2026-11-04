@@ -209,12 +209,12 @@ struct SettingsView: View {
                                 : "Enable Accessibility for 1-Step Auto-Paste",
                             subtitle: prefs.isAccessibilityGranted
                                 ? "Keyboardy can directly paste (⌘V) into Slack, Messages, and Discord"
-                                : "Required so Keyboardy can send ⌘V automatically into your active chat"
+                                : "Ensure switch is ON in Settings > Device Control (if ON, toggle OFF & ON to refresh)"
                         ) {
                             Button(action: {
-                                prefs.isAccessibilityGranted = ImageCommitService.shared.isAccessibilityTrusted(promptIfNeeded: true)
+                                prefs.isAccessibilityGranted = ImageCommitService.shared.openAndRefreshAccessibilityPermission()
                             }) {
-                                Text(prefs.isAccessibilityGranted ? "Recheck" : "Grant Access")
+                                Text(prefs.isAccessibilityGranted ? "Recheck" : "Open Settings")
                                     .font(.system(size: 11, weight: .bold))
                                     .foregroundColor(prefs.isAccessibilityGranted ? palette.textPrimary : .white)
                                     .padding(.horizontal, 10)

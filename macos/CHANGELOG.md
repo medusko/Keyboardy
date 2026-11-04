@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [macos-v1.0.1-beta.5] - 2026-11-04
+
+### Fixed
+- **Completely Eliminated Unprompted System Alert Dialogs:**
+  - Removed `promptIfNeeded: true` calls from `applicationDidFinishLaunching` that caused macOS to popup the *"Keyboardy would like to control this Mac..."* dialog unprompted on startup.
+  - Replaced modal permission requests with direct, non-intrusive System Settings navigation (`openAndRefreshAccessibilityPermission()`), allowing users to view or toggle settings without modal alerts blocking their screen.
+- **Resolved Stale macOS TCC Permission Desynchronization:**
+  - Explained and addressed the macOS bug where the GUI switch under *Device Control and Data Access* displays as **ON (blue)**, but the system's underlying TCC database rejects the binary due to cached hashes from previous builds.
+  - Reset stale development TCC database entries via `tccutil reset Accessibility com.medusko.keyboardy.macos`.
+  - Added in-app guidance advising users to toggle the switch **OFF and back ON** (or remove with `-` and re-add) to immediately flush the macOS TCC cache without requiring a system restart.
+
+---
+
 ## [macos-v1.0.1-beta.4] - 2026-11-04
 
 ### Fixed

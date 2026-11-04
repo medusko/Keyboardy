@@ -31,15 +31,18 @@ public final class ImageCommitService {
         }
     }
 
+    /// Opens System Settings to Privacy & Security -> Accessibility without triggering modal alert dialogs.
+    @discardableResult
+    public func openAndRefreshAccessibilityPermission() -> Bool {
+        openAccessibilitySettings()
+        return isAccessibilityTrusted(promptIfNeeded: false)
+    }
+
     /// Requests Accessibility permission from macOS and opens System Settings so the user can easily toggle Keyboardy.
     @discardableResult
     public func requestAccessibilityPermission() -> Bool {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        let trusted = AXIsProcessTrustedWithOptions(options)
-        if !trusted {
-            openAccessibilitySettings()
-        }
-        return trusted
+        openAccessibilitySettings()
+        return isAccessibilityTrusted(promptIfNeeded: false)
     }
 
     /// Reads either selected text or short single-line input text from the currently focused UI element in the target app.

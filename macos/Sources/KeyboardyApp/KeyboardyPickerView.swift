@@ -217,20 +217,19 @@ struct KeyboardyPickerView: View {
                         .foregroundColor(palette.accentBlue)
                         .font(.system(size: 13))
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("Enable Accessibility for 1-Click Auto-Paste")
+                        Text("1-Click Auto-Paste Permission")
                             .font(.system(size: 11, weight: .bold))
                             .foregroundColor(palette.textPrimary)
-                        Text("macOS requires Accessibility permission so Keyboardy can send ⌘V into \(viewModel.targetAppName)")
+                        Text("In System Settings > Device Control, ensure switch is ON (if already ON, toggle OFF & ON).")
                             .font(.system(size: 10))
                             .foregroundColor(palette.textSecondary)
                             .lineLimit(1)
                     }
                     Spacer()
                     Button(action: {
-                        let trusted = ImageCommitService.shared.requestAccessibilityPermission()
-                        prefs.isAccessibilityGranted = trusted
+                        prefs.isAccessibilityGranted = ImageCommitService.shared.openAndRefreshAccessibilityPermission()
                     }) {
-                        Text("Grant")
+                        Text("Open Settings")
                             .font(.system(size: 10.5, weight: .bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 8)

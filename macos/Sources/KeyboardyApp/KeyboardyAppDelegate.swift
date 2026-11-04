@@ -40,9 +40,6 @@ final class KeyboardyAppDelegate: NSObject, NSApplicationDelegate {
     private func checkAndPromptInitialPermissions() {
         let isTrusted = ImageCommitService.shared.isAccessibilityTrusted(promptIfNeeded: false)
         prefs.isAccessibilityGranted = isTrusted
-        if !isTrusted && prefs.insertBehaviorMode == .autoPasteIntoApp {
-            _ = ImageCommitService.shared.isAccessibilityTrusted(promptIfNeeded: true)
-        }
     }
 
     /// Provides a standard macOS Edit menu so ⌘A (Select All), ⌘C, ⌘V, ⌘X, and ⌘Z work natively inside the Search TextField.
