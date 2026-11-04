@@ -80,9 +80,17 @@ public final class ImageSearchRepository {
             }
 
             let googleResults = await googleTask
+            let filteredGoogle: [ImageResult]
+            if filter.animatedOnly {
+                filteredGoogle = googleResults.filter {
+                    !$0.fullImageUrl.contains("encrypted-tbn0.gstatic.com")
+                }
+            } else {
+                filteredGoogle = googleResults
+            }
             let combined = Self.interleaveResults(
-                primary: apiResults + googleResults,
-                secondary: fastResults
+                primary: filter.animatedOnly ? (apiResults + fastResults) : (apiResults + filteredGoogle),
+                secondary: filter.animatedOnly ? filteredGoogle : fastResults
             )
             onProgressiveResults(combined)
             return combined

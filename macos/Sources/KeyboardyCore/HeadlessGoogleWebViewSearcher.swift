@@ -168,8 +168,9 @@ public final class HeadlessGoogleWebViewSearcher: NSObject, WKNavigationDelegate
                 var img = imgs[i];
                 var src = img.getAttribute('data-iurl') || img.getAttribute('data-src') || img.src || '';
                 var alt = img.alt || 'Google Image';
-                if (src.indexOf('https://encrypted-tbn0.gstatic.com/images') === 0 ||
-                    (src.indexOf('http') === 0 && src.indexOf('google.com') === -1)) {
+                if (src.indexOf('http') === 0 &&
+                    src.indexOf('google.com') === -1 &&
+                    src.indexOf('encrypted-tbn0.gstatic.com') === -1) {
                     addItem(src, src, alt);
                 }
             }
