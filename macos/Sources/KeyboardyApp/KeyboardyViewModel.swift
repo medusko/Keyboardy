@@ -298,6 +298,27 @@ final class KeyboardyViewModel: ObservableObject {
             statusBannerText = nil
         }
     }
+
+    /// Creates an NSItemProvider for native macOS drag-and-drop from the search grid into external apps.
+    func makeItemProvider(for item: ImageResult) -> NSItemProvider {
+        let rawData = RemoteImageCache.shared.data(for: item.fullImageUrl)
+            ?? RemoteImageCache.shared.data(for: item.thumbnailUrl)
+
+        if let rawData = rawData {
+            let prepared = ImageCommitService.prepareImageDataAndExtension(rawData: rawData)
+            if let fileURL = ImageCommitService.saveToSharedTempDirectory(data: prepared.data, ext: prepared.ext) {
+                let provider = NSItemProvider(contentsOf: fileURL) ?? NSItemProvider(object: fileURL as NSURL)
+                provider.suggestedName = "Keyboardy_\(item.id).\(prepared.ext)"
+                KeyboardyPrefs.shared.recordImageInserted()
+                return provider
+            }
+        }
+
+        if let url = URL(string: item.fullImageUrl) {
+            return NSItemProvider(object: url as NSURL)
+        }
+        return NSItemProvider()
+    }
 }
 
 private extension Comparable {

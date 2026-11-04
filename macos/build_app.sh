@@ -10,7 +10,7 @@ if [[ -z "${VERSION:-}" ]] && [[ -f "$VERSION_FILE" ]]; then
     VERSION="$(cat "$VERSION_FILE" | tr -d '[:space:]')"
 fi
 VERSION="${VERSION:-1.0.1-beta.1}"
-BUILD_NUMBER="${BUILD_NUMBER:-2}"
+BUILD_NUMBER="${BUILD_NUMBER:-3}"
 
 echo "==> Building Keyboardy for macOS v${VERSION} (Build ${BUILD_NUMBER}) [Release]..."
 swift build -c release
@@ -75,6 +75,10 @@ cat > "$CONTENTS_DIR/Info.plist" << EOF
     <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSAccessibilityUsageDescription</key>
+    <string>Keyboardy requires Accessibility access to automatically insert images and animated GIFs into your active chat applications (Slack, Messages, Discord, WhatsApp) using ⌘V.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Keyboardy requires Apple Events access to interact with target chat applications when inserting images and animated GIFs.</string>
 </dict>
 </plist>
 EOF

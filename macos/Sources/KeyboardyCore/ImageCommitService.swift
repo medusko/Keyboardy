@@ -24,6 +24,24 @@ public final class ImageCommitService {
         return AXIsProcessTrusted()
     }
 
+    /// Opens macOS System Settings directly to Privacy & Security -> Accessibility
+    public func openAccessibilitySettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    /// Requests Accessibility permission from macOS and opens System Settings so the user can easily toggle Keyboardy.
+    @discardableResult
+    public func requestAccessibilityPermission() -> Bool {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        let trusted = AXIsProcessTrustedWithOptions(options)
+        if !trusted {
+            openAccessibilitySettings()
+        }
+        return trusted
+    }
+
     /// Reads either selected text or short single-line input text from the currently focused UI element in the target app.
     public func readFocusedOrSelectedText(from app: NSRunningApplication?) -> (text: String, wasFullFieldValue: Bool)? {
         guard isAccessibilityTrusted(promptIfNeeded: false),

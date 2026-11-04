@@ -34,6 +34,15 @@ final class KeyboardyAppDelegate: NSObject, NSApplicationDelegate {
         setupPopoverAndFloatingPanel()
         setupBindingsAndTriggers()
         setupKeyboardShortcutsInsidePanel()
+        checkAndPromptInitialPermissions()
+    }
+
+    private func checkAndPromptInitialPermissions() {
+        let isTrusted = ImageCommitService.shared.isAccessibilityTrusted(promptIfNeeded: false)
+        prefs.isAccessibilityGranted = isTrusted
+        if !isTrusted && prefs.insertBehaviorMode == .autoPasteIntoApp {
+            _ = ImageCommitService.shared.isAccessibilityTrusted(promptIfNeeded: true)
+        }
     }
 
     /// Provides a standard macOS Edit menu so ⌘A (Select All), ⌘C, ⌘V, ⌘X, and ⌘Z work natively inside the Search TextField.
@@ -288,6 +297,7 @@ final class KeyboardyAppDelegate: NSObject, NSApplicationDelegate {
         }
         floatingPanel?.orderOut(nil)
         captureCurrentFrontmostExternalApp()
+        prefs.isAccessibilityGranted = ImageCommitService.shared.isAccessibilityTrusted(promptIfNeeded: false)
         viewModel.prepareForPanelOpen(capturedApp: lastExternalApp, initialQueryOverride: initialQueryOverride)
 
         guard let button = statusItem.button else {
@@ -303,6 +313,7 @@ final class KeyboardyAppDelegate: NSObject, NSApplicationDelegate {
     private func showFloatingHud(nearCursor: Bool, initialQueryOverride: String?) {
         popover.performClose(nil)
         captureCurrentFrontmostExternalApp()
+        prefs.isAccessibilityGranted = ImageCommitService.shared.isAccessibilityTrusted(promptIfNeeded: false)
         viewModel.prepareForPanelOpen(capturedApp: lastExternalApp, initialQueryOverride: initialQueryOverride)
 
         guard let panel = floatingPanel else { return }

@@ -8,7 +8,7 @@
 
 We publish independent per-platform releases so Android and macOS can evolve at their own pace. All minor improvements and beta updates are tracked in detail in our [**CHANGELOG.md**](CHANGELOG.md):
 
-- 💻 **[Download Keyboardy for macOS Beta (`Keyboardy-macOS-v1.0.1-beta.1.dmg` / `.zip`)](https://github.com/medusko/Keyboardy/releases/tag/macos-v1.0.1-beta.1)** *(Latest macOS Beta — includes Tenor fast GIFs, continuous looping, 1-step auto-paste, and native drag-and-drop)*
+- 💻 **[Download Keyboardy for macOS Beta (`Keyboardy-macOS-v1.0.1-beta.2.dmg` / `.zip`)](https://github.com/medusko/Keyboardy/releases/tag/macos-v1.0.1-beta.2)** *(Latest macOS Beta — includes Accessibility permission onboarding, reliable 1-click auto-paste, native drag-and-drop, and continuous GIF looping)*
 - 📱 **[Download Keyboardy for Android (`Keyboardy-Android-v1.01.apk`)](https://github.com/medusko/Keyboardy/releases/tag/android-v1.01)** *(Latest Android update — instant ACTION_DOWN typing with zero lag, 550ms search debounce, real-time spell-check & word suggestion strip, and aspect-fit GIF scaling)*
 - 📋 **[View All Releases & Full Changelog](CHANGELOG.md)**
 
@@ -33,6 +33,10 @@ We publish independent per-platform releases so Android and macOS can evolve at 
    - Detects real image formats (`image/gif`, `image/png`, `image/webp`, `image/jpeg`) via magic bytes.
    - Preserves animated GIFs byte-for-byte (`image/gif` on Android `CommitContent`; `public.file-url` + `com.compuserve.gif` on macOS `NSPasteboard` so Slack/Discord/Messages never flatten animations).
    - Automatically transcodes static WebP images to PNG for universal compatibility.
+
+4. **macOS Permissions & Insertion Mechanisms:**
+   - **Native Drag-and-Drop:** Dragging any image or animated GIF out of the search grid into another app (Messages, Slack, Discord, Chrome, Finder) uses standard macOS pointer event streaming and works out-of-the-box with **zero permissions**.
+   - **1-Click Auto-Paste (`⌘V`):** Clicking an image activates your target chat app and synthesizes `⌘V` to paste the image immediately. macOS security strictly requires **Accessibility access** (`AXIsProcessTrusted`) for any application simulating keystrokes into other apps. Keyboardy proactively prompts on first launch and provides an in-app banner with a 1-click shortcut to `System Settings > Privacy & Security > Accessibility`. If Accessibility is not enabled, Keyboardy copies the image to the clipboard and guides you to paste manually with `⌘V`.
 
 ---
 

@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [macos-v1.0.1-beta.2] - 2026-11-03
+
+### Added
+- **Proactive macOS Accessibility Permission Onboarding:**
+  - Added initial launch permission detection: if Accessibility is not yet granted, Keyboardy automatically displays the system permission prompt.
+  - Added an in-app actionable Accessibility warning banner directly under the search bar when Auto-Paste mode is active without permissions, featuring a 1-click **"Grant"** button that directly opens `System Settings > Privacy & Security > Accessibility`.
+  - Added `NSAccessibilityUsageDescription` and `NSAppleEventsUsageDescription` to `Info.plist` explaining why Keyboardy needs Accessibility access (synthesizing `⌘V` to paste into active chat apps).
+- **Graceful Clipboard Fallback with Guidance:**
+  - When clicking an image without Accessibility permissions, Keyboardy copies the image/GIF to the clipboard and provides actionable feedback instructing the user to grant permission in System Settings for 1-step auto-paste.
+
+### Fixed
+- **1-Click Auto-Paste vs. Drag-and-Drop Conflict:**
+  - **Root Cause:** Drag-and-drop uses macOS pointer event streams (`NSItemProvider`) which require zero special permissions. Keystroke synthesis (`⌘V` into external apps), however, strictly requires macOS Accessibility trust (`AXIsProcessTrusted() == true`). Without it, macOS silently drops the synthetic keystrokes. Additionally, custom mouse handling in `AspectFitImageContainerView` (`mouseDown`, `mouseDragged`, `mouseUp`) intercepted pointer events inside SwiftUI's grid, preventing clicks from firing reliably.
+  - **Fix:** Decoupled image rendering from gesture handling: `AspectFitImageContainerView` now operates purely as a high-performance layer-backed frame animator, while grid tiles are standard SwiftUI `Button` elements with native `.onDrag` handlers.
+- **Keystroke Registration Reliability:**
+  - Switched `CGEventSource` to `.combinedSessionState` and added a 25ms key-down hold delay before posting key-up, ensuring Slack, Discord, Chrome, and Messages process the `⌘V` keystroke every time.
+
+---
+
 ## [macos-v1.0.1-beta.1] - 2026-11-03
 
 ### Added

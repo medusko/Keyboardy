@@ -210,6 +210,43 @@ struct KeyboardyPickerView: View {
 
             Divider().background(palette.border)
 
+            // Accessibility Onboarding Banner (if user has Auto-Paste selected but Accessibility permission is not yet granted in macOS)
+            if prefs.insertBehaviorMode == .autoPasteIntoApp && !prefs.isAccessibilityGranted {
+                HStack(spacing: 8) {
+                    Image(systemName: "hand.tap.fill")
+                        .foregroundColor(palette.accentBlue)
+                        .font(.system(size: 13))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Enable Accessibility for 1-Click Auto-Paste")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(palette.textPrimary)
+                        Text("macOS requires Accessibility permission so Keyboardy can send ⌘V into \(viewModel.targetAppName)")
+                            .font(.system(size: 10))
+                            .foregroundColor(palette.textSecondary)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    Button(action: {
+                        let trusted = ImageCommitService.shared.requestAccessibilityPermission()
+                        prefs.isAccessibilityGranted = trusted
+                    }) {
+                        Text("Grant")
+                            .font(.system(size: 10.5, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(palette.accentBlue)
+                            .cornerRadius(5)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(palette.accentBlue.opacity(0.12))
+
+                Divider().background(palette.border)
+            }
+
             // Status Banner (if active)
             if let banner = viewModel.statusBannerText {
                 HStack(spacing: 6) {
@@ -352,71 +389,75 @@ struct KeyboardyPickerView: View {
         let isSelected = viewModel.selectedIndex == index
         let isLoading = viewModel.loadingItemId == item.id
 
-        return ZStack {
-            palette.surfaceVariant
+        return Button(action: {
+            viewModel.selectedIndex = index
+            viewModel.selectImageResult(item)
+        }) {
+            ZStack {
+                palette.surfaceVariant
 
-            AnimatedRemoteImageView(
-                item: item,
-                onSelect: {
-                    viewModel.selectedIndex = index
-                    viewModel.selectImageResult(item)
-                }
-            )
-            .frame(height: 116)
-            .padding(4)
+                AnimatedRemoteImageView(item: item)
+                    .frame(height: 116)
+                    .padding(4)
 
-            VStack {
-                HStack {
-                    if index < 9 {
-                        Text("⌘\(index + 1)")
-                            .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                VStack {
+                    HStack {
+                        if index < 9 {
+                            Text("⌘\(index + 1)")
+                                .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(Color.black.opacity(0.65))
+                                .cornerRadius(4)
+                        }
+                        Spacer()
+                        if item.isAnimatedGif {
+                            Text("GIF")
+                                .font(.system(size: 9.5, weight: .heavy))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(palette.accentBlue.opacity(0.92))
+                                .cornerRadius(4)
+                        }
+                    }
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Text(item.sourceLabel)
+                            .font(.system(size: 9.5, weight: .bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
                             .background(Color.black.opacity(0.65))
                             .cornerRadius(4)
                     }
-                    Spacer()
-                    if item.isAnimatedGif {
-                        Text("GIF")
-                            .font(.system(size: 9.5, weight: .heavy))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(palette.accentBlue.opacity(0.92))
-                            .cornerRadius(4)
-                    }
                 }
-                Spacer()
-                HStack {
-                    Spacer()
-                    Text(item.sourceLabel)
-                        .font(.system(size: 9.5, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(Color.black.opacity(0.65))
-                        .cornerRadius(4)
-                }
-            }
-            .padding(5)
-            .allowsHitTesting(false)
-
-            if isLoading {
-                Color.black.opacity(0.55)
-                    .allowsHitTesting(false)
-                ProgressView()
-                    .scaleEffect(0.8)
-                    .allowsHitTesting(false)
-            }
-        }
-        .frame(height: 116)
-        .cornerRadius(9)
-        .overlay(
-            RoundedRectangle(cornerRadius: 9)
-                .stroke(isSelected ? palette.accentBlue : palette.border, lineWidth: isSelected ? 2.5 : 1)
+                .padding(5)
                 .allowsHitTesting(false)
-        )
+
+                if isLoading {
+                    Color.black.opacity(0.55)
+                        .allowsHitTesting(false)
+                    ProgressView()
+                        .scaleEffect(0.8)
+                        .allowsHitTesting(false)
+                }
+            }
+            .frame(height: 116)
+            .cornerRadius(9)
+            .overlay(
+                RoundedRectangle(cornerRadius: 9)
+                    .stroke(isSelected ? palette.accentBlue : palette.border, lineWidth: isSelected ? 2.5 : 1)
+                    .allowsHitTesting(false)
+            )
+        }
+        .buttonStyle(.plain)
+        .onDrag {
+            viewModel.selectedIndex = index
+            return viewModel.makeItemProvider(for: item)
+        }
         .help("Click to Auto-Paste into \(viewModel.targetAppName), or Drag & Drop anywhere")
     }
 
