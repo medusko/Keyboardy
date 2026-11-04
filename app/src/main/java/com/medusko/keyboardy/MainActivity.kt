@@ -435,27 +435,14 @@ class MainActivity : AppCompatActivity() {
         titleRow.addView(titleText)
         container.addView(titleRow)
 
-        // Section Label: "About"
-        val sectionLabel = TextView(this).apply {
-            text = "About"
-            setTextColor(palette.accentBlue)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-            typeface = Typeface.DEFAULT_BOLD
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = dpToPx(14)
-            }
+        val vName = try {
+            packageManager.getPackageInfo(packageName, 0).versionName ?: "1.0.1-RC1"
+        } catch (_: Exception) {
+            "1.0.1-RC1"
         }
-        container.addView(sectionLabel)
 
-        // Body Description
-        val bodyText = TextView(this).apply {
-            text = "Keyboardy is a zero-step auxiliary Google Image & GIF search keyboard engineered to eliminate manual downloading and file-picking when sharing pictures in Slack, Google Messages, WhatsApp, Discord, and other chat apps.\n\nSwitch from your default keyboard with one tap, search full-screen across our Hybrid Google WebView + Instant Web engine, tap any image or animated GIF to insert it directly into your conversation via Android's CommitContent API, and automatically jump right back to your default keyboard."
-            setTextColor(palette.textPrimary)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-            setLineSpacing(dpToPx(3).toFloat(), 1f)
+        val scrollArea = ScrollView(this).apply {
+            isFillViewport = true
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -463,13 +450,46 @@ class MainActivity : AppCompatActivity() {
                 topMargin = dpToPx(8)
             }
         }
-        container.addView(bodyText)
 
-        // Version Footer matching Lagatron
-        val footerText = TextView(this).apply {
-            text = "Keyboardy v1.06 • Built for Android 15 / Pixel"
-            setTextColor(palette.textSecondary)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+        val scrollContent = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        // Section Label: "About"
+        val sectionLabel = TextView(this).apply {
+            text = "About"
+            setTextColor(palette.accentBlue)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f)
+            typeface = Typeface.DEFAULT_BOLD
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dpToPx(6)
+            }
+        }
+        scrollContent.addView(sectionLabel)
+
+        // Body Description
+        val bodyText = TextView(this).apply {
+            text = "Keyboardy is a zero-step auxiliary Google Image & GIF search keyboard engineered to eliminate manual downloading and file-picking when sharing pictures in Slack, Google Messages, WhatsApp, Discord, and other chat apps.\n\nSwitch from your default keyboard with one tap, search full-screen across our Hybrid Google WebView + Instant Web engine, tap any image or animated GIF to insert it directly into your conversation via Android's CommitContent API, and automatically jump right back to your default keyboard."
+            setTextColor(palette.textPrimary)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f)
+            setLineSpacing(dpToPx(3).toFloat(), 1f)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dpToPx(6)
+            }
+        }
+        scrollContent.addView(bodyText)
+
+        // Section Label: "Release Candidate 1 & What's New"
+        val sectionRcLabel = TextView(this).apply {
+            text = "Release Candidate 1 & What's New"
+            setTextColor(palette.accentBlue)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f)
             typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -478,7 +498,79 @@ class MainActivity : AppCompatActivity() {
                 topMargin = dpToPx(14)
             }
         }
-        container.addView(footerText)
+        scrollContent.addView(sectionRcLabel)
+
+        val whatsNewBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dpToPx(12), dpToPx(10), dpToPx(12), dpToPx(10))
+            background = palette.createRoundedRect(
+                fillColor = palette.surfaceVariant,
+                cornerRadiusPx = 10f * density,
+                strokeWidthPx = strokePx,
+                strokeColor = palette.border
+            )
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dpToPx(6)
+            }
+        }
+
+        val whatsNewText = TextView(this).apply {
+            text = "• Solid boundary bar directly on top of the keyboard area\n" +
+                   "• Modern rounded top corners with clean transparent background\n" +
+                   "• Instant Settings button (⚙️) directly in keyboard top bar\n" +
+                   "• Auto-lowers keyboard when navigating to Settings\n" +
+                   "• Height toggle chip (Standard ~74% / Full Screen ~96%)\n" +
+                   "• Transparent launcher app icon with smooth borders\n" +
+                   "• Hybrid Google WebView + Instant Web engine with Tenor GIFs"
+            setTextColor(palette.textPrimary)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f)
+            setLineSpacing(dpToPx(3).toFloat(), 1f)
+        }
+        whatsNewBox.addView(whatsNewText)
+        scrollContent.addView(whatsNewBox)
+
+        // Changelog Link Button
+        val changelogBtn = TextView(this).apply {
+            text = "View Full Changelog on GitHub ↗"
+            setTextColor(palette.accentBlue)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            typeface = Typeface.DEFAULT_BOLD
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dpToPx(8)
+            }
+            setOnClickListener {
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/medusko/Keyboardy/blob/main/CHANGELOG.md"))
+                    startActivity(intent)
+                } catch (_: Exception) {}
+            }
+        }
+        scrollContent.addView(changelogBtn)
+
+        // Version Footer
+        val footerText = TextView(this).apply {
+            text = "Keyboardy v$vName (Build 8) • Release Candidate 1 • Built for Android 15 / Pixel"
+            setTextColor(palette.textSecondary)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f)
+            typeface = Typeface.DEFAULT_BOLD
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dpToPx(12)
+                bottomMargin = dpToPx(4)
+            }
+        }
+        scrollContent.addView(footerText)
+
+        scrollArea.addView(scrollContent)
+        container.addView(scrollArea)
 
         // Close Button Row
         val buttonRow = LinearLayout(this).apply {
