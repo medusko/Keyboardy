@@ -20,34 +20,54 @@ final class RemoteImageCache {
     }
 }
 
+/// Custom container NSView that enforces zero intrinsic content size and resizes its child NSImageView
+/// strictly to fit inside the tile bounds, so the FULL image is always shown (aspect-fit) without cropping.
+final class AspectFitImageContainerView: NSView {
+    let imageView = NSImageView()
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.masksToBounds = true
+
+        imageView.imageScaling = .scaleProportionallyUpOrDown
+        imageView.imageAlignment = .alignCenter
+        imageView.animates = true
+        imageView.canDrawSubviewsIntoLayer = true
+        imageView.setContentCompressionResistancePriority(.init(1), for: .horizontal)
+        imageView.setContentCompressionResistancePriority(.init(1), for: .vertical)
+        imageView.setContentHuggingPriority(.init(1), for: .horizontal)
+        imageView.setContentHuggingPriority(.init(1), for: .vertical)
+        addSubview(imageView)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
+    }
+
+    override func layout() {
+        super.layout()
+        // Inset by 4pt so the full image is clearly visible from edge to edge inside the tile
+        imageView.frame = bounds.insetBy(dx: 4, dy: 4)
+    }
+}
+
 struct AnimatedRemoteImageView: NSViewRepresentable {
     let item: ImageResult
 
-    func makeNSView(context: Context) -> NSView {
-        let container = NSView()
-        container.wantsLayer = true
-        container.layer?.masksToBounds = true
-
-        let imageView = NSImageView()
-        imageView.imageScaling = .scaleProportionallyUpOrDown
-        imageView.animates = true
-        imageView.canDrawSubviewsIntoLayer = true
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-
-        container.addSubview(imageView)
-        NSLayoutConstraint.activate([
-            imageView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-            imageView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-            imageView.topAnchor.constraint(equalTo: container.topAnchor),
-            imageView.bottomAnchor.constraint(equalTo: container.bottomAnchor)
-        ])
-
-        context.coordinator.imageView = imageView
+    func makeNSView(context: Context) -> AspectFitImageContainerView {
+        let container = AspectFitImageContainerView()
+        context.coordinator.imageView = container.imageView
         context.coordinator.load(item: item)
         return container
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {
+    func updateNSView(_ nsView: AspectFitImageContainerView, context: Context) {
+        context.coordinator.imageView = nsView.imageView
         context.coordinator.load(item: item)
     }
 

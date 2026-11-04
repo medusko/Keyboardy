@@ -40,23 +40,42 @@ enum StatusBarBadgeRenderer {
            let img = NSImage(contentsOf: icnsURL) {
             return img
         }
+        let fallbackPath = "app/src/main/res/drawable-nodpi/ic_app_option_1.png"
+        if FileManager.default.fileExists(atPath: fallbackPath),
+           let img = NSImage(contentsOfFile: fallbackPath) {
+            return img
+        }
         return NSApp?.applicationIconImage
     }
 
-    /// Renders the original full-color Android Keyboardy App Icon (`StatusBarIcon.png`).
+    /// Renders the full-color Android Keyboardy App Icon (`StatusBarIcon.png`), cropping inside the white outer corners
+    /// so no white border from the source PNG is ever visible.
     private static func drawColorAppIcon() -> NSImage {
         let targetSize = NSSize(width: 20, height: 20)
         guard let rawIcon = loadSourcePngImage() else {
-            return drawVectorKeyboardyIcon(isWhite: true)
+            return drawMonochromeKeyboardyIcon(isWhite: true)
         }
 
         let rendered = NSImage(size: targetSize, flipped: false) { rect in
             NSGraphicsContext.current?.imageInterpolation = .high
-            let clipPath = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: 4.5, yRadius: 4.5)
+            let innerRect = rect.insetBy(dx: 1.0, dy: 1.0)
+            let clipPath = NSBezierPath(roundedRect: innerRect, xRadius: 4.5, yRadius: 4.5)
             clipPath.addClip()
+
+            // Inset source rect by 6% to crop out the opaque white outer margin/corners of ic_app_option_1.png
+            let srcW = rawIcon.size.width
+            let srcH = rawIcon.size.height
+            let cropInsetX = srcW * 0.06
+            let cropInsetY = srcH * 0.06
+            let srcRect = NSRect(
+                x: cropInsetX,
+                y: cropInsetY,
+                width: srcW - cropInsetX * 2,
+                height: srcH - cropInsetY * 2
+            )
             rawIcon.draw(
-                in: rect,
-                from: NSRect(origin: .zero, size: rawIcon.size),
+                in: innerRect,
+                from: srcRect,
                 operation: .sourceOver,
                 fraction: 1.0
             )
@@ -66,17 +85,16 @@ enum StatusBarBadgeRenderer {
         return rendered
     }
 
-    /// Produces a crisp White or Black version of the Keyboardy App Icon by converting the source icon's
-    /// cyan/blue hologram + keyboard artwork into a high-contrast White or Black monochrome icon
-    /// (with vector fallback if the PNG resource is unavailable).
+    /// Extracts the Keyboardy hologram picture frame + perspective keyboard from `StatusBarIcon.png`
+    /// and renders a pure White or pure Black transparent-background icon with ZERO border.
     private static func drawMonochromeKeyboardyIcon(isWhite: Bool) -> NSImage {
         guard let rawIcon = loadSourcePngImage(),
               let cgSource = rawIcon.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            return drawVectorKeyboardyIcon(isWhite: isWhite)
+            return NSImage(size: NSSize(width: 20, height: 20))
         }
 
-        let pxWidth = 44
-        let pxHeight = 44
+        let pxWidth = 64
+        let pxHeight = 64
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
 
@@ -89,120 +107,82 @@ enum StatusBarBadgeRenderer {
             space: colorSpace,
             bitmapInfo: bitmapInfo
         ), let dataPtr = ctx.data else {
-            return drawVectorKeyboardyIcon(isWhite: isWhite)
+            return NSImage(size: NSSize(width: 20, height: 20))
         }
 
         ctx.interpolationQuality = .high
-        ctx.draw(cgSource, in: CGRect(x: 0, y: 0, width: pxWidth, height: pxHeight))
+        // Draw slightly zoomed in (+8%) so the hologram + keyboard fills the 20x20 menu bar slot cleanly
+        // and completely excludes the outer white corners of ic_app_option_1.png
+        let drawInset: CGFloat = -3.0
+        ctx.draw(cgSource, in: CGRect(x: drawInset, y: drawInset, width: CGFloat(pxWidth) - drawInset * 2, height: CGFloat(pxHeight) - drawInset * 2))
 
         let pixels = dataPtr.bindMemory(to: UInt8.self, capacity: pxWidth * pxHeight * 4)
 
-        // Transform the glowing cyan/blue foreground artwork of ic_app_option_1.png into a crisp
-        // pure White or pure Black monochrome version on a matching contrast squircle badge.
-        for i in 0..<(pxWidth * pxHeight) {
-            let offset = i * 4
-            let g = Float(pixels[offset + 1])
-            let b = Float(pixels[offset + 2])
-            let a = Float(pixels[offset + 3]) / 255.0
+        for y in 0..<pxHeight {
+            for x in 0..<pxWidth {
+                let i = y * pxWidth + x
+                let offset = i * 4
+                let r = Float(pixels[offset])
+                let g = Float(pixels[offset + 1])
+                let b = Float(pixels[offset + 2])
 
-            if a < 0.08 {
-                pixels[offset] = 0
-                pixels[offset + 1] = 0
-                pixels[offset + 2] = 0
-                pixels[offset + 3] = 0
-                continue
-            }
+                // Exclude any outer white background pixel from ic_app_option_1.png
+                // (Outer background in ic_app_option_1.png is neutral white/gray where R, G, B are all high and B - R is near 0;
+                // the Keyboardy artwork is cyan/blue where B > R, except the central glowing mountain/sun inside x: 14..50, y: 22..52)
+                let isInsideCentralHologram = (x >= 14 && x <= 50 && y >= 20 && y <= 54)
+                if !isInsideCentralHologram && r > 110 && (b - r) < 25 {
+                    pixels[offset] = 0
+                    pixels[offset + 1] = 0
+                    pixels[offset + 2] = 0
+                    pixels[offset + 3] = 0
+                    continue
+                }
 
-            // In ic_app_option_1.png, the dark squircle background has B ~ 18..28,
-            // while the keyboard keys and hologram picture frame have B ~ 90..255.
-            let signal = max(g, b)
-            // Normalize foreground intensity with S-curve contrast boost
-            let norm = min(max((signal - 38.0) / 155.0, 0.0), 1.0)
-            let boosted = norm * norm * (3.0 - 2.0 * norm)
+                // Compute foreground alpha from the cyan/blue hologram & keyboard keys
+                // Background of the dark squircle has B ~ 15..28. Keys and hologram have B ~ 85..255.
+                let cyanSignal = max(b, g) - (isInsideCentralHologram ? 0.0 : r * 0.5)
+                let norm = min(max((cyanSignal - 42.0) / 135.0, 0.0), 1.0)
+                // Boost contrast so the hologram frame, mountains, sun, and keycaps have crisp solid opacity
+                let alpha = norm * norm * (3.0 - 2.0 * norm)
 
-            if isWhite {
-                // White Version: Pure white foreground (#FFFFFF) on a sleek dark charcoal squircle (#14171F)
-                let bgR: Float = 20.0
-                let bgG: Float = 23.0
-                let bgB: Float = 31.0
-                let outR = bgR + boosted * (255.0 - bgR)
-                let outG = bgG + boosted * (255.0 - bgG)
-                let outB = bgB + boosted * (255.0 - bgB)
-
-                pixels[offset]     = UInt8(min(max(outR * a, 0), 255))
-                pixels[offset + 1] = UInt8(min(max(outG * a, 0), 255))
-                pixels[offset + 2] = UInt8(min(max(outB * a, 0), 255))
-                pixels[offset + 3] = UInt8(min(max(a * 255.0, 0), 255))
-            } else {
-                // Black Version: Pure black/charcoal foreground (#12141A) on a crisp white/silver squircle (#F4F6FA)
-                let bgR: Float = 244.0
-                let bgG: Float = 246.0
-                let bgB: Float = 250.0
-                let fgR: Float = 16.0
-                let fgG: Float = 18.0
-                let fgB: Float = 24.0
-                let outR = bgR - boosted * (bgR - fgR)
-                let outG = bgG - boosted * (bgG - fgG)
-                let outB = bgB - boosted * (bgB - fgB)
-
-                pixels[offset]     = UInt8(min(max(outR * a, 0), 255))
-                pixels[offset + 1] = UInt8(min(max(outG * a, 0), 0 + 255))
-                pixels[offset + 2] = UInt8(min(max(outB * a, 0), 255))
-                pixels[offset + 3] = UInt8(min(max(a * 255.0, 0), 255))
+                if alpha < 0.05 {
+                    pixels[offset] = 0
+                    pixels[offset + 1] = 0
+                    pixels[offset + 2] = 0
+                    pixels[offset + 3] = 0
+                } else {
+                    let outAlpha = UInt8(min(max(alpha * 255.0, 0), 255))
+                    if isWhite {
+                        // Premultiplied pure White (#FFFFFF) on 100% transparent background (zero border!)
+                        pixels[offset]     = outAlpha
+                        pixels[offset + 1] = outAlpha
+                        pixels[offset + 2] = outAlpha
+                        pixels[offset + 3] = outAlpha
+                    } else {
+                        // Premultiplied pure Black (#0D0E12) on 100% transparent background (zero border!)
+                        let c = UInt8(Float(outAlpha) * 0.06)
+                        pixels[offset]     = c
+                        pixels[offset + 1] = c
+                        pixels[offset + 2] = c
+                        pixels[offset + 3] = outAlpha
+                    }
+                }
             }
         }
 
         guard let outCg = ctx.makeImage() else {
-            return drawVectorKeyboardyIcon(isWhite: isWhite)
+            return NSImage(size: NSSize(width: 20, height: 20))
         }
 
         let targetSize = NSSize(width: 20, height: 20)
         let finalImg = NSImage(size: targetSize, flipped: false) { rect in
             NSGraphicsContext.current?.imageInterpolation = .high
-            let innerRect = rect.insetBy(dx: 0.5, dy: 0.5)
-            let clipPath = NSBezierPath(roundedRect: innerRect, xRadius: 4.5, yRadius: 4.5)
-            clipPath.addClip()
-
             if let cgCtx = NSGraphicsContext.current?.cgContext {
-                cgCtx.draw(outCg, in: innerRect)
-            }
-
-            if !isWhite {
-                let borderPath = NSBezierPath(roundedRect: innerRect, xRadius: 4.5, yRadius: 4.5)
-                borderPath.lineWidth = 0.8
-                NSColor(calibratedWhite: 0.1, alpha: 0.35).setStroke()
-                borderPath.stroke()
+                cgCtx.draw(outCg, in: rect)
             }
             return true
         }
         finalImg.isTemplate = false
         return finalImg
-    }
-
-    private static func drawVectorKeyboardyIcon(isWhite: Bool) -> NSImage {
-        let size = NSSize(width: 20, height: 20)
-        let img = NSImage(size: size, flipped: false) { rect in
-            let inner = rect.insetBy(dx: 1.0, dy: 1.0)
-            let bg = NSBezierPath(roundedRect: inner, xRadius: 4.5, yRadius: 4.5)
-            (isWhite ? NSColor(calibratedWhite: 0.1, alpha: 1.0) : NSColor(calibratedWhite: 0.96, alpha: 1.0)).setFill()
-            bg.fill()
-
-            let fg = isWhite ? NSColor.white : NSColor(calibratedWhite: 0.1, alpha: 1.0)
-            fg.setStroke()
-            fg.setFill()
-
-            let frameRect = NSRect(x: 4.5, y: 8.5, width: 11.0, height: 8.0)
-            let framePath = NSBezierPath(roundedRect: frameRect, xRadius: 1.5, yRadius: 1.5)
-            framePath.lineWidth = 1.3
-            framePath.stroke()
-
-            let kbRect = NSRect(x: 3.0, y: 2.5, width: 14.0, height: 4.2)
-            let kbPath = NSBezierPath(roundedRect: kbRect, xRadius: 1.2, yRadius: 1.2)
-            kbPath.lineWidth = 1.2
-            kbPath.stroke()
-            return true
-        }
-        img.isTemplate = false
-        return img
     }
 }
