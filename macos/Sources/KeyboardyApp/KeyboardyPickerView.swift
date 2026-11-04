@@ -35,6 +35,7 @@ struct KeyboardyPickerView: View {
                     prefs: prefs,
                     onCloseSettings: {
                         viewModel.isShowingSettings = false
+                        prefs.isShowingAbout = false
                         isSearchFieldFocused = true
                     }
                 )

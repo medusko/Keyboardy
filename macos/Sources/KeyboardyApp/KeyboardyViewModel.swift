@@ -41,6 +41,7 @@ final class KeyboardyViewModel: ObservableObject {
     func prepareForPanelOpen(capturedApp: NSRunningApplication?, initialQueryOverride: String? = nil) {
         self.targetApp = capturedApp
         self.isShowingSettings = false
+        self.prefs.isShowingAbout = false
         self.isShowingHistory = false
         self.statusBannerText = nil
         self.lastSessionIncrementalHistoryQuery = nil

@@ -3,36 +3,15 @@
     android:id="@+id/root_ime_container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/transparent"
+    android:background="@color/kb_bg"
     android:orientation="vertical">
 
-    <!-- Top Boundary Line Container (with genuine transparent background behind it) -->
-    <LinearLayout
-        android:id="@+id/ime_top_boundary"
+    <!-- Blue bar directly on top of the keyboard area -->
+    <View
+        android:id="@+id/ime_top_line"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@android:color/transparent"
-        android:paddingHorizontal="12dp"
-        android:paddingTop="6dp"
-        android:paddingBottom="5dp"
-        android:orientation="vertical">
-
-        <!-- Blue line going across the top with rounded off edges -->
-        <View
-            android:id="@+id/ime_top_line"
-            android:layout_width="match_parent"
-            android:layout_height="3.5dp"
-            android:background="@color/kb_accent" />
-    </LinearLayout>
-
-    <!-- Main Keyboard Body Sheet -->
-    <LinearLayout
-        android:id="@+id/keyboard_body_sheet"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:background="@color/kb_bg"
-        android:orientation="vertical">
+        android:layout_height="3dp"
+        android:background="@color/kb_accent" />
 
     <!-- Top Bar: Return to Gboard + Interactive Search Bar + History Button + Settings Button -->
     <LinearLayout
@@ -474,7 +453,5 @@
         android:id="@+id/bottom_nav_spacer"
         android:layout_width="match_parent"
         android:layout_height="54dp" />
-
-    </LinearLayout>
 
 </LinearLayout>

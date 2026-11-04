@@ -87,9 +87,7 @@ class KeyboardyImeService : InputMethodService() {
     private var ivHistoryIcon: ImageView? = null
     private var btnSettings: LinearLayout? = null
     private var ivSettingsIcon: ImageView? = null
-    private var imeTopBoundary: LinearLayout? = null
     private var imeTopLine: View? = null
-    private var keyboardBodySheet: LinearLayout? = null
 
     private var selectionActionBar: LinearLayout? = null
     private var btnCtxPaste: TextView? = null
@@ -172,9 +170,7 @@ class KeyboardyImeService : InputMethodService() {
         ivHistoryIcon = root.findViewById(R.id.iv_history_icon)
         btnSettings = root.findViewById(R.id.btn_settings)
         ivSettingsIcon = root.findViewById(R.id.iv_settings_icon)
-        imeTopBoundary = root.findViewById(R.id.ime_top_boundary)
         imeTopLine = root.findViewById(R.id.ime_top_line)
-        keyboardBodySheet = root.findViewById(R.id.keyboard_body_sheet)
 
         selectionActionBar = root.findViewById(R.id.selection_action_bar)
         btnCtxPaste = root.findViewById(R.id.btn_ctx_paste)
@@ -554,12 +550,9 @@ class KeyboardyImeService : InputMethodService() {
             (screenHeightPx * 0.74f).toInt().coerceAtLeast(dpToPx(420))
         }
 
-        // Set IME dialog window background to transparent for seamless transparency behind the top line
-        window?.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-
-        // Root container is transparent so host app content is visible behind the top boundary
+        // Apply background and target container height directly to root IME container
         rootImeContainer?.let { root ->
-            root.setBackgroundColor(Color.TRANSPARENT)
+            root.setBackgroundColor(palette.background)
             val lp = root.layoutParams
             if (lp != null) {
                 lp.height = targetContainerHeightPx
@@ -568,44 +561,15 @@ class KeyboardyImeService : InputMethodService() {
             root.requestLayout()
         }
 
-        // Top Blue Bar: goes across the top with rounded off edges and transparent background behind it
-        imeTopBoundary?.let { boundary ->
-            val horizPadding = if (isFull) 0 else dpToPx(12)
-            val topPadding = if (isFull) 0 else dpToPx(6)
-            val bottomPadding = if (isFull) 0 else dpToPx(5)
-            boundary.setPadding(horizPadding, topPadding, horizPadding, bottomPadding)
-        }
-
+        // Blue bar directly on top of the keyboard area
         imeTopLine?.let { line ->
-            val lp = line.layoutParams as? LinearLayout.LayoutParams
+            line.setBackgroundColor(palette.accentBlue)
+            val lp = line.layoutParams
             if (lp != null) {
-                lp.width = LinearLayout.LayoutParams.MATCH_PARENT
-                lp.height = if (isFull) dpToPx(2) else dpToPx(3.5f.toInt().coerceAtLeast(3))
+                lp.width = ViewGroup.LayoutParams.MATCH_PARENT
+                lp.height = dpToPx(3)
                 line.layoutParams = lp
             }
-            val lineRadius = if (isFull) 0f else dpToPx(2).toFloat()
-            line.background = palette.createRoundedRect(
-                fillColor = palette.accentBlue,
-                cornerRadiusPx = lineRadius
-            )
-        }
-
-        // Main Keyboard Body Sheet: rounded off top edges in standard mode with palette background
-        keyboardBodySheet?.let { sheet ->
-            val topRadius = if (isFull) 0f else dpToPx(16).toFloat()
-            val sheetBg = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                setColor(palette.background)
-                if (topRadius > 0) {
-                    cornerRadii = floatArrayOf(
-                        topRadius, topRadius, // top-left
-                        topRadius, topRadius, // top-right
-                        0f, 0f,               // bottom-right
-                        0f, 0f                // bottom-left
-                    )
-                }
-            }
-            sheet.background = sheetBg
         }
 
         // Update Top Bar height

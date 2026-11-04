@@ -54,6 +54,7 @@ public final class KeyboardyPrefs: ObservableObject {
     }
 
     @Published public var isRecordingCustomShortcut: Bool = false
+    @Published public var isShowingAbout: Bool = false
 
     @Published public var popupAnchorMode: PopupAnchorMode {
         didSet { defaults.set(popupAnchorMode.rawValue, forKey: Keys.popupAnchorMode) }

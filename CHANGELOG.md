@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [android-v1.06] - 2026-11-04
+
+### Changed
+- **Integrated Blue Boundary Bar Directly on Top of Keyboard:**
+  - Removed all floating layers, separate outer containers, and gaps.
+  - Attached the 3dp accent blue boundary bar directly across the top edge of the keyboard view (`MATCH_PARENT` width), cleanly and solidly defining the top border of Keyboardy.
+
+---
+
 ## [android-v1.05] - 2026-11-04
 
 ### Changed & Fixed

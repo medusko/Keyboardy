@@ -5,7 +5,6 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var prefs: KeyboardyPrefs
     let onCloseSettings: () -> Void
-    @State private var isShowingAbout: Bool = false
 
     private var palette: ThemePalette {
         ThemePalette.forMode(isDark: prefs.isDarkMode)
@@ -16,9 +15,9 @@ struct SettingsView: View {
             // Top Navigation Bar
             HStack(spacing: 10) {
                 Button(action: {
-                    if isShowingAbout {
+                    if prefs.isShowingAbout {
                         withAnimation(.easeInOut(duration: 0.15)) {
-                            isShowingAbout = false
+                            prefs.isShowingAbout = false
                         }
                     } else {
                         onCloseSettings()
@@ -27,7 +26,7 @@ struct SettingsView: View {
                     HStack(spacing: 5) {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 11.5, weight: .bold))
-                        Text(isShowingAbout ? "Settings" : "Back")
+                        Text(prefs.isShowingAbout ? "Settings" : "Back")
                             .font(.system(size: 12.5, weight: .bold))
                     }
                     .foregroundColor(palette.textPrimary)
@@ -44,7 +43,7 @@ struct SettingsView: View {
 
                 Spacer()
 
-                Text(isShowingAbout ? "About Keyboardy" : "Keyboardy Settings")
+                Text(prefs.isShowingAbout ? "About Keyboardy" : "Keyboardy Settings")
                     .font(.system(size: 14, weight: .black, design: .rounded))
                     .foregroundColor(palette.textPrimary)
 
@@ -71,16 +70,16 @@ struct SettingsView: View {
                 // (i) Icon Button to the right of the status pill
                 Button(action: {
                     withAnimation(.easeInOut(duration: 0.15)) {
-                        isShowingAbout.toggle()
+                        prefs.isShowingAbout.toggle()
                     }
                 }) {
-                    Image(systemName: isShowingAbout ? "info.circle.fill" : "info.circle")
+                    Image(systemName: prefs.isShowingAbout ? "info.circle.fill" : "info.circle")
                         .font(.system(size: 15, weight: .bold))
                         .foregroundColor(palette.accentBlue)
                         .frame(width: 22, height: 22)
                 }
                 .buttonStyle(.plain)
-                .help(isShowingAbout ? "Back to Settings" : "About Keyboardy & What's New")
+                .help(prefs.isShowingAbout ? "Back to Settings" : "About Keyboardy & What's New")
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -88,7 +87,7 @@ struct SettingsView: View {
 
             Divider().background(palette.border)
 
-            if isShowingAbout {
+            if prefs.isShowingAbout {
                 aboutScrollView
             } else {
                 mainSettingsScrollView
@@ -444,7 +443,6 @@ struct SettingsView: View {
                 .padding(14)
             }
         }
-    }
 
     // MARK: - About Keyboardy & What's New Content
 
