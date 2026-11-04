@@ -20,6 +20,108 @@ public enum SearchParsers {
         )
     }()
 
+    private static let tenorImgTagRegex: NSRegularExpression = {
+        try! NSRegularExpression(
+            pattern: #"<img[^>]+src="(https://media[0-9]*\.tenor\.com/[^"]+\.gif)"[^>]*alt="([^"]*)""#,
+            options: [.caseInsensitive]
+        )
+    }()
+
+    private static let tenorUrlIdRegex: NSRegularExpression = {
+        try! NSRegularExpression(
+            pattern: #"https://media[0-9]*\.tenor\.com/(?:m/)?([A-Za-z0-9_\-]{11})AAAA[A-Za-z]/([^\s"<>]+?\.gif)"#,
+            options: []
+        )
+    }()
+
+    /// Converts any Tenor GIF URL into its fast ~100KB animated preview URL (`AAAAM`) and full HD URL (`AAAAC`).
+    public static func normalizeTenorGifUrls(_ url: String) -> (animatedThumb: String, fullGif: String)? {
+        let ns = url as NSString
+        let range = NSRange(location: 0, length: ns.length)
+        guard let m = tenorUrlIdRegex.firstMatch(in: url, options: [], range: range),
+              m.numberOfRanges >= 3 else {
+            return nil
+        }
+        let tenorId = ns.substring(with: m.range(at: 1))
+        let slug = ns.substring(with: m.range(at: 2))
+        let thumb = "https://media.tenor.com/\(tenorId)AAAAM/\(slug)"
+        let full = "https://media1.tenor.com/m/\(tenorId)AAAAC/\(slug)"
+        return (thumb, full)
+    }
+
+    /// Parses Tenor search HTML (`https://tenor.com/search/<slug>-gifs`) into fast-loading animated GIF results.
+    /// Every returned item has `thumbnailUrl` set to Tenor's ~100KB animated `AAAAM` GIF so it animates in ~60ms!
+    public static func parseTenorSearchHtml(_ html: String) -> [ImageResult] {
+        var results: [ImageResult] = []
+        var seenTenorIds = Set<String>()
+        let nsHtml = html as NSString
+        let fullRange = NSRange(location: 0, length: nsHtml.length)
+
+        // 1. First match <img> tags with alt text
+        let imgMatches = tenorImgTagRegex.matches(in: html, options: [], range: fullRange)
+        for match in imgMatches {
+            guard match.numberOfRanges >= 3 else { continue }
+            let rawUrl = nsHtml.substring(with: match.range(at: 1))
+            if rawUrl.contains("/assets/") || rawUrl.contains("tenor-logo") { continue }
+            let rawAlt = unescapeHtmlEntities(nsHtml.substring(with: match.range(at: 2)))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let title = rawAlt.isEmpty ? "Tenor GIF" : rawAlt
+
+            if let pair = normalizeTenorGifUrls(rawUrl) {
+                if seenTenorIds.insert(pair.animatedThumb).inserted {
+                    results.append(
+                        ImageResult(
+                            id: "tenor_\(results.count)_\(pair.animatedThumb.hashValue)",
+                            title: title,
+                            thumbnailUrl: pair.animatedThumb,
+                            fullImageUrl: pair.fullGif,
+                            isAnimatedGif: true,
+                            sourceLabel: "GIF"
+                        )
+                    )
+                }
+            } else if rawUrl.hasPrefix("http"), seenTenorIds.insert(rawUrl).inserted {
+                results.append(
+                    ImageResult(
+                        id: "tenor_\(results.count)_\(rawUrl.hashValue)",
+                        title: title,
+                        thumbnailUrl: rawUrl,
+                        fullImageUrl: rawUrl,
+                        isAnimatedGif: true,
+                        sourceLabel: "GIF"
+                    )
+                )
+            }
+        }
+
+        // 2. Also scan any remaining Tenor GIF URLs in script/preload blocks
+        let urlMatches = tenorUrlIdRegex.matches(in: html, options: [], range: fullRange)
+        for match in urlMatches {
+            guard match.numberOfRanges >= 3 else { continue }
+            let tenorId = nsHtml.substring(with: match.range(at: 1))
+            let slug = nsHtml.substring(with: match.range(at: 2))
+            let thumb = "https://media.tenor.com/\(tenorId)AAAAM/\(slug)"
+            let full = "https://media1.tenor.com/m/\(tenorId)AAAAC/\(slug)"
+            if seenTenorIds.insert(thumb).inserted {
+                let readableSlug = slug
+                    .replacingOccurrences(of: ".gif", with: "")
+                    .replacingOccurrences(of: "-", with: " ")
+                results.append(
+                    ImageResult(
+                        id: "tenor_\(results.count)_\(thumb.hashValue)",
+                        title: readableSlug.isEmpty ? "Tenor GIF" : readableSlug,
+                        thumbnailUrl: thumb,
+                        fullImageUrl: full,
+                        isAnimatedGif: true,
+                        sourceLabel: "GIF"
+                    )
+                )
+            }
+        }
+
+        return results
+    }
+
     /// Parses the HTML fragment returned by https://www.bing.com/images/async?q=...
     /// Each image card embeds a JSON object inside m="{...}" with:
     ///  - murl: Direct full-resolution image or animated GIF URL
@@ -46,10 +148,26 @@ public enum SearchParsers {
             let title = rawTitle.isEmpty ? "Image" : rawTitle
 
             if fullUrl.hasPrefix("http"), seenUrls.insert(fullUrl).inserted {
-                let effectiveThumb = thumbUrl.isEmpty ? fullUrl : thumbUrl
-                let isGif = forceGifHint ||
-                    fullUrl.lowercased().contains(".gif") ||
-                    title.lowercased().contains("gif")
+                let lowerFull = fullUrl.lowercased()
+                let isKnownStaticExt = lowerFull.hasSuffix(".jpg") ||
+                    lowerFull.hasSuffix(".jpeg") ||
+                    lowerFull.hasSuffix(".png") ||
+                    lowerFull.contains(".jpg?") ||
+                    lowerFull.contains(".jpeg?") ||
+                    lowerFull.contains(".png?")
+
+                let isGif = !isKnownStaticExt && (
+                    lowerFull.contains(".gif") ||
+                    (forceGifHint && !lowerFull.contains("pexels.com"))
+                )
+
+                // If this Bing result is a Tenor GIF, use Tenor's fast ~100KB animated AAAAM thumbnail so it animates immediately!
+                let effectiveThumb: String
+                if let tenorPair = normalizeTenorGifUrls(fullUrl) {
+                    effectiveThumb = tenorPair.animatedThumb
+                } else {
+                    effectiveThumb = thumbUrl.isEmpty ? fullUrl : thumbUrl
+                }
 
                 results.append(
                     ImageResult(
@@ -103,19 +221,35 @@ public enum SearchParsers {
             guard primaryUrl.hasPrefix("http"), seen.insert(primaryUrl).inserted else { continue }
 
             let itemIsGif = (item["isGif"] as? Bool) ?? false
-            let isGif = forceGifHint ||
+            let lowerPrimary = primaryUrl.lowercased()
+            let isKnownStaticExt = lowerPrimary.hasSuffix(".jpg") ||
+                lowerPrimary.hasSuffix(".jpeg") ||
+                lowerPrimary.hasSuffix(".png") ||
+                lowerPrimary.contains(".jpg?") ||
+                lowerPrimary.contains(".jpeg?") ||
+                lowerPrimary.contains(".png?")
+            let isGif = !isKnownStaticExt && (
                 itemIsGif ||
-                primaryUrl.lowercased().contains(".gif") ||
-                title.lowercased().contains("gif")
+                lowerPrimary.contains(".gif") ||
+                forceGifHint
+            )
+
+            let effectiveThumb: String
+            if let tenorPair = normalizeTenorGifUrls(primaryUrl) {
+                effectiveThumb = tenorPair.animatedThumb
+            } else {
+                effectiveThumb = thumbUrl.isEmpty ? primaryUrl : thumbUrl
+            }
+            let srcLabel = (item["source"] as? String) ?? "G"
 
             results.append(
                 ImageResult(
                     id: "gweb_\(i)_\(primaryUrl.hashValue)",
                     title: title,
-                    thumbnailUrl: thumbUrl.isEmpty ? primaryUrl : thumbUrl,
+                    thumbnailUrl: effectiveThumb,
                     fullImageUrl: primaryUrl,
                     isAnimatedGif: isGif,
-                    sourceLabel: "G"
+                    sourceLabel: srcLabel
                 )
             )
         }

@@ -77,7 +77,7 @@ final class RemoteImageCache: @unchecked Sendable {
         }
 
         let fetchedData = await downloadTask.value
-        lock.withLock {
+        _ = lock.withLock {
             inFlightTasks.removeValue(forKey: urlStr)
         }
 
@@ -197,28 +197,28 @@ final class RemoteImageCache: @unchecked Sendable {
     }
 }
 
-/// CoreAnimation layer-hosted container view that displays the FULL image (`contentsGravity = .resizeAspect`)
-/// and plays multi-frame animated GIFs/WebPs in a continuous deterministic loop via a `RunLoop.main` `.common` timer.
-final class AspectFitImageContainerView: NSView {
-    private let imageLayer = CALayer()
+/// CoreAnimation layer-backed container view (`wantsUpdateLayer = true`) that:
+/// 1. Displays the FULL image scaled proportionally (`contentsGravity = .resizeAspect`)
+/// 2. Loops multi-frame animated GIFs/WebPs via `RunLoop.main` (`.common` mode) + `needsDisplay = true`
+/// 3. Supports both 1-click Auto-Paste AND native macOS Drag-and-Drop (`NSDraggingSource`) to any app or folder!
+final class AspectFitImageContainerView: NSView, NSDraggingSource {
+    var currentItem: ImageResult?
+    var onSelect: (() -> Void)?
+
     private var currentFrames: [CGImage] = []
     private var currentDelays: [TimeInterval] = []
     private var currentFrameIndex: Int = 0
     private var frameTimer: Timer?
+    private var mouseDownPoint: NSPoint?
+    private var didStartDrag: Bool = false
+
+    override var wantsUpdateLayer: Bool { true }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
         layer?.masksToBounds = true
-
-        imageLayer.contentsGravity = .resizeAspect
-        imageLayer.masksToBounds = true
-        imageLayer.actions = [
-            "contents": NSNull(),
-            "bounds": NSNull(),
-            "position": NSNull()
-        ]
-        layer?.addSublayer(imageLayer)
+        layer?.contentsGravity = .resizeAspect
     }
 
     required init?(coder: NSCoder) {
@@ -233,20 +233,14 @@ final class AspectFitImageContainerView: NSView {
         NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
     }
 
-    override func layout() {
-        super.layout()
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        imageLayer.frame = bounds.insetBy(dx: 4, dy: 4)
-        CATransaction.commit()
-    }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        if window == nil {
-            stopFrameTimer()
-        } else if currentFrames.count > 1 && frameTimer == nil {
-            scheduleNextFrameTick()
+    override func updateLayer() {
+        guard let layer = self.layer else { return }
+        layer.contentsGravity = .resizeAspect
+        layer.masksToBounds = true
+        if currentFrames.indices.contains(currentFrameIndex) {
+            layer.contents = currentFrames[currentFrameIndex]
+        } else {
+            layer.contents = nil
         }
     }
 
@@ -262,8 +256,9 @@ final class AspectFitImageContainerView: NSView {
         currentFrameIndex = 0
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        imageLayer.contents = nil
+        self.layer?.contents = nil
         CATransaction.commit()
+        self.needsDisplay = true
     }
 
     func applyDecodedPayload(_ payload: DecodedImagePayload) {
@@ -279,8 +274,10 @@ final class AspectFitImageContainerView: NSView {
 
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        imageLayer.contents = first
+        self.layer?.contentsGravity = .resizeAspect
+        self.layer?.contents = first
         CATransaction.commit()
+        self.needsDisplay = true
 
         if payload.isAnimated {
             scheduleNextFrameTick()
@@ -298,26 +295,109 @@ final class AspectFitImageContainerView: NSView {
             self.currentFrameIndex = (self.currentFrameIndex + 1) % self.currentFrames.count
             CATransaction.begin()
             CATransaction.setDisableActions(true)
-            self.imageLayer.contents = self.currentFrames[self.currentFrameIndex]
+            self.layer?.contentsGravity = .resizeAspect
+            self.layer?.contents = self.currentFrames[self.currentFrameIndex]
             CATransaction.commit()
+            self.needsDisplay = true
             self.scheduleNextFrameTick()
         }
         RunLoop.main.add(timer, forMode: .common)
         self.frameTimer = timer
     }
+
+    // MARK: - Click & Native Drag-and-Drop Support (NSDraggingSource)
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        true
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        mouseDownPoint = convert(event.locationInWindow, from: nil)
+        didStartDrag = false
+
+        // Pre-warm full-resolution image/GIF in background in case user drags or clicks
+        if let item = currentItem,
+           item.fullImageUrl != item.thumbnailUrl,
+           RemoteImageCache.shared.data(for: item.fullImageUrl) == nil {
+            let fullUrl = item.fullImageUrl
+            Task.detached(priority: .userInitiated) {
+                _ = await RemoteImageCache.shared.fetchAndDecode(urlStr: fullUrl, timeout: 6.0)
+            }
+        }
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard !didStartDrag,
+              let startPt = mouseDownPoint,
+              let item = currentItem else { return }
+
+        let curPt = convert(event.locationInWindow, from: nil)
+        let dist = hypot(curPt.x - startPt.x, curPt.y - startPt.y)
+        guard dist >= 4.0 else { return }
+        didStartDrag = true
+
+        // Grab cached full data or cached thumbnail data immediately
+        guard let rawData = RemoteImageCache.shared.data(for: item.fullImageUrl)
+            ?? RemoteImageCache.shared.data(for: item.thumbnailUrl) else {
+            return
+        }
+
+        let prepared = ImageCommitService.prepareImageDataAndExtension(rawData: rawData)
+        guard let fileURL = ImageCommitService.saveToSharedTempDirectory(data: prepared.data, ext: prepared.ext) else {
+            return
+        }
+
+        // Write both file URL and image/GIF data onto the pasteboard item so Finder, Messages, Slack, Discord, and browsers accept the drop!
+        let draggingItem = NSDraggingItem(pasteboardWriter: fileURL as NSURL)
+
+        let dragPreviewImage: NSImage
+        if currentFrames.indices.contains(currentFrameIndex) {
+            let cg = currentFrames[currentFrameIndex]
+            dragPreviewImage = NSImage(cgImage: cg, size: bounds.size)
+        } else if let img = NSImage(data: prepared.data) {
+            dragPreviewImage = img
+        } else {
+            dragPreviewImage = NSImage(size: bounds.size)
+        }
+
+        draggingItem.setDraggingFrame(bounds, contents: dragPreviewImage)
+        beginDraggingSession(with: [draggingItem], event: event, source: self)
+        KeyboardyPrefs.shared.recordImageInserted()
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        defer {
+            mouseDownPoint = nil
+            didStartDrag = false
+        }
+        guard !didStartDrag, let startPt = mouseDownPoint else { return }
+        let endPt = convert(event.locationInWindow, from: nil)
+        if bounds.contains(endPt) || hypot(endPt.x - startPt.x, endPt.y - startPt.y) < 8.0 {
+            onSelect?()
+        }
+    }
+
+    func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation {
+        .copy
+    }
 }
 
 struct AnimatedRemoteImageView: NSViewRepresentable {
     let item: ImageResult
+    var onSelect: (() -> Void)? = nil
 
     func makeNSView(context: Context) -> AspectFitImageContainerView {
         let container = AspectFitImageContainerView()
+        container.currentItem = item
+        container.onSelect = onSelect
         context.coordinator.containerView = container
         context.coordinator.load(item: item)
         return container
     }
 
     func updateNSView(_ nsView: AspectFitImageContainerView, context: Context) {
+        nsView.currentItem = item
+        nsView.onSelect = onSelect
         context.coordinator.containerView = nsView
         context.coordinator.load(item: item)
     }
@@ -361,36 +441,49 @@ struct AnimatedRemoteImageView: NSViewRepresentable {
                 return
             }
 
-            // 2. Otherwise show cached thumbnail immediately while full image/GIF downloads
-            var displayedAnimatedAlready = false
+            // 2. If thumbnail is already decoded in memory, display it immediately!
             if let cachedThumbPayload = RemoteImageCache.shared.decodedPayload(for: thumbUrl) {
                 containerView?.applyDecodedPayload(cachedThumbPayload)
-                displayedAnimatedAlready = cachedThumbPayload.isAnimated
+                // If thumbnail is ALREADY animated (like all Tenor AAAAM GIFs!) or item isn't an animated GIF, we're done!
+                if cachedThumbPayload.isAnimated || !item.isAnimatedGif || fullUrl == thumbUrl {
+                    return
+                }
             }
 
-            // 3. Download thumbnail (fast preview) and full URL (for GIF animation or high-res fallback) in parallel
+            // 3. Download thumbnail first; only fetch fullUrl in the grid if needed for GIF animation or fallback!
             loadTask = Task { [weak self] in
-                async let fullPayloadTask: DecodedImagePayload? = (fullUrl != thumbUrl)
-                    ? RemoteImageCache.shared.fetchAndDecode(urlStr: fullUrl, timeout: 7.5)
-                    : nil
+                var thumbSucceeded = false
+                var thumbIsAnimated = false
 
-                if RemoteImageCache.shared.decodedPayload(for: thumbUrl) == nil {
-                    if let thumbPayload = await RemoteImageCache.shared.fetchAndDecode(urlStr: thumbUrl, timeout: 4.5) {
-                        if !Task.isCancelled,
-                           let self = self,
-                           self.currentFullUrl == fullUrl {
-                            self.containerView?.applyDecodedPayload(thumbPayload)
-                            displayedAnimatedAlready = thumbPayload.isAnimated
-                        }
+                if let existingThumb = RemoteImageCache.shared.decodedPayload(for: thumbUrl) {
+                    thumbSucceeded = true
+                    thumbIsAnimated = existingThumb.isAnimated
+                } else if let thumbPayload = await RemoteImageCache.shared.fetchAndDecode(urlStr: thumbUrl, timeout: 4.5) {
+                    thumbSucceeded = true
+                    thumbIsAnimated = thumbPayload.isAnimated
+                    if !Task.isCancelled,
+                       let self = self,
+                       self.currentFullUrl == fullUrl {
+                        self.containerView?.applyDecodedPayload(thumbPayload)
                     }
                 }
 
-                if let fullPayload = await fullPayloadTask {
-                    guard !Task.isCancelled,
-                          let self = self,
-                          self.currentFullUrl == fullUrl else { return }
-                    if fullPayload.isAnimated || !displayedAnimatedAlready {
-                        self.containerView?.applyDecodedPayload(fullPayload)
+                guard !Task.isCancelled else { return }
+
+                // Fetch fullUrl only if:
+                // - The item is an animated GIF whose thumbnail was static (e.g. Bing OIP static thumb), OR
+                // - The thumbnail download failed completely.
+                let needsFullFetch = (item.isAnimatedGif && !thumbIsAnimated && fullUrl != thumbUrl)
+                    || (!thumbSucceeded && fullUrl != thumbUrl)
+
+                if needsFullFetch {
+                    if let fullPayload = await RemoteImageCache.shared.fetchAndDecode(urlStr: fullUrl, timeout: 7.5) {
+                        guard !Task.isCancelled,
+                              let self = self,
+                              self.currentFullUrl == fullUrl else { return }
+                        if fullPayload.isAnimated || !thumbSucceeded {
+                            self.containerView?.applyDecodedPayload(fullPayload)
+                        }
                     }
                 }
             }

@@ -259,7 +259,7 @@ struct KeyboardyPickerView: View {
 
                 Spacer()
 
-                Text("Click or ⌘1–9 to Insert  •  ↵ Search  •  \(prefs.activeHotkeyShortLabel) Toggle")
+                Text("Click or Drag to Insert  •  ⌘1–9  •  ↵ Search  •  \(prefs.activeHotkeyShortLabel)")
                     .font(.system(size: 10.5, weight: .medium))
                     .foregroundColor(palette.textSecondary)
             }
@@ -352,67 +352,72 @@ struct KeyboardyPickerView: View {
         let isSelected = viewModel.selectedIndex == index
         let isLoading = viewModel.loadingItemId == item.id
 
-        return Button(action: {
-            viewModel.selectedIndex = index
-            viewModel.selectImageResult(item)
-        }) {
-            ZStack {
-                palette.surfaceVariant
+        return ZStack {
+            palette.surfaceVariant
 
-                AnimatedRemoteImageView(item: item)
-                    .frame(height: 116)
-                    .clipped()
+            AnimatedRemoteImageView(
+                item: item,
+                onSelect: {
+                    viewModel.selectedIndex = index
+                    viewModel.selectImageResult(item)
+                }
+            )
+            .frame(height: 116)
+            .padding(4)
 
-                VStack {
-                    HStack {
-                        if index < 9 {
-                            Text("⌘\(index + 1)")
-                                .font(.system(size: 9.5, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 2)
-                                .background(Color.black.opacity(0.65))
-                                .cornerRadius(4)
-                        }
-                        Spacer()
-                        if item.isAnimatedGif {
-                            Text("GIF")
-                                .font(.system(size: 9.5, weight: .heavy))
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 2)
-                                .background(palette.accentBlue.opacity(0.92))
-                                .cornerRadius(4)
-                        }
-                    }
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Text(item.sourceLabel)
-                            .font(.system(size: 9.5, weight: .bold))
+            VStack {
+                HStack {
+                    if index < 9 {
+                        Text("⌘\(index + 1)")
+                            .font(.system(size: 9.5, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 2)
                             .background(Color.black.opacity(0.65))
                             .cornerRadius(4)
                     }
+                    Spacer()
+                    if item.isAnimatedGif {
+                        Text("GIF")
+                            .font(.system(size: 9.5, weight: .heavy))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(palette.accentBlue.opacity(0.92))
+                            .cornerRadius(4)
+                    }
                 }
-                .padding(5)
-
-                if isLoading {
-                    Color.black.opacity(0.55)
-                    ProgressView()
-                        .scaleEffect(0.8)
+                Spacer()
+                HStack {
+                    Spacer()
+                    Text(item.sourceLabel)
+                        .font(.system(size: 9.5, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color.black.opacity(0.65))
+                        .cornerRadius(4)
                 }
             }
-            .frame(height: 116)
-            .cornerRadius(9)
-            .overlay(
-                RoundedRectangle(cornerRadius: 9)
-                    .stroke(isSelected ? palette.accentBlue : palette.border, lineWidth: isSelected ? 2.5 : 1)
-            )
+            .padding(5)
+            .allowsHitTesting(false)
+
+            if isLoading {
+                Color.black.opacity(0.55)
+                    .allowsHitTesting(false)
+                ProgressView()
+                    .scaleEffect(0.8)
+                    .allowsHitTesting(false)
+            }
         }
-        .buttonStyle(.plain)
+        .frame(height: 116)
+        .cornerRadius(9)
+        .overlay(
+            RoundedRectangle(cornerRadius: 9)
+                .stroke(isSelected ? palette.accentBlue : palette.border, lineWidth: isSelected ? 2.5 : 1)
+                .allowsHitTesting(false)
+        )
+        .help("Click to Auto-Paste into \(viewModel.targetAppName), or Drag & Drop anywhere")
     }
 
     private var historyPanelView: some View {

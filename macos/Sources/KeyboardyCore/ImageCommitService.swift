@@ -95,28 +95,38 @@ public final class ImageCommitService {
         onPanelShouldHideBeforePaste()
         app.activate(options: [.activateIgnoringOtherApps])
 
-        guard isAccessibilityTrusted(promptIfNeeded: false) else {
-            return .copiedToClipboard(
-                reason: "Copied to Clipboard! (Enable Accessibility in Settings to auto-paste into \(appName))"
-            )
+        // Wait until the target application actually becomes frontmost (up to 450ms) + 80ms settle delay
+        for _ in 0..<18 {
+            if NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier {
+                break
+            }
+            try? await Task.sleep(nanoseconds: 25_000_000)
+        }
+        try? await Task.sleep(nanoseconds: 85_000_000)
+
+        let trusted = isAccessibilityTrusted(promptIfNeeded: false)
+        if !trusted {
+            // Prompt macOS to grant Accessibility permission for the current binary
+            _ = isAccessibilityTrusted(promptIfNeeded: true)
         }
 
-        // Give macOS 120ms to complete window activation before sending key events
-        try? await Task.sleep(nanoseconds: 120_000_000)
-
-        if clearTargetQueryBeforePaste {
+        if clearTargetQueryBeforePaste && trusted {
             // Select all & delete the temporary query text in the focused chat input before pasting
             Self.synthesizeKeyStroke(keyCode: CGKeyCode(kVK_ANSI_A), flags: .maskCommand)
-            try? await Task.sleep(nanoseconds: 35_000_000)
+            try? await Task.sleep(nanoseconds: 40_000_000)
             Self.synthesizeKeyStroke(keyCode: CGKeyCode(kVK_Delete), flags: [])
-            try? await Task.sleep(nanoseconds: 35_000_000)
+            try? await Task.sleep(nanoseconds: 40_000_000)
         }
 
-        // Synthesize Cmd+V (Paste)
+        // Synthesize Cmd+V (Paste) via CGEvent (and AppleScript System Events fallback if needed)
         Self.synthesizeKeyStroke(keyCode: CGKeyCode(kVK_ANSI_V), flags: .maskCommand)
+        if !trusted {
+            Self.tryAppleScriptPasteFallback()
+        }
 
         if restoreClipboardAfterPaste, let previousText = savedTextClipboard {
-            try? await Task.sleep(nanoseconds: 450_000_000)
+            // Wait 3.0s before restoring old text clipboard so Slack/Discord/Messages/browsers finish reading the pasted image/GIF
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
             let pb = NSPasteboard.general
             pb.clearContents()
             pb.setString(previousText, forType: .string)
@@ -220,6 +230,12 @@ public final class ImageCommitService {
             keyDown.post(tap: .cghidEventTap)
             keyUp.post(tap: .cghidEventTap)
         }
+    }
+
+    private nonisolated static func tryAppleScriptPasteFallback() {
+        let script = NSAppleScript(source: #"tell application "System Events" to keystroke "v" using command down"#)
+        var err: NSDictionary?
+        script?.executeAndReturnError(&err)
     }
 
     private nonisolated static func downloadBytes(urlStr: String) async -> Data? {

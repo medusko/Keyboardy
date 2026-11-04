@@ -13,6 +13,18 @@ if CommandLine.arguments.contains("--verify") {
     let (mime, ext) = SearchParsers.detectImageMimeTypeAndExtension(gifHeader)
     precondition(mime == "image/gif" && ext == "gif", "GIF magic byte verification failed")
 
+    let sampleTenorHtml = """
+    <img src="https://media.tenor.com/1RVeTBOtmi4AAAAM/lil-jon-yeah.gif" alt="Lil Jon Yeah GIF">
+    """
+    let tenorParsed = SearchParsers.parseTenorSearchHtml(sampleTenorHtml)
+    precondition(
+        tenorParsed.count == 1 &&
+        tenorParsed[0].isAnimatedGif &&
+        tenorParsed[0].thumbnailUrl == "https://media.tenor.com/1RVeTBOtmi4AAAAM/lil-jon-yeah.gif" &&
+        tenorParsed[0].fullImageUrl == "https://media1.tenor.com/m/1RVeTBOtmi4AAAAC/lil-jon-yeah.gif",
+        "Tenor GIF parser verification failed"
+    )
+
     let appImg = StatusBarBadgeRenderer.makeStatusBarImage(style: .keyboardyAppIcon)
     let whiteImg = StatusBarBadgeRenderer.makeStatusBarImage(style: .keyboardyWhiteIcon)
     let blackImg = StatusBarBadgeRenderer.makeStatusBarImage(style: .keyboardyBlackIcon)

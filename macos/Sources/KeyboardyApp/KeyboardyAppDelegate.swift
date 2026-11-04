@@ -63,25 +63,51 @@ final class KeyboardyAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func captureCurrentFrontmostExternalApp() {
+        let myPid = ProcessInfo.processInfo.processIdentifier
         if let front = NSWorkspace.shared.frontmostApplication,
-           front.processIdentifier != ProcessInfo.processInfo.processIdentifier {
+           front.processIdentifier != myPid {
             lastExternalApp = front
+            return
+        }
+        if lastExternalApp == nil || lastExternalApp?.isTerminated == true {
+            lastExternalApp = NSWorkspace.shared.runningApplications.first(where: {
+                $0.processIdentifier != myPid &&
+                $0.activationPolicy == .regular &&
+                !$0.isTerminated
+            })
         }
     }
 
     private func observeWorkspaceActiveApplications() {
-        NSWorkspace.shared.notificationCenter.addObserver(
+        let myPid = ProcessInfo.processInfo.processIdentifier
+        let center = NSWorkspace.shared.notificationCenter
+
+        center.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification,
             object: nil,
             queue: .main
         ) { [weak self] note in
-            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                  app.processIdentifier != myPid else {
                 return
             }
-            if app.processIdentifier != ProcessInfo.processInfo.processIdentifier {
-                Task { @MainActor in
-                    self?.lastExternalApp = app
-                }
+            Task { @MainActor in
+                self?.lastExternalApp = app
+            }
+        }
+
+        // Also capture the app that just deactivated when the user clicks Keyboardy's menu bar icon!
+        center.addObserver(
+            forName: NSWorkspace.didDeactivateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                  app.processIdentifier != myPid else {
+                return
+            }
+            Task { @MainActor in
+                self?.lastExternalApp = app
             }
         }
     }
@@ -134,7 +160,7 @@ final class KeyboardyAppDelegate: NSObject, NSApplicationDelegate {
         self.floatingPanel = panel
 
         viewModel.onRequestClosePanel = { [weak self] in
-            self?.closeAllPanels(restoreFocusToTarget: false)
+            self?.closeAllPanels(restoreFocusToTarget: true)
         }
     }
 
@@ -323,6 +349,7 @@ final class KeyboardyAppDelegate: NSObject, NSApplicationDelegate {
             globalClickOutsideMonitor = nil
         }
         if restoreFocusToTarget {
+            NSApp.hide(nil)
             lastExternalApp?.activate(options: [.activateIgnoringOtherApps])
         }
     }
