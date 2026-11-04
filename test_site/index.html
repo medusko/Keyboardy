@@ -444,14 +444,31 @@
     });
 
     // Monitor raw key combinations (⌘V, etc.)
+    let lastKeydownVTime = 0;
     window.addEventListener('keydown', (e) => {
       if (e.metaKey && e.key.toLowerCase() === 'v') {
-        log(`🎹 Keydown: ⌘V (Command + V) intercepted on window!`, 'key');
+        const now = Date.now();
+        const diff = now - lastKeydownVTime;
+        lastKeydownVTime = now;
+        if (diff < 150) {
+          log(`⚠️ Rapid duplicate ⌘V keydown intercepted (${diff}ms apart)`, 'warning');
+        } else {
+          log(`🎹 Keydown: ⌘V (Command + V) intercepted on window!`, 'key');
+        }
       }
     }, true);
 
     // Universal Paste Handler (works when chatInput is focused or on document)
+    let lastPasteTime = 0;
     document.addEventListener('paste', (e) => {
+      const now = Date.now();
+      const diff = now - lastPasteTime;
+      lastPasteTime = now;
+      if (diff < 150) {
+        log(`⚠️ Duplicate rapid paste received within ${diff}ms — prevented duplicate insertion!`, 'warning');
+        e.preventDefault();
+        return;
+      }
       log('📥 Paste event received!', 'paste');
       const clipboardData = e.clipboardData || window.clipboardData;
       if (!clipboardData) {

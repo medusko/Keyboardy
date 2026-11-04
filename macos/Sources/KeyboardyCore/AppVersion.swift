@@ -1,8 +1,8 @@
 import Foundation
 
 public enum KeyboardyVersion {
-    public static let versionName = "1.0.1-beta.5"
-    public static let buildNumber = "6"
+    public static let versionName = "1.0.1-beta.6"
+    public static let buildNumber = "7"
     public static let releaseDate = "2026-11-04"
 
     public static var displayString: String {
@@ -14,6 +14,10 @@ public enum KeyboardyVersion {
     }
 
     public static let recentImprovements: [(title: String, detail: String)] = [
+        (
+            "🎯 Single-Tap Keystroke Dispatch (Fixed Double Paste)",
+            "Eliminated duplicate image insertion caused by concurrent HID tap and PID event queue synthesis; now dispatches a single hardware-accurate ⌘V keystroke to the active window."
+        ),
         (
             "🔇 Zero-Modal Permission Flow",
             "Completely eliminated unprompted system alert dialogs on startup and in settings; directly opens System Settings without modal interruptions."

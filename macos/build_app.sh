@@ -10,7 +10,7 @@ if [[ -z "${VERSION:-}" ]] && [[ -f "$VERSION_FILE" ]]; then
     VERSION="$(cat "$VERSION_FILE" | tr -d '[:space:]')"
 fi
 VERSION="${VERSION:-1.0.1-beta.1}"
-BUILD_NUMBER="${BUILD_NUMBER:-6}"
+BUILD_NUMBER="${BUILD_NUMBER:-7}"
 
 echo "==> Building Keyboardy for macOS v${VERSION} (Build ${BUILD_NUMBER}) [Release]..."
 swift build -c release

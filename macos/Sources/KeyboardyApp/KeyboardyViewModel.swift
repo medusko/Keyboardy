@@ -233,7 +233,8 @@ final class KeyboardyViewModel: ObservableObject {
 
     func selectImageResult(_ item: ImageResult) {
         let now = ProcessInfo.processInfo.systemUptime
-        guard now - lastSelectTimestamp > 0.35 else { return }
+        guard now - lastSelectTimestamp > 0.40 else { return }
+        guard loadingItemId == nil else { return }
         lastSelectTimestamp = now
 
         let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -246,7 +246,9 @@ public final class ImageCommitService {
     }
 
     /// Synthesizes a true hardware-like ⌘V keystroke sequence (Cmd down -> V down -> 35ms hold -> V up -> Cmd up)
-    /// dispatched to both the system HID tap and directly to the target application's PID.
+    /// dispatched exclusively via the system HID event tap (.cghidEventTap) to the active frontmost window.
+    /// Note: We do NOT dual-dispatch to postToPid because sending to both HID and PID produces duplicate
+    /// keystrokes in Chromium, Electron, Safari, and AppKit applications.
     public nonisolated static func synthesizePasteKeystroke(targetPid: pid_t? = nil) {
         guard let src = CGEventSource(stateID: .combinedSessionState) else { return }
 
@@ -257,7 +259,6 @@ public final class ImageCommitService {
         if let cmdDown = CGEvent(keyboardEventSource: src, virtualKey: cmdKeyCode, keyDown: true) {
             cmdDown.flags = .maskCommand
             cmdDown.post(tap: .cghidEventTap)
-            if let pid = targetPid { cmdDown.postToPid(pid) }
         }
 
         usleep(15_000) // 15ms delay
@@ -266,7 +267,6 @@ public final class ImageCommitService {
         if let vDown = CGEvent(keyboardEventSource: src, virtualKey: vKeyCode, keyDown: true) {
             vDown.flags = .maskCommand
             vDown.post(tap: .cghidEventTap)
-            if let pid = targetPid { vDown.postToPid(pid) }
         }
 
         usleep(35_000) // 35ms hold so the target app's event loop registers the keypress
@@ -275,7 +275,6 @@ public final class ImageCommitService {
         if let vUp = CGEvent(keyboardEventSource: src, virtualKey: vKeyCode, keyDown: false) {
             vUp.flags = .maskCommand
             vUp.post(tap: .cghidEventTap)
-            if let pid = targetPid { vUp.postToPid(pid) }
         }
 
         usleep(15_000) // 15ms delay
@@ -284,11 +283,11 @@ public final class ImageCommitService {
         if let cmdUp = CGEvent(keyboardEventSource: src, virtualKey: cmdKeyCode, keyDown: false) {
             cmdUp.flags = []
             cmdUp.post(tap: .cghidEventTap)
-            if let pid = targetPid { cmdUp.postToPid(pid) }
         }
     }
 
     /// Synthesizes ⌘A (Select All) followed by Delete with reliable hold delays to clear temporary query text.
+    /// Dispatched via the system HID tap (.cghidEventTap) to avoid duplicate key events.
     private nonisolated static func synthesizeSelectAllAndDelete(targetPid: pid_t? = nil) {
         guard let src = CGEventSource(stateID: .combinedSessionState) else { return }
 
@@ -300,25 +299,21 @@ public final class ImageCommitService {
         if let cmdDown = CGEvent(keyboardEventSource: src, virtualKey: cmdKeyCode, keyDown: true) {
             cmdDown.flags = .maskCommand
             cmdDown.post(tap: .cghidEventTap)
-            if let pid = targetPid { cmdDown.postToPid(pid) }
         }
         usleep(10_000)
         if let aDown = CGEvent(keyboardEventSource: src, virtualKey: aKeyCode, keyDown: true) {
             aDown.flags = .maskCommand
             aDown.post(tap: .cghidEventTap)
-            if let pid = targetPid { aDown.postToPid(pid) }
         }
         usleep(25_000)
         if let aUp = CGEvent(keyboardEventSource: src, virtualKey: aKeyCode, keyDown: false) {
             aUp.flags = .maskCommand
             aUp.post(tap: .cghidEventTap)
-            if let pid = targetPid { aUp.postToPid(pid) }
         }
         usleep(10_000)
         if let cmdUp = CGEvent(keyboardEventSource: src, virtualKey: cmdKeyCode, keyDown: false) {
             cmdUp.flags = []
             cmdUp.post(tap: .cghidEventTap)
-            if let pid = targetPid { cmdUp.postToPid(pid) }
         }
         usleep(25_000)
 
@@ -326,13 +321,11 @@ public final class ImageCommitService {
         if let delDown = CGEvent(keyboardEventSource: src, virtualKey: deleteKeyCode, keyDown: true) {
             delDown.flags = []
             delDown.post(tap: .cghidEventTap)
-            if let pid = targetPid { delDown.postToPid(pid) }
         }
         usleep(25_000)
         if let delUp = CGEvent(keyboardEventSource: src, virtualKey: deleteKeyCode, keyDown: false) {
             delUp.flags = []
             delUp.post(tap: .cghidEventTap)
-            if let pid = targetPid { delUp.postToPid(pid) }
         }
     }
 

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [macos-v1.0.1-beta.6] - 2026-11-04
+
+### Fixed
+- **Resolved Duplicate Image Insertion on Single Click (Double Paste Fix):**
+  - **Root Cause:** In `ImageCommitService.synthesizePasteKeystroke`, keystrokes were being dispatched to **both** the system HID event tap (`.cghidEventTap`) and directly into the target process's Mach event queue via `postToPid(pid)`. Because the target application was already frontmost, macOS delivered the `⌘V` keystroke twice in the exact same millisecond (`10:25:42`), causing chat inputs and web browsers to paste two identical copies of the image.
+  - **Fix:** Switched exclusively to system HID event tap dispatch (`.cghidEventTap`), matching the behavior of standard macOS accessibility utilities (Raycast, Alfred, 1Password). Keystrokes are cleanly routed once to the active frontmost window.
+  - Also removed dual `postToPid` dispatch from `synthesizeSelectAllAndDelete`.
+- **Added Selection In-Flight Guard:**
+  - Added `guard loadingItemId == nil else { return }` in `KeyboardyViewModel.selectImageResult` and increased debounce to 400ms to guarantee rapid duplicate clicks cannot spawn overlapping commit tasks.
+- **Enhanced Test Studio Diagnostics (`test_site/index.html`):**
+  - Added timestamp tracking on `Keydown: ⌘V` and pasteboard events to detect and visually flag rapid duplicate pastes within 150ms.
+
+---
+
 ## [macos-v1.0.1-beta.5] - 2026-11-04
 
 ### Fixed
