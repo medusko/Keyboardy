@@ -25,6 +25,7 @@ final class KeyboardyAppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Run as an accessory/menu-bar app (no clutter in Dock, stays in Menu Bar like GIF)
         NSApp.setActivationPolicy(.accessory)
+        setupMainMenuForStandardTextEditing()
 
         captureCurrentFrontmostExternalApp()
         observeWorkspaceActiveApplications()
@@ -33,6 +34,32 @@ final class KeyboardyAppDelegate: NSObject, NSApplicationDelegate {
         setupPopoverAndFloatingPanel()
         setupBindingsAndTriggers()
         setupKeyboardShortcutsInsidePanel()
+    }
+
+    /// Provides a standard macOS Edit menu so ⌘A (Select All), ⌘C, ⌘V, ⌘X, and ⌘Z work natively inside the Search TextField.
+    private func setupMainMenuForStandardTextEditing() {
+        let mainMenu = NSMenu()
+
+        let appMenuItem = NSMenuItem()
+        mainMenu.addItem(appMenuItem)
+        let appMenu = NSMenu()
+        appMenu.addItem(withTitle: "Quit Keyboardy", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenuItem.submenu = appMenu
+
+        let editMenuItem = NSMenuItem()
+        mainMenu.addItem(editMenuItem)
+        let editMenu = NSMenu(title: "Edit")
+        editMenu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        let redoItem = editMenu.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "Z")
+        redoItem.keyEquivalentModifierMask = [.command, .shift]
+        editMenu.addItem(.separator())
+        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editMenuItem.submenu = editMenu
+
+        NSApp.mainMenu = mainMenu
     }
 
     private func captureCurrentFrontmostExternalApp() {
@@ -345,6 +372,39 @@ final class KeyboardyAppDelegate: NSObject, NSApplicationDelegate {
                     self.viewModel.submitSearchFromKeyboard()
                 }
                 return nil
+            }
+
+            // Standard text editing shortcuts inside the search field / settings fields (⌘A, ⌘C, ⌘V, ⌘X, ⌘Z, ⌘⇧Z)
+            let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            if mods == .command, let key = event.charactersIgnoringModifiers?.lowercased() {
+                switch key {
+                case "a":
+                    if NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil) {
+                        return nil
+                    }
+                case "c":
+                    if NSApp.sendAction(#selector(NSText.copy(_:)), to: nil, from: nil) {
+                        return nil
+                    }
+                case "v":
+                    if NSApp.sendAction(#selector(NSText.paste(_:)), to: nil, from: nil) {
+                        return nil
+                    }
+                case "x":
+                    if NSApp.sendAction(#selector(NSText.cut(_:)), to: nil, from: nil) {
+                        return nil
+                    }
+                case "z":
+                    if NSApp.sendAction(Selector(("undo:")), to: nil, from: nil) {
+                        return nil
+                    }
+                default:
+                    break
+                }
+            } else if mods == [.command, .shift], event.charactersIgnoringModifiers?.lowercased() == "z" {
+                if NSApp.sendAction(Selector(("redo:")), to: nil, from: nil) {
+                    return nil
+                }
             }
 
             // Cmd + 1..9 quick-selects image result 0..8

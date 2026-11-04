@@ -11,6 +11,15 @@ struct KeyboardyPickerView: View {
         ThemePalette.forMode(isDark: prefs.isDarkMode)
     }
 
+    private var searchQueryBinding: Binding<String> {
+        Binding(
+            get: { viewModel.searchQuery },
+            set: { newValue in
+                viewModel.onUserEditedSearchQuery(newValue)
+            }
+        )
+    }
+
     private let gridColumns = [
         GridItem(.flexible(), spacing: 8),
         GridItem(.flexible(), spacing: 8),
@@ -60,14 +69,11 @@ struct KeyboardyPickerView: View {
                         .font(.system(size: 12.5, weight: .semibold))
                         .foregroundColor(palette.textSecondary)
 
-                    TextField("Search Google Images, GIFs, Memes...", text: $viewModel.searchQuery)
+                    TextField("Search Google Images, GIFs, Memes...", text: searchQueryBinding)
                         .textFieldStyle(.plain)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(palette.textPrimary)
                         .focused($isSearchFieldFocused)
-                        .onChange(of: viewModel.searchQuery) { newValue in
-                            viewModel.onSearchQueryEdited(newValue)
-                        }
                         .onSubmit {
                             viewModel.submitSearchFromKeyboard()
                         }
@@ -325,7 +331,7 @@ struct KeyboardyPickerView: View {
                 LazyVGrid(columns: gridColumns, spacing: 8) {
                     ForEach(Array(viewModel.results.enumerated()), id: \.element.fullImageUrl) { index, item in
                         resultTile(item: item, index: index)
-                            .id(item.fullImageUrl)
+                            .id("\(viewModel.searchGeneration)_\(item.fullImageUrl)")
                     }
                 }
                 .id(viewModel.searchGeneration)
@@ -333,7 +339,7 @@ struct KeyboardyPickerView: View {
             }
             .onChange(of: viewModel.selectedIndex) { newIdx in
                 if viewModel.results.indices.contains(newIdx) {
-                    let targetId = viewModel.results[newIdx].fullImageUrl
+                    let targetId = "\(viewModel.searchGeneration)_\(viewModel.results[newIdx].fullImageUrl)"
                     withAnimation(.easeInOut(duration: 0.12)) {
                         proxy.scrollTo(targetId, anchor: .center)
                     }

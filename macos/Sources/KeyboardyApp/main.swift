@@ -18,7 +18,20 @@ if CommandLine.arguments.contains("--verify") {
     let blackImg = StatusBarBadgeRenderer.makeStatusBarImage(style: .keyboardyBlackIcon)
     precondition(appImg.size.width > 0 && whiteImg.size.width > 0 && blackImg.size.width > 0, "StatusBar badge render failed")
 
-    print("✅ Keyboardy macOS verification passed (parsers, magic bytes, and App/White/Black status bar icons)!")
+    precondition(SearchFilter.all.requiresAnimatedGif(for: "happy cat gif") == true, "GIF query detection failed")
+    precondition(SearchFilter.gif.requiresAnimatedGif(for: "happy cat") == true, "GIF filter detection failed")
+    precondition(SearchFilter.all.requiresAnimatedGif(for: "sunset wallpaper") == false, "Non-GIF query detection failed")
+
+    MainActor.assumeIsolated {
+        let suite = UserDefaults(suiteName: "com.medusko.keyboardy.verify.\(UUID().uuidString)")!
+        let testPrefs = KeyboardyPrefs(defaults: suite)
+        testPrefs.applyThemeMode(.dark, syncIcon: true)
+        precondition(testPrefs.isDarkMode == true && testPrefs.statusBarBadgeStyle == .keyboardyWhiteIcon, "Night mode must select White Icon")
+        testPrefs.applyThemeMode(.light, syncIcon: true)
+        precondition(testPrefs.isDarkMode == false && testPrefs.statusBarBadgeStyle == .keyboardyBlackIcon, "Light mode must select Black Icon")
+    }
+
+    print("✅ Keyboardy macOS verification passed (parsers, magic bytes, GIF filter detection, and Night=White / Light=Black icons)!")
     exit(0)
 }
 

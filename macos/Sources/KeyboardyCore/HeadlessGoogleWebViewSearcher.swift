@@ -4,6 +4,7 @@ import WebKit
 @MainActor
 public final class HeadlessGoogleWebViewSearcher: NSObject, WKNavigationDelegate {
     private var webView: WKWebView?
+    private var activeSearchId: UUID?
     private var activeContinuation: CheckedContinuation<[ImageResult], Never>?
     private var currentForceGifHint: Bool = false
     private var timeoutWorkItem: DispatchWorkItem?
@@ -14,9 +15,12 @@ public final class HeadlessGoogleWebViewSearcher: NSObject, WKNavigationDelegate
         super.init()
     }
 
-    private func getOrCreateWebView() -> WKWebView {
-        if let existing = webView {
-            return existing
+    /// Creates a brand-new, clean WKWebView for each search so a previous search's DOM can never leak into a new search.
+    private func createFreshWebView() -> WKWebView {
+        if let old = webView {
+            old.stopLoading()
+            old.navigationDelegate = nil
+            webView = nil
         }
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .nonPersistent()
@@ -38,8 +42,9 @@ public final class HeadlessGoogleWebViewSearcher: NSObject, WKNavigationDelegate
             return []
         }
 
+        let animatedRequested = filter.requiresAnimatedGif(for: query)
         let tbsParam: String
-        if filter.animatedOnly {
+        if animatedRequested {
             tbsParam = "&tbs=itp:animated"
         } else if filter.transparentOnly {
             tbsParam = "&tbs=ic:trans"
@@ -53,35 +58,41 @@ public final class HeadlessGoogleWebViewSearcher: NSObject, WKNavigationDelegate
         // Cancel any previous pending continuation before starting a new search
         finishCurrentContinuation(with: [])
 
+        let searchId = UUID()
+        self.activeSearchId = searchId
+
         return await withCheckedContinuation { continuation in
             self.activeContinuation = continuation
-            self.currentForceGifHint = filter.animatedOnly
+            self.currentForceGifHint = animatedRequested
 
-            let wv = getOrCreateWebView()
-            wv.stopLoading()
+            let wv = createFreshWebView()
 
             let timeout = DispatchWorkItem { [weak self] in
                 Task { @MainActor in
-                    self?.extractAndFinish(forceComplete: true)
+                    guard let self = self, self.activeSearchId == searchId else { return }
+                    self.extractAndFinish(searchId: searchId, forceComplete: true)
                 }
             }
             self.timeoutWorkItem = timeout
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4.8, execute: timeout)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.5, execute: timeout)
 
             var request = URLRequest(url: url)
-            request.timeoutInterval = 4.5
+            request.timeoutInterval = 4.2
             request.setValue("en-US,en;q=0.9", forHTTPHeaderField: "Accept-Language")
             wv.load(request)
         }
     }
 
     public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        guard webView === self.webView, let searchId = self.activeSearchId else { return }
+
         check1WorkItem?.cancel()
         check2WorkItem?.cancel()
 
         let w1 = DispatchWorkItem { [weak self] in
             Task { @MainActor in
-                self?.extractAndFinish(forceComplete: false)
+                guard let self = self, self.activeSearchId == searchId else { return }
+                self.extractAndFinish(searchId: searchId, forceComplete: false)
             }
         }
         check1WorkItem = w1
@@ -89,28 +100,35 @@ public final class HeadlessGoogleWebViewSearcher: NSObject, WKNavigationDelegate
 
         let w2 = DispatchWorkItem { [weak self] in
             Task { @MainActor in
-                self?.extractAndFinish(forceComplete: true)
+                guard let self = self, self.activeSearchId == searchId else { return }
+                self.extractAndFinish(searchId: searchId, forceComplete: true)
             }
         }
         check2WorkItem = w2
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.15, execute: w2)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.10, execute: w2)
     }
 
     public func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        guard webView === self.webView else { return }
         finishCurrentContinuation(with: [])
     }
 
     public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        guard webView === self.webView else { return }
         finishCurrentContinuation(with: [])
     }
 
-    private func extractAndFinish(forceComplete: Bool) {
-        guard activeContinuation != nil, let wv = webView else { return }
+    private func extractAndFinish(searchId: UUID, forceComplete: Bool) {
+        guard self.activeSearchId == searchId,
+              activeContinuation != nil,
+              let wv = webView else { return }
         let gifHint = currentForceGifHint
 
         wv.evaluateJavaScript(Self.extractionJS) { [weak self] result, _ in
             Task { @MainActor in
-                guard let self = self, self.activeContinuation != nil else { return }
+                guard let self = self,
+                      self.activeSearchId == searchId,
+                      self.activeContinuation != nil else { return }
                 let rawJson = (result as? String) ?? ""
                 let parsed = SearchParsers.parseGoogleWebViewJson(rawJson, forceGifHint: gifHint)
                 if !parsed.isEmpty || forceComplete {
@@ -127,6 +145,13 @@ public final class HeadlessGoogleWebViewSearcher: NSObject, WKNavigationDelegate
         timeoutWorkItem = nil
         check1WorkItem = nil
         check2WorkItem = nil
+        activeSearchId = nil
+
+        if let old = webView {
+            old.stopLoading()
+            old.navigationDelegate = nil
+            webView = nil
+        }
 
         if let cont = activeContinuation {
             activeContinuation = nil
@@ -141,7 +166,7 @@ public final class HeadlessGoogleWebViewSearcher: NSObject, WKNavigationDelegate
         function addItem(thumb, full, title) {
             var key = full || thumb;
             if (!key || key.indexOf('http') !== 0 || seen[key]) return;
-            if (key.indexOf('google.com/images/branding') !== -1 || key.indexOf('gstatic.com/kp') !== -1) return;
+            if (key.indexOf('google.com') !== -1 || key.indexOf('gstatic.com/kp') !== -1) return;
             seen[key] = true;
             results.push({
                 thumb: thumb || full,
@@ -159,19 +184,6 @@ public final class HeadlessGoogleWebViewSearcher: NSObject, WKNavigationDelegate
                 var fUrl = m[2].replace(/\\\\u003d/g, '=').replace(/\\\\u0026/g, '&');
                 if (fUrl.indexOf('gstatic.com') === -1) {
                     addItem(tUrl, fUrl, 'Google Image');
-                }
-            }
-        } catch (e) {}
-        try {
-            var imgs = document.querySelectorAll('img');
-            for (var i = 0; i < imgs.length && results.length < 45; i++) {
-                var img = imgs[i];
-                var src = img.getAttribute('data-iurl') || img.getAttribute('data-src') || img.src || '';
-                var alt = img.alt || 'Google Image';
-                if (src.indexOf('http') === 0 &&
-                    src.indexOf('google.com') === -1 &&
-                    src.indexOf('encrypted-tbn0.gstatic.com') === -1) {
-                    addItem(src, src, alt);
                 }
             }
         } catch (e) {}

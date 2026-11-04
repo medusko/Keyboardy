@@ -62,6 +62,16 @@ public enum SearchFilter: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// Returns true if either the selected filter chip requires animated GIFs (.gif / .reaction)
+    /// OR the user's search query explicitly includes "gif" or "gifs" as a search term.
+    public func requiresAnimatedGif(for rawQuery: String) -> Bool {
+        if animatedOnly { return true }
+        let tokens = rawQuery.lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+        return tokens.contains("gif") || tokens.contains("gifs")
+    }
+
     public var transparentOnly: Bool {
         self == .transparent
     }

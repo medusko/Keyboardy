@@ -4,8 +4,9 @@ import KeyboardyCore
 import QuartzCore
 import SwiftUI
 
-struct DecodedImagePayload {
+struct DecodedImagePayload: @unchecked Sendable {
     let frames: [CGImage]
+    let frameDelays: [TimeInterval]
     let keyTimes: [NSNumber]
     let totalDuration: CFTimeInterval
 
@@ -14,13 +15,24 @@ struct DecodedImagePayload {
     }
 }
 
-final class RemoteImageCache {
+private final class DecodedImagePayloadBox: NSObject {
+    let payload: DecodedImagePayload
+    init(_ payload: DecodedImagePayload) {
+        self.payload = payload
+    }
+}
+
+final class RemoteImageCache: @unchecked Sendable {
     static let shared = RemoteImageCache()
     private let dataCache = NSCache<NSString, NSData>()
+    private let payloadCache = NSCache<NSString, DecodedImagePayloadBox>()
+    private let lock = NSLock()
+    private var inFlightTasks: [String: Task<Data?, Never>] = [:]
 
     private init() {
-        dataCache.countLimit = 200
-        dataCache.totalCostLimit = 150 * 1024 * 1024 // 150 MB
+        dataCache.countLimit = 250
+        dataCache.totalCostLimit = 180 * 1024 * 1024 // 180 MB
+        payloadCache.countLimit = 120
     }
 
     func data(for url: String) -> Data? {
@@ -29,6 +41,79 @@ final class RemoteImageCache {
 
     func store(_ data: Data, for url: String) {
         dataCache.setObject(data as NSData, forKey: url as NSString, cost: data.count)
+    }
+
+    func decodedPayload(for url: String) -> DecodedImagePayload? {
+        if let boxed = payloadCache.object(forKey: url as NSString) {
+            return boxed.payload
+        }
+        if let cachedData = data(for: url),
+           let decoded = Self.decodePayload(from: cachedData) {
+            payloadCache.setObject(DecodedImagePayloadBox(decoded), forKey: url as NSString)
+            return decoded
+        }
+        return nil
+    }
+
+    func storeDecodedPayload(_ payload: DecodedImagePayload, for url: String) {
+        payloadCache.setObject(DecodedImagePayloadBox(payload), forKey: url as NSString)
+    }
+
+    /// Deduplicated download + decode so progressive grid updates never cancel an in-flight GIF download.
+    func fetchAndDecode(urlStr: String, timeout: TimeInterval) async -> DecodedImagePayload? {
+        if let existing = decodedPayload(for: urlStr) {
+            return existing
+        }
+
+        let downloadTask: Task<Data?, Never> = lock.withLock {
+            if let active = inFlightTasks[urlStr] {
+                return active
+            }
+            let task = Task<Data?, Never>.detached(priority: .userInitiated) {
+                await Self.performNetworkFetch(urlStr: urlStr, timeout: timeout)
+            }
+            inFlightTasks[urlStr] = task
+            return task
+        }
+
+        let fetchedData = await downloadTask.value
+        lock.withLock {
+            inFlightTasks.removeValue(forKey: urlStr)
+        }
+
+        guard let data = fetchedData, data.count < 20 * 1024 * 1024 else {
+            return nil
+        }
+        store(data, for: urlStr)
+
+        let decoded = await Task.detached(priority: .userInitiated) {
+            Self.decodePayload(from: data)
+        }.value
+
+        if let decoded = decoded {
+            storeDecodedPayload(decoded, for: urlStr)
+        }
+        return decoded
+    }
+
+    private static func performNetworkFetch(urlStr: String, timeout: TimeInterval) async -> Data? {
+        guard urlStr.hasPrefix("http"), let url = URL(string: urlStr) else { return nil }
+        var req = URLRequest(url: url)
+        req.timeoutInterval = timeout
+        req.setValue(
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+            forHTTPHeaderField: "User-Agent"
+        )
+        req.setValue("image/gif,image/webp,image/apng,image/*,*/*;q=0.8", forHTTPHeaderField: "Accept")
+        do {
+            let (data, response) = try await URLSession.shared.data(for: req)
+            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+                return nil
+            }
+            return data
+        } catch {
+            return nil
+        }
     }
 
     /// Decodes either a single-frame image or a multi-frame animated GIF / WebP using ImageIO (`CGImageSource`).
@@ -41,24 +126,32 @@ final class RemoteImageCache {
 
         if totalCount == 1 {
             guard let cgImg = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
-            return DecodedImagePayload(frames: [cgImg], keyTimes: [0.0], totalDuration: 0)
+            return DecodedImagePayload(frames: [cgImg], frameDelays: [0.0], keyTimes: [0.0], totalDuration: 0)
         }
 
         // For very long GIFs (> 72 frames), stride by 2 to keep GPU memory and decode time ultra-fast
         let strideStep = totalCount > 72 ? 2 : 1
         var frames: [CGImage] = []
-        var delays: [Double] = []
+        var delays: [TimeInterval] = []
+
+        let thumbOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceThumbnailMaxPixelSize: 360,
+            kCGImageSourceCreateThumbnailWithTransform: true
+        ]
 
         for idx in stride(from: 0, to: totalCount, by: strideStep) {
-            guard let cgImg = CGImageSourceCreateImageAtIndex(source, idx, nil) else { continue }
+            let cgImg = CGImageSourceCreateThumbnailAtIndex(source, idx, thumbOptions as CFDictionary)
+                ?? CGImageSourceCreateImageAtIndex(source, idx, nil)
+            guard let validImg = cgImg else { continue }
             let frameDelay = Self.frameDuration(at: idx, source: source) * Double(strideStep)
-            frames.append(cgImg)
+            frames.append(validImg)
             delays.append(frameDelay)
         }
 
         guard !frames.isEmpty else { return nil }
         if frames.count == 1 {
-            return DecodedImagePayload(frames: frames, keyTimes: [0.0], totalDuration: 0)
+            return DecodedImagePayload(frames: frames, frameDelays: [0.0], keyTimes: [0.0], totalDuration: 0)
         }
 
         let totalDuration = delays.reduce(0, +)
@@ -71,13 +164,14 @@ final class RemoteImageCache {
 
         return DecodedImagePayload(
             frames: frames,
+            frameDelays: delays,
             keyTimes: keyTimes,
             totalDuration: max(totalDuration, 0.1)
         )
     }
 
     private static func frameDuration(at index: Int, source: CGImageSource) -> Double {
-        var delay = 0.08
+        var delay = 0.07
         guard let props = CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any] else {
             return delay
         }
@@ -97,16 +191,20 @@ final class RemoteImageCache {
         }
 
         if delay < 0.025 {
-            delay = 0.08
+            delay = 0.07
         }
         return delay
     }
 }
 
 /// CoreAnimation layer-hosted container view that displays the FULL image (`contentsGravity = .resizeAspect`)
-/// and plays multi-frame animated GIFs/WebPs in a continuous hardware-accelerated loop (`CAKeyframeAnimation`).
+/// and plays multi-frame animated GIFs/WebPs in a continuous deterministic loop via a `RunLoop.main` `.common` timer.
 final class AspectFitImageContainerView: NSView {
     private let imageLayer = CALayer()
+    private var currentFrames: [CGImage] = []
+    private var currentDelays: [TimeInterval] = []
+    private var currentFrameIndex: Int = 0
+    private var frameTimer: Timer?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -127,6 +225,10 @@ final class AspectFitImageContainerView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    deinit {
+        frameTimer?.invalidate()
+    }
+
     override var intrinsicContentSize: NSSize {
         NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric)
     }
@@ -139,29 +241,69 @@ final class AspectFitImageContainerView: NSView {
         CATransaction.commit()
     }
 
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window == nil {
+            stopFrameTimer()
+        } else if currentFrames.count > 1 && frameTimer == nil {
+            scheduleNextFrameTick()
+        }
+    }
+
+    private func stopFrameTimer() {
+        frameTimer?.invalidate()
+        frameTimer = nil
+    }
+
     func clearImage() {
-        imageLayer.removeAnimation(forKey: "gifLoop")
+        stopFrameTimer()
+        currentFrames = []
+        currentDelays = []
+        currentFrameIndex = 0
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
         imageLayer.contents = nil
+        CATransaction.commit()
     }
 
     func applyDecodedPayload(_ payload: DecodedImagePayload) {
-        imageLayer.removeAnimation(forKey: "gifLoop")
+        stopFrameTimer()
         guard let first = payload.frames.first else {
-            imageLayer.contents = nil
+            clearImage()
             return
         }
+
+        currentFrames = payload.frames
+        currentDelays = payload.frameDelays
+        currentFrameIndex = 0
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
         imageLayer.contents = first
+        CATransaction.commit()
 
         if payload.isAnimated {
-            let anim = CAKeyframeAnimation(keyPath: "contents")
-            anim.values = payload.frames
-            anim.keyTimes = payload.keyTimes
-            anim.duration = payload.totalDuration
-            anim.calculationMode = .discrete
-            anim.repeatCount = .infinity
-            anim.isRemovedOnCompletion = false
-            imageLayer.add(anim, forKey: "gifLoop")
+            scheduleNextFrameTick()
         }
+    }
+
+    private func scheduleNextFrameTick() {
+        guard currentFrames.count > 1 else { return }
+        let delay = currentDelays.indices.contains(currentFrameIndex)
+            ? max(currentDelays[currentFrameIndex], 0.03)
+            : 0.07
+
+        let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
+            guard let self = self, self.currentFrames.count > 1 else { return }
+            self.currentFrameIndex = (self.currentFrameIndex + 1) % self.currentFrames.count
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            self.imageLayer.contents = self.currentFrames[self.currentFrameIndex]
+            CATransaction.commit()
+            self.scheduleNextFrameTick()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        self.frameTimer = timer
     }
 }
 
@@ -180,6 +322,11 @@ struct AnimatedRemoteImageView: NSViewRepresentable {
         context.coordinator.load(item: item)
     }
 
+    static func dismantleNSView(_ nsView: AspectFitImageContainerView, coordinator: Coordinator) {
+        coordinator.cancel()
+        nsView.clearImage()
+    }
+
     func makeCoordinator() -> Coordinator {
         Coordinator()
     }
@@ -191,6 +338,13 @@ struct AnimatedRemoteImageView: NSViewRepresentable {
         private var currentThumbUrl: String?
         private var loadTask: Task<Void, Never>?
 
+        func cancel() {
+            loadTask?.cancel()
+            loadTask = nil
+            currentFullUrl = nil
+            currentThumbUrl = nil
+        }
+
         func load(item: ImageResult) {
             guard currentFullUrl != item.fullImageUrl || currentThumbUrl != item.thumbnailUrl else { return }
             currentFullUrl = item.fullImageUrl
@@ -201,79 +355,44 @@ struct AnimatedRemoteImageView: NSViewRepresentable {
             let thumbUrl = item.thumbnailUrl
             let fullUrl = item.fullImageUrl
 
-            // 1. Check if full image/GIF is already cached
-            if let cachedFull = RemoteImageCache.shared.data(for: fullUrl),
-               let payload = RemoteImageCache.decodePayload(from: cachedFull) {
-                containerView?.applyDecodedPayload(payload)
+            // 1. If full image/GIF is already decoded in memory, display it immediately!
+            if let cachedFullPayload = RemoteImageCache.shared.decodedPayload(for: fullUrl) {
+                containerView?.applyDecodedPayload(cachedFullPayload)
                 return
             }
 
             // 2. Otherwise show cached thumbnail immediately while full image/GIF downloads
             var displayedAnimatedAlready = false
-            if let cachedThumb = RemoteImageCache.shared.data(for: thumbUrl),
-               let thumbPayload = RemoteImageCache.decodePayload(from: cachedThumb) {
-                containerView?.applyDecodedPayload(thumbPayload)
-                displayedAnimatedAlready = thumbPayload.isAnimated
+            if let cachedThumbPayload = RemoteImageCache.shared.decodedPayload(for: thumbUrl) {
+                containerView?.applyDecodedPayload(cachedThumbPayload)
+                displayedAnimatedAlready = cachedThumbPayload.isAnimated
             }
 
+            // 3. Download thumbnail (fast preview) and full URL (for GIF animation or high-res fallback) in parallel
             loadTask = Task { [weak self] in
-                let shouldFetchFullForAnimation = item.isAnimatedGif ||
-                    fullUrl.lowercased().contains(".gif") ||
-                    thumbUrl.lowercased().contains(".gif")
-
-                // Start full GIF download in parallel with thumbnail so animations start as fast as possible!
-                async let fullDataTask: Data? = (shouldFetchFullForAnimation && fullUrl != thumbUrl)
-                    ? Self.fetchData(urlStr: fullUrl, timeout: 6.5)
+                async let fullPayloadTask: DecodedImagePayload? = (fullUrl != thumbUrl)
+                    ? RemoteImageCache.shared.fetchAndDecode(urlStr: fullUrl, timeout: 7.5)
                     : nil
 
-                if RemoteImageCache.shared.data(for: thumbUrl) == nil {
-                    if let thumbData = await Self.fetchData(urlStr: thumbUrl, timeout: 4.0) {
-                        RemoteImageCache.shared.store(thumbData, for: thumbUrl)
+                if RemoteImageCache.shared.decodedPayload(for: thumbUrl) == nil {
+                    if let thumbPayload = await RemoteImageCache.shared.fetchAndDecode(urlStr: thumbUrl, timeout: 4.5) {
                         if !Task.isCancelled,
                            let self = self,
-                           self.currentFullUrl == fullUrl,
-                           let thumbPayload = await Self.decodeOffMainThread(thumbData) {
+                           self.currentFullUrl == fullUrl {
                             self.containerView?.applyDecodedPayload(thumbPayload)
                             displayedAnimatedAlready = thumbPayload.isAnimated
                         }
                     }
                 }
 
-                if let fullData = await fullDataTask, fullData.count < 15 * 1024 * 1024 {
-                    RemoteImageCache.shared.store(fullData, for: fullUrl)
-                    guard !Task.isCancelled else { return }
-                    if let self = self,
-                       self.currentFullUrl == fullUrl,
-                       let fullPayload = await Self.decodeOffMainThread(fullData) {
-                        if fullPayload.isAnimated || !displayedAnimatedAlready {
-                            self.containerView?.applyDecodedPayload(fullPayload)
-                        }
+                if let fullPayload = await fullPayloadTask {
+                    guard !Task.isCancelled,
+                          let self = self,
+                          self.currentFullUrl == fullUrl else { return }
+                    if fullPayload.isAnimated || !displayedAnimatedAlready {
+                        self.containerView?.applyDecodedPayload(fullPayload)
                     }
                 }
-            }
-        }
-
-        private nonisolated static func decodeOffMainThread(_ data: Data) async -> DecodedImagePayload? {
-            RemoteImageCache.decodePayload(from: data)
-        }
-
-        private nonisolated static func fetchData(urlStr: String, timeout: TimeInterval) async -> Data? {
-            guard urlStr.hasPrefix("http"), let url = URL(string: urlStr) else { return nil }
-            var req = URLRequest(url: url)
-            req.timeoutInterval = timeout
-            req.setValue(
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
-                forHTTPHeaderField: "User-Agent"
-            )
-            req.setValue("image/gif,image/webp,image/apng,image/*,*/*;q=0.8", forHTTPHeaderField: "Accept")
-            do {
-                let (data, response) = try await URLSession.shared.data(for: req)
-                if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
-                    return nil
-                }
-                return data
-            } catch {
-                return nil
             }
         }
     }

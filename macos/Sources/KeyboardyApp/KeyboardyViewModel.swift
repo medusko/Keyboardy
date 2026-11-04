@@ -30,12 +30,12 @@ final class KeyboardyViewModel: ObservableObject {
     private lazy var repository = ImageSearchRepository(headlessGoogleSearcher: googleSearcher)
 
     private var searchTask: Task<Void, Never>?
+    private var activeSearchToken = UUID()
     private var commitTask: Task<Void, Never>?
     private var bannerClearTask: Task<Void, Never>?
     private var lastCountedSearchKey: String = ""
     private var queryOriginatedFromTargetField: Bool = false
     private var lastSessionIncrementalHistoryQuery: String? = nil
-    private var ignoreNextOnChangeCallback: Bool = false
 
     func prepareForPanelOpen(capturedApp: NSRunningApplication?, initialQueryOverride: String? = nil) {
         self.targetApp = capturedApp
@@ -46,38 +46,40 @@ final class KeyboardyViewModel: ObservableObject {
 
         if let overrideText = initialQueryOverride, !overrideText.isEmpty {
             queryOriginatedFromTargetField = false
-            setSearchQueryProgrammatically(overrideText)
-            triggerSearch(immediate: true, clearExistingResultsFirst: true)
+            if searchQuery != overrideText {
+                searchQuery = overrideText
+                triggerSearch(immediate: true, clearExistingResultsFirst: true)
+            } else if results.isEmpty {
+                triggerSearch(immediate: true, clearExistingResultsFirst: true)
+            }
             return
         }
 
         if prefs.autoReadSelectedOrChatText,
            let extracted = ImageCommitService.shared.readFocusedOrSelectedText(from: capturedApp) {
             queryOriginatedFromTargetField = extracted.wasFullFieldValue
-            setSearchQueryProgrammatically(extracted.text)
-            triggerSearch(immediate: true, clearExistingResultsFirst: true)
+            if searchQuery != extracted.text {
+                searchQuery = extracted.text
+                triggerSearch(immediate: true, clearExistingResultsFirst: true)
+            } else if results.isEmpty {
+                triggerSearch(immediate: true, clearExistingResultsFirst: true)
+            }
             return
         }
 
         queryOriginatedFromTargetField = false
     }
 
-    private func setSearchQueryProgrammatically(_ text: String) {
-        if searchQuery != text {
-            ignoreNextOnChangeCallback = true
-            searchQuery = text
-        }
-    }
-
-    func onSearchQueryEdited(_ newValue: String) {
-        if ignoreNextOnChangeCallback {
-            ignoreNextOnChangeCallback = false
-            return
-        }
+    /// Called directly by the Search TextField's Binding setter whenever the user types, pastes, or deletes text.
+    func onUserEditedSearchQuery(_ newValue: String) {
+        let oldTrimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        let newTrimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        searchQuery = newValue
         queryOriginatedFromTargetField = false
-        let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty {
+
+        if newTrimmed.isEmpty {
             searchTask?.cancel()
+            activeSearchToken = UUID()
             isSearching = false
             results = []
             searchGeneration &+= 1
@@ -85,7 +87,10 @@ final class KeyboardyViewModel: ObservableObject {
             lastSessionIncrementalHistoryQuery = nil
             return
         }
-        triggerSearch(immediate: false, clearExistingResultsFirst: false)
+
+        // Immediately clear old search results when the query changes so stale images never linger on screen!
+        let queryChanged = oldTrimmed.caseInsensitiveCompare(newTrimmed) != .orderedSame
+        triggerSearch(immediate: false, clearExistingResultsFirst: queryChanged)
     }
 
     func selectFilter(_ filter: SearchFilter) {
@@ -101,7 +106,7 @@ final class KeyboardyViewModel: ObservableObject {
         queryOriginatedFromTargetField = false
         lastSessionIncrementalHistoryQuery = nil
         isShowingHistory = false
-        setSearchQueryProgrammatically(queryItem)
+        searchQuery = queryItem
         triggerSearch(immediate: true, clearExistingResultsFirst: true)
     }
 
@@ -118,9 +123,10 @@ final class KeyboardyViewModel: ObservableObject {
             recordQueryInHistory(currentTrimmed, lockSession: true)
         }
         searchTask?.cancel()
+        activeSearchToken = UUID()
         queryOriginatedFromTargetField = false
         lastSessionIncrementalHistoryQuery = nil
-        setSearchQueryProgrammatically("")
+        searchQuery = ""
         results = []
         searchGeneration &+= 1
         selectedIndex = 0
@@ -145,11 +151,14 @@ final class KeyboardyViewModel: ObservableObject {
         lastSessionIncrementalHistoryQuery = lockSession ? nil : cleaned
     }
 
-    func triggerSearch(immediate: Bool, clearExistingResultsFirst: Bool = false) {
+    func triggerSearch(immediate: Bool, clearExistingResultsFirst: Bool = true) {
         let trimmed = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             searchTask?.cancel()
+            activeSearchToken = UUID()
             isSearching = false
+            results = []
+            searchGeneration &+= 1
             return
         }
 
@@ -169,11 +178,14 @@ final class KeyboardyViewModel: ObservableObject {
         let activeApiKey = prefs.optionalApiKey
 
         searchTask?.cancel()
+        let searchToken = UUID()
+        self.activeSearchToken = searchToken
+
         searchTask = Task { [weak self] in
             guard let self = self else { return }
             if !immediate {
-                try? await Task.sleep(nanoseconds: 340_000_000)
-                guard !Task.isCancelled else { return }
+                try? await Task.sleep(nanoseconds: 280_000_000)
+                guard !Task.isCancelled, self.activeSearchToken == searchToken else { return }
             }
 
             self.isSearching = true
@@ -195,10 +207,11 @@ final class KeyboardyViewModel: ObservableObject {
                 nsfwMode: activeNsfw,
                 optionalApiKey: activeApiKey,
                 onProgressiveResults: { [weak self] partial in
-                    guard let self = self, !Task.isCancelled else { return }
-                    if !partial.isEmpty {
+                    guard let self = self,
+                          !Task.isCancelled,
+                          self.activeSearchToken == searchToken else { return }
+                    if !partial.isEmpty && self.results != partial {
                         self.results = partial
-                        self.searchGeneration &+= 1
                         if self.selectedIndex >= partial.count {
                             self.selectedIndex = 0
                         }
@@ -206,10 +219,11 @@ final class KeyboardyViewModel: ObservableObject {
                 }
             )
 
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, self.activeSearchToken == searchToken else { return }
             self.isSearching = false
-            self.results = finalItems
-            self.searchGeneration &+= 1
+            if self.results != finalItems {
+                self.results = finalItems
+            }
             if self.selectedIndex >= finalItems.count {
                 self.selectedIndex = 0
             }

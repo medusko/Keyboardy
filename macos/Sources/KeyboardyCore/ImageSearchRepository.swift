@@ -18,12 +18,14 @@ public final class ImageSearchRepository {
     ) async -> [ImageResult] {
         let effectiveQuery = filter.buildEffectiveQuery(query)
         guard !effectiveQuery.isEmpty else { return [] }
+        let animatedRequested = filter.requiresAnimatedGif(for: query)
 
         async let apiResultsTask: [ImageResult] = optionalApiKey.isEmpty
             ? []
             : Self.fetchOptionalApiResults(
                 effectiveQuery: effectiveQuery,
                 filter: filter,
+                animatedRequested: animatedRequested,
                 nsfwMode: nsfwMode,
                 apiKey: optionalApiKey
             )
@@ -33,6 +35,7 @@ public final class ImageSearchRepository {
             async let fastTask = Self.fetchInstantHttpImages(
                 effectiveQuery: effectiveQuery,
                 filter: filter,
+                animatedRequested: animatedRequested,
                 nsfwMode: nsfwMode
             )
             let fast = await fastTask
@@ -54,6 +57,7 @@ public final class ImageSearchRepository {
                 finalItems = await Self.fetchInstantHttpImages(
                     effectiveQuery: effectiveQuery,
                     filter: filter,
+                    animatedRequested: animatedRequested,
                     nsfwMode: nsfwMode
                 )
             }
@@ -64,6 +68,7 @@ public final class ImageSearchRepository {
             async let instantTask = Self.fetchInstantHttpImages(
                 effectiveQuery: effectiveQuery,
                 filter: filter,
+                animatedRequested: animatedRequested,
                 nsfwMode: nsfwMode
             )
             async let googleTask = headlessGoogleSearcher.searchGoogleImages(
@@ -81,16 +86,17 @@ public final class ImageSearchRepository {
 
             let googleResults = await googleTask
             let filteredGoogle: [ImageResult]
-            if filter.animatedOnly {
+            if animatedRequested {
                 filteredGoogle = googleResults.filter {
-                    !$0.fullImageUrl.contains("encrypted-tbn0.gstatic.com")
+                    !$0.fullImageUrl.contains("encrypted-tbn0.gstatic.com") &&
+                    $0.fullImageUrl.lowercased().contains(".gif")
                 }
             } else {
                 filteredGoogle = googleResults
             }
             let combined = Self.interleaveResults(
-                primary: filter.animatedOnly ? (apiResults + fastResults) : (apiResults + filteredGoogle),
-                secondary: filter.animatedOnly ? filteredGoogle : fastResults
+                primary: animatedRequested ? (apiResults + fastResults) : (apiResults + filteredGoogle),
+                secondary: animatedRequested ? filteredGoogle : fastResults
             )
             onProgressiveResults(combined)
             return combined
@@ -100,13 +106,15 @@ public final class ImageSearchRepository {
     public nonisolated static func fetchInstantHttpImages(
         effectiveQuery: String,
         filter: SearchFilter,
+        animatedRequested: Bool? = nil,
         nsfwMode: Bool
     ) async -> [ImageResult] {
         guard let encoded = effectiveQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
             return []
         }
+        let wantAnimated = animatedRequested ?? filter.requiresAnimatedGif(for: effectiveQuery)
         let qftFilter: String
-        if filter.animatedOnly {
+        if wantAnimated {
             qftFilter = "&qft=+filterui:photo-animatedgif"
         } else if filter.transparentOnly {
             qftFilter = "&qft=+filterui:photo-transparent"
@@ -120,25 +128,27 @@ public final class ImageSearchRepository {
         guard let html = await httpGetString(urlStr, extraHeaders: headers) else {
             return []
         }
-        return SearchParsers.parseBingAsyncImagesHtml(html, forceGifHint: filter.animatedOnly)
+        return SearchParsers.parseBingAsyncImagesHtml(html, forceGifHint: wantAnimated)
     }
 
     public nonisolated static func fetchOptionalApiResults(
         effectiveQuery: String,
         filter: SearchFilter,
+        animatedRequested: Bool? = nil,
         nsfwMode: Bool,
         apiKey: String
     ) async -> [ImageResult] {
         guard let encoded = effectiveQuery.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
             return []
         }
+        let wantAnimated = animatedRequested ?? filter.requiresAnimatedGif(for: effectiveQuery)
 
         if apiKey.count >= 40 && apiKey.allSatisfy({ $0.isLetter || $0.isNumber }) {
-            let tbs = filter.animatedOnly ? "&tbs=itp:animated" : ""
+            let tbs = wantAnimated ? "&tbs=itp:animated" : ""
             let safe = nsfwMode ? "off" : "active"
             let serpUrl = "https://serpapi.com/search.json?engine=google_images&q=\(encoded)&safe=\(safe)\(tbs)&api_key=\(apiKey)"
             if let json = await httpGetString(serpUrl) {
-                let parsed = SearchParsers.parseSerpApiImagesJson(json, forceGifHint: filter.animatedOnly)
+                let parsed = SearchParsers.parseSerpApiImagesJson(json, forceGifHint: wantAnimated)
                 if !parsed.isEmpty { return parsed }
             }
         }
@@ -146,7 +156,7 @@ public final class ImageSearchRepository {
         let braveSafe = nsfwMode ? "off" : "moderate"
         let braveUrl = "https://api.search.brave.com/res/v1/images/search?q=\(encoded)&safesearch=\(braveSafe)&count=30"
         if let json = await httpGetString(braveUrl, extraHeaders: ["X-Subscription-Token": apiKey]) {
-            return SearchParsers.parseBraveImagesJson(json, forceGifHint: filter.animatedOnly)
+            return SearchParsers.parseBraveImagesJson(json, forceGifHint: wantAnimated)
         }
         return []
     }

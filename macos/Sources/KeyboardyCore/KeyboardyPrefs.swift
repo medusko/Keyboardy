@@ -124,14 +124,16 @@ public final class KeyboardyPrefs: ObservableObject {
         }
         self.isDarkMode = effectiveDark
 
-        // Select icon based on system/app mode by default (White Icon in Dark mode, Black Icon in Light mode),
-        // or restore the user's explicit choice if saved under v3.
+        // Night/Dark Mode -> White Icon (.keyboardyWhiteIcon)
+        // Light Mode      -> Black Icon (.keyboardyBlackIcon)
         let defaultIconForMode: StatusBarBadgeStyle = effectiveDark ? .keyboardyWhiteIcon : .keyboardyBlackIcon
         if let badgeRaw = defaults.string(forKey: Keys.statusBarBadgeStyle),
-           let savedStyle = StatusBarBadgeStyle(rawValue: badgeRaw) {
-            self.statusBarBadgeStyle = savedStyle
+           let savedStyle = StatusBarBadgeStyle(rawValue: badgeRaw),
+           savedStyle == .keyboardyAppIcon {
+            self.statusBarBadgeStyle = .keyboardyAppIcon
         } else {
             self.statusBarBadgeStyle = defaultIconForMode
+            defaults.set(defaultIconForMode.rawValue, forKey: Keys.statusBarBadgeStyle)
         }
 
         // Default to ⌥⇧Space (Option + Shift + Space) so it never conflicts with Gemini (⌥Space) or Spotlight (⌘Space)

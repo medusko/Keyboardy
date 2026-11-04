@@ -267,22 +267,22 @@ struct SettingsView: View {
                     // SECTION 3: APPEARANCE & SEARCH ENGINE
                     // =====================================================
                     sectionGroup(header: "APPEARANCE & SEARCH ENGINE") {
-                        // Row 1: Menu Bar Icon Style (App Icon, White Icon, Black Icon)
+                        // Row 1: Menu Bar Icon Style (App Icon, White Icon for Night, Black Icon for Light)
                         VStack(alignment: .leading, spacing: 7) {
                             HStack {
                                 Text("Menu Bar Icon Style")
                                     .font(.system(size: 12, weight: .bold))
                                     .foregroundColor(palette.textPrimary)
                                 Spacer()
-                                Text("Auto-switches with Theme, or pick manually")
-                                    .font(.system(size: 10))
+                                Text("White = Night Mode • Black = Light Mode")
+                                    .font(.system(size: 10, weight: .semibold))
                                     .foregroundColor(palette.textSecondary)
                             }
 
                             HStack(spacing: 8) {
                                 badgeOptionButton(.keyboardyAppIcon, label: "App Icon")
-                                badgeOptionButton(.keyboardyWhiteIcon, label: "White Icon")
-                                badgeOptionButton(.keyboardyBlackIcon, label: "Black Icon")
+                                badgeOptionButton(.keyboardyWhiteIcon, label: "White (Night)")
+                                badgeOptionButton(.keyboardyBlackIcon, label: "Black (Light)")
                             }
                         }
 
@@ -291,7 +291,7 @@ struct SettingsView: View {
                         // Row 2: Rewired App Theme Mode (System Auto / Dark / Light)
                         settingRow(
                             title: "App Theme & Icon Mode",
-                            subtitle: "Follow macOS System Settings or choose Dark (White Icon) / Light (Black Icon)"
+                            subtitle: "System Auto, Night Mode (White Icon), or Light Mode (Black Icon)"
                         ) {
                             HStack(spacing: 5) {
                                 ForEach(AppThemeMode.allCases) { mode in
@@ -542,12 +542,29 @@ struct SettingsView: View {
     @ViewBuilder
     private func badgeOptionButton(_ style: StatusBarBadgeStyle, label: String) -> some View {
         let isSelected = prefs.statusBarBadgeStyle == style
+        let previewBackdrop: Color = {
+            switch style {
+            case .keyboardyWhiteIcon:
+                return Color(red: 0.14, green: 0.16, blue: 0.20)
+            case .keyboardyBlackIcon:
+                return Color(red: 0.93, green: 0.91, blue: 0.87)
+            case .keyboardyAppIcon:
+                return Color.clear
+            }
+        }()
         Button(action: { prefs.statusBarBadgeStyle = style }) {
             HStack(spacing: 6) {
-                Image(nsImage: StatusBarBadgeRenderer.makeStatusBarImage(style: style))
-                    .resizable()
-                    .interpolation(.high)
-                    .frame(width: 16, height: 16)
+                ZStack {
+                    if style != .keyboardyAppIcon {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(previewBackdrop)
+                            .frame(width: 20, height: 20)
+                    }
+                    Image(nsImage: StatusBarBadgeRenderer.makeStatusBarImage(style: style))
+                        .resizable()
+                        .interpolation(.high)
+                        .frame(width: 16, height: 16)
+                }
                 Text(label)
                     .font(.system(size: 11, weight: .bold))
                     .foregroundColor(isSelected ? .white : palette.textPrimary)
