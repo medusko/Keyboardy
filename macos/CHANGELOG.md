@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [macos-v1.0.1-RC1] - 2026-11-04
+
+### Added & Enhanced
+- **Refined macOS-Native "About Keyboardy" Experience:**
+  - Redesigned the About view to seamlessly reflect the macOS app design system:
+    - High-resolution Retina App Icon hero badge with squircle rounding, subtle drop shadow, and border.
+    - Live system status indicators displaying 1-Click Auto-Paste accessibility readiness, active global hotkey (`⌘⌥K`), and universal binary architecture (Apple Silicon & Intel).
+    - Zero-Step workflow feature pillars featuring native SF Symbols: 1-Click Auto-Paste (`bolt.fill`), Native Drag & Drop (`hand.draw.fill`), Looping Tenor GIFs (`play.circle.fill`), and Zero Telemetry (`lock.shield.fill`).
+    - Dedicated Release Notes & What's New section detailing recent beta improvements.
+    - Interactive macOS quick-action link buttons: *Full Changelog*, *All Releases*, *Source Code*, *macOS Accessibility Settings*, and *Launch Test Studio*.
+- **Integrated Release Candidate & What's New:**
+  - Relocated release notes, improvement logs, and external links from the main settings scrollview into the dedicated About view, keeping Settings uncluttered and focused on configuration.
+- **Release Candidate 1 Milestone:**
+  - Transitioned versioning from `beta#` to **Release Candidate 1 (`v1.0.1-RC1`, Build 8)**.
+
+---
+
 ## [macos-v1.0.1-beta.6] - 2026-11-04
 
 ### Fixed

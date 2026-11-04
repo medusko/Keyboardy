@@ -448,102 +448,167 @@ struct SettingsView: View {
 
     private var aboutScrollView: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                // SECTION: ABOUT KEYBOARDY (Mirroring Android layout & info)
-                sectionGroup(header: "ABOUT KEYBOARDY") {
-                    HStack(spacing: 12) {
-                        Image(nsImage: StatusBarBadgeRenderer.makeStatusBarImage(style: .keyboardyAppIcon))
+            VStack(alignment: .leading, spacing: 14) {
+                // 1. HERO IDENTITY CARD
+                sectionGroup(header: "APPLICATION") {
+                    HStack(spacing: 14) {
+                        Image(nsImage: StatusBarBadgeRenderer.loadAppIconImage())
                             .resizable()
                             .interpolation(.high)
-                            .frame(width: 34, height: 34)
-                            .padding(6)
-                            .background(palette.surfaceVariant)
-                            .cornerRadius(10)
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 48, height: 48)
+                            .cornerRadius(12)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(palette.border, lineWidth: 1)
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(palette.border.opacity(0.8), lineWidth: 1)
                             )
+                            .shadow(color: Color.black.opacity(0.15), radius: 3, x: 0, y: 1.5)
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Keyboardy for macOS")
-                                .font(.system(size: 14, weight: .black, design: .rounded))
-                                .foregroundColor(palette.textPrimary)
-                            Text("Zero-step auxiliary Google Image & GIF search")
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 6) {
+                                Text("Keyboardy")
+                                    .font(.system(size: 16, weight: .black, design: .rounded))
+                                    .foregroundColor(palette.textPrimary)
+
+                                Text("macOS")
+                                    .font(.system(size: 10, weight: .black, design: .rounded))
+                                    .foregroundColor(palette.accentBlue)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(palette.accentBlue.opacity(0.12))
+                                    .cornerRadius(6)
+                            }
+
+                            Text("Instant Auxiliary Google Image & GIF Search Companion")
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundColor(palette.textSecondary)
                         }
 
                         Spacer()
 
-                        Text(KeyboardyVersion.displayString)
-                            .font(.system(size: 11, weight: .black, design: .monospaced))
-                            .foregroundColor(palette.accentBlue)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 4)
-                            .background(palette.accentBlue.opacity(0.12))
-                            .cornerRadius(8)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(palette.accentBlue.opacity(0.4), lineWidth: 1)
-                            )
+                        VStack(alignment: .trailing, spacing: 3) {
+                            Text(KeyboardyVersion.displayString)
+                                .font(.system(size: 11, weight: .black, design: .monospaced))
+                                .foregroundColor(palette.accentBlue)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3.5)
+                                .background(palette.accentBlue.opacity(0.12))
+                                .cornerRadius(7)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 7)
+                                        .stroke(palette.accentBlue.opacity(0.35), lineWidth: 1)
+                                )
+
+                            Text("Build \(KeyboardyVersion.buildNumber)")
+                                .font(.system(size: 9.5, weight: .bold, design: .monospaced))
+                                .foregroundColor(palette.textSecondary)
+                        }
                     }
 
                     rowDivider
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("About")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(palette.accentBlue)
+                    // Quick Diagnostic Status Bar
+                    HStack(spacing: 12) {
+                        HStack(spacing: 5) {
+                            Circle()
+                                .fill(prefs.isAccessibilityGranted ? palette.successGreen : Color.orange)
+                                .frame(width: 7, height: 7)
+                            Text(prefs.isAccessibilityGranted ? "1-Click Auto-Paste Ready" : "Accessibility Needed")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(prefs.isAccessibilityGranted ? palette.successGreen : Color.orange)
+                        }
 
-                        Text("Keyboardy is a zero-step auxiliary Google Image & GIF search companion engineered to eliminate manual downloading, browser tabs, and file-picking when sharing pictures in Slack, Messages, Discord, WhatsApp, and other chat apps.\n\nTrigger Keyboardy from any app using your global hotkey (\(prefs.activeHotkeyShortLabel)), search full-screen across our Hybrid Google WebView + Instant Web engine, and tap any image or animated GIF to insert it directly into your conversation via 1-click auto-paste (⌘V)—or drag and drop anywhere.")
-                            .font(.system(size: 11.5))
-                            .foregroundColor(palette.textPrimary)
-                            .lineSpacing(3)
-                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer()
 
-                        Text("Keyboardy \(KeyboardyVersion.detailedDisplayString) • Built for macOS 14+ • Apple Silicon & Intel")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(palette.textSecondary)
-                            .padding(.top, 4)
+                        HStack(spacing: 5) {
+                            Image(systemName: "command")
+                                .font(.system(size: 10, weight: .bold))
+                            Text("Hotkey: \(prefs.activeHotkeyShortLabel)")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .foregroundColor(palette.textSecondary)
+
+                        HStack(spacing: 5) {
+                            Image(systemName: "cpu")
+                                .font(.system(size: 10, weight: .bold))
+                            Text("Universal (Apple Silicon & Intel)")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .foregroundColor(palette.textSecondary)
+                    }
+                    .padding(.top, 2)
+                }
+
+                // 2. ABOUT & WORKFLOW HIGHLIGHTS
+                sectionGroup(header: "ZERO-STEP WORKFLOW") {
+                    Text("Keyboardy is engineered to eliminate the friction of manual image searching, browser tabs, downloads folders, and file-picker dialogs when sharing pictures and animated GIFs in chat.")
+                        .font(.system(size: 11.5))
+                        .foregroundColor(palette.textPrimary)
+                        .lineSpacing(2.5)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    rowDivider
+
+                    // Feature Pillars with macOS SF Symbols
+                    VStack(alignment: .leading, spacing: 9) {
+                        aboutFeatureRow(
+                            icon: "bolt.fill",
+                            iconColor: Color.yellow,
+                            title: "Instant 1-Click Auto-Paste (⌘V)",
+                            description: "Restores focus to your previous app (Slack, Messages, Discord, WhatsApp, Chrome) and automatically executes a hardware-accurate ⌘V keystroke."
+                        )
+
+                        aboutFeatureRow(
+                            icon: "hand.draw.fill",
+                            iconColor: palette.accentBlue,
+                            title: "Native Drag-and-Drop",
+                            description: "Drag any picture or animated GIF thumbnail directly into your conversation input, browser window, or Desktop."
+                        )
+
+                        aboutFeatureRow(
+                            icon: "play.circle.fill",
+                            iconColor: Color.green,
+                            title: "Infinite Looping Tenor GIFs",
+                            description: "Streams high-speed Tenor animations with ~60ms preview loading and dedicated RunLoop frame-stepping for continuous playback."
+                        )
+
+                        aboutFeatureRow(
+                            icon: "lock.shield.fill",
+                            iconColor: Color.blue,
+                            title: "Zero Telemetry & 100% Private",
+                            description: "Direct Google WebView and Instant search connections only. No analytics, tracking, or keystroke logging."
+                        )
                     }
                 }
 
-                // SECTION: BETA VERSION & WHAT'S NEW (Content and links moved under About)
-                sectionGroup(header: "BETA VERSION & WHAT'S NEW") {
+                // 3. RELEASE NOTES & RECENT IMPROVEMENTS
+                sectionGroup(header: "RELEASE NOTES & WHAT'S NEW") {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Keyboardy for macOS")
-                                .font(.system(size: 13, weight: .bold))
+                            Text("Keyboardy for macOS \(KeyboardyVersion.displayString)")
+                                .font(.system(size: 12.5, weight: .bold))
                                 .foregroundColor(palette.textPrimary)
-                            Text("Active Beta Build")
+                            Text("Release Candidate 1 • \(KeyboardyVersion.releaseDate)")
                                 .font(.system(size: 10.5))
                                 .foregroundColor(palette.textSecondary)
                         }
 
                         Spacer()
 
-                        Text(KeyboardyVersion.detailedDisplayString)
-                            .font(.system(size: 10.5, weight: .black, design: .monospaced))
-                            .foregroundColor(palette.accentBlue)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 4)
-                            .background(palette.accentBlue.opacity(0.12))
-                            .cornerRadius(8)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(palette.accentBlue.opacity(0.4), lineWidth: 1)
-                            )
+                        Text("Current Build")
+                            .font(.system(size: 10, weight: .heavy))
+                            .foregroundColor(palette.successGreen)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(palette.successGreen.opacity(0.12))
+                            .cornerRadius(6)
                     }
 
                     rowDivider
 
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Recent Improvements in this Beta:")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(palette.textPrimary)
-
-                        ForEach(KeyboardyVersion.recentImprovements, id: \.title) { item in
-                            VStack(alignment: .leading, spacing: 1) {
+                        ForEach(KeyboardyVersion.recentImprovements.prefix(6), id: \.title) { item in
+                            VStack(alignment: .leading, spacing: 2) {
                                 Text(item.title)
                                     .font(.system(size: 11, weight: .bold))
                                     .foregroundColor(palette.textPrimary)
@@ -555,19 +620,40 @@ struct SettingsView: View {
                             .padding(.vertical, 1)
                         }
                     }
+                }
+
+                // 4. QUICK ACTIONS & LINKS
+                sectionGroup(header: "LINKS & RESOURCES") {
+                    HStack(spacing: 8) {
+                        linkButton(
+                            title: "Full Changelog",
+                            icon: "doc.text.magnifyingglass",
+                            url: "https://github.com/medusko/Keyboardy/blob/main/CHANGELOG.md"
+                        )
+
+                        linkButton(
+                            title: "All Releases",
+                            icon: "arrow.down.circle",
+                            url: "https://github.com/medusko/Keyboardy/releases"
+                        )
+
+                        linkButton(
+                            title: "Source Code",
+                            icon: "curlybraces",
+                            url: "https://github.com/medusko/Keyboardy"
+                        )
+                    }
 
                     rowDivider
 
-                    HStack {
+                    HStack(spacing: 8) {
                         Button(action: {
-                            if let url = URL(string: "https://github.com/medusko/Keyboardy/blob/main/CHANGELOG.md") {
-                                NSWorkspace.shared.open(url)
-                            }
+                            _ = ImageCommitService.shared.openAndRefreshAccessibilityPermission()
                         }) {
                             HStack(spacing: 5) {
-                                Image(systemName: "doc.text.magnifyingglass")
+                                Image(systemName: "gearshape.2")
                                     .font(.system(size: 11, weight: .bold))
-                                Text("Full Changelog")
+                                Text("macOS Accessibility Settings")
                                     .font(.system(size: 11, weight: .bold))
                             }
                             .foregroundColor(palette.accentBlue)
@@ -585,14 +671,18 @@ struct SettingsView: View {
                         Spacer()
 
                         Button(action: {
-                            if let url = URL(string: "https://github.com/medusko/Keyboardy/releases") {
-                                NSWorkspace.shared.open(url)
+                            let testSitePath = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+                                .appendingPathComponent("test_site/index.html")
+                            if FileManager.default.fileExists(atPath: testSitePath.path) {
+                                NSWorkspace.shared.open(testSitePath)
+                            } else if let repoUrl = URL(string: "https://github.com/medusko/Keyboardy") {
+                                NSWorkspace.shared.open(repoUrl)
                             }
                         }) {
                             HStack(spacing: 5) {
-                                Image(systemName: "arrow.down.circle")
+                                Image(systemName: "testtube.2")
                                     .font(.system(size: 11, weight: .bold))
-                                Text("All Releases")
+                                Text("Launch Test Studio")
                                     .font(.system(size: 11, weight: .bold))
                             }
                             .foregroundColor(palette.textSecondary)
@@ -608,9 +698,69 @@ struct SettingsView: View {
                         .buttonStyle(.plain)
                     }
                 }
+
+                // 5. FOOTER
+                HStack {
+                    Spacer()
+                    Text("Designed & Engineered for macOS by Medusko • Keyboardy \(KeyboardyVersion.detailedDisplayString)")
+                        .font(.system(size: 9.5, weight: .medium))
+                        .foregroundColor(palette.textSecondary.opacity(0.8))
+                    Spacer()
+                }
+                .padding(.top, 4)
+                .padding(.bottom, 6)
             }
             .padding(14)
         }
+    }
+
+    private func aboutFeatureRow(icon: String, iconColor: Color, title: String, description: String) -> some View {
+        HStack(alignment: .top, spacing: 9) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(iconColor)
+                .frame(width: 18, height: 18)
+                .padding(4)
+                .background(iconColor.opacity(0.12))
+                .cornerRadius(6)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 11.5, weight: .bold))
+                    .foregroundColor(palette.textPrimary)
+                Text(description)
+                    .font(.system(size: 10.5))
+                    .foregroundColor(palette.textSecondary)
+                    .lineSpacing(1.5)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func linkButton(title: String, icon: String, url: String) -> some View {
+        Button(action: {
+            if let targetUrl = URL(string: url) {
+                NSWorkspace.shared.open(targetUrl)
+            }
+        }) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 10.5, weight: .bold))
+                Text(title)
+                    .font(.system(size: 11, weight: .bold))
+            }
+            .foregroundColor(palette.accentBlue)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity)
+            .background(palette.surfaceVariant)
+            .cornerRadius(7)
+            .overlay(
+                RoundedRectangle(cornerRadius: 7)
+                    .stroke(palette.border, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Reusable High-Contrast Components (Explicit Palette Colors in Dark & Light Mode)

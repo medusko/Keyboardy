@@ -1,8 +1,8 @@
 import Foundation
 
 public enum KeyboardyVersion {
-    public static let versionName = "1.0.1-beta.6"
-    public static let buildNumber = "7"
+    public static let versionName = "1.0.1-RC1"
+    public static let buildNumber = "8"
     public static let releaseDate = "2026-11-04"
 
     public static var displayString: String {
@@ -14,6 +14,14 @@ public enum KeyboardyVersion {
     }
 
     public static let recentImprovements: [(title: String, detail: String)] = [
+        (
+            "ℹ️ Dedicated About View with Android Parity",
+            "Added an (i) info button in Settings to the right of the status pill that presents the full 'About Keyboardy' description and build metadata mirroring the Android app."
+        ),
+        (
+            "📋 Integrated Release Candidate & What's New",
+            "Relocated the What's New changelog, recent improvements, and release links directly inside the new About view, keeping Settings clean and focused."
+        ),
         (
             "🎯 Single-Tap Keystroke Dispatch (Fixed Double Paste)",
             "Eliminated duplicate image insertion caused by concurrent HID tap and PID event queue synthesis; now dispatches a single hardware-accurate ⌘V keystroke to the active window."

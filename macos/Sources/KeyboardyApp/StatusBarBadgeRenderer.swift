@@ -31,6 +31,14 @@ enum StatusBarBadgeRenderer {
         }
     }
 
+    /// Loads the authentic full-resolution app icon image for UI dialogs and About views.
+    static func loadAppIconImage() -> NSImage {
+        if let img = loadSourcePngImage() {
+            return img
+        }
+        return makeStatusBarImage(style: .keyboardyAppIcon)
+    }
+
     private static func loadSourcePngImage() -> NSImage? {
         if let resourceURL = Bundle.main.url(forResource: "StatusBarIcon", withExtension: "png"),
            let img = NSImage(contentsOf: resourceURL) {

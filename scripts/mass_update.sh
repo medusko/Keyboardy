@@ -47,7 +47,13 @@ echo "   - macOS:   v$MACOS_VERSION"
 if [[ "$PLATFORM" == "android" || "$PLATFORM" == "all" ]]; then
   echo ""
   echo "🔨 Building Android APK (v$ANDROID_VERSION)..."
-  export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@21}"
+  if [[ -z "${JAVA_HOME:-}" || ! -d "$JAVA_HOME" ]]; then
+    if [[ -d "/opt/homebrew/opt/openjdk@21" ]]; then
+      export JAVA_HOME="/opt/homebrew/opt/openjdk@21"
+    elif [[ -d "/Applications/Android Studio.app/Contents/jbr/Contents/Home" ]]; then
+      export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+    fi
+  fi
   ./gradlew assembleDebug testDebugUnitTest
   
   APK_SRC="app/build/outputs/apk/debug/app-debug.apk"
@@ -63,8 +69,8 @@ fi
 
 if [[ "$PLATFORM" == "macos" || "$PLATFORM" == "all" ]]; then
   echo ""
-  echo "🔨 Building macOS Bundle (v$MACOS_VERSION)..."
-  ./macos/build_app.sh
+  echo "🔨 Building & Packaging macOS Bundle (v$MACOS_VERSION)..."
+  ./macos/build_app.sh --package
 fi
 
 # 3. Git Commit & Push Main
@@ -105,6 +111,34 @@ if [[ "$PLATFORM" == "android" || "$PLATFORM" == "all" ]]; then
         --notes "Release v$ANDROID_VERSION - see CHANGELOG.md for detailed highlights."
     fi
     echo "✅ Published GitHub Release: https://github.com/medusko/Keyboardy/releases/tag/$TAG"
+  else
+    echo "⚠️  'gh' CLI not found; skipping GitHub Release creation."
+  fi
+fi
+
+if [[ "$PLATFORM" == "macos" || "$PLATFORM" == "all" ]]; then
+  MACOS_TAG="macos-v${MACOS_VERSION}"
+  echo ""
+  echo "🏷️  Checking Git tag $MACOS_TAG..."
+  if ! git rev-parse "$MACOS_TAG" >/dev/null 2>&1; then
+    git tag "$MACOS_TAG"
+    git push origin "$MACOS_TAG"
+    echo "✅ Created and pushed tag $MACOS_TAG"
+  fi
+
+  echo "🌐 Publishing GitHub Release for $MACOS_TAG..."
+  DMG_FILE="macos/build/Keyboardy-macOS-v${MACOS_VERSION}.dmg"
+  ZIP_FILE="macos/build/Keyboardy-macOS-v${MACOS_VERSION}.zip"
+  if command -v gh >/dev/null 2>&1; then
+    if gh release view "$MACOS_TAG" >/dev/null 2>&1; then
+      echo "ℹ️  Release $MACOS_TAG exists, uploading latest macOS assets..."
+      gh release upload "$MACOS_TAG" "$DMG_FILE" "$ZIP_FILE" --clobber
+    else
+      gh release create "$MACOS_TAG" "$DMG_FILE" "$ZIP_FILE" \
+        --title "Keyboardy for macOS v$MACOS_VERSION" \
+        --notes "Release Candidate 1 (v$MACOS_VERSION) - Dedicated About View with Android Parity, integrated What's New changelog & release links, and single-tap keystroke auto-paste. See CHANGELOG.md for details."
+    fi
+    echo "✅ Published GitHub Release: https://github.com/medusko/Keyboardy/releases/tag/$MACOS_TAG"
   else
     echo "⚠️  'gh' CLI not found; skipping GitHub Release creation."
   fi
