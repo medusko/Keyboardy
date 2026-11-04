@@ -5,6 +5,7 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var prefs: KeyboardyPrefs
     let onCloseSettings: () -> Void
+    @State private var isShowingAbout: Bool = false
 
     private var palette: ThemePalette {
         ThemePalette.forMode(isDark: prefs.isDarkMode)
@@ -14,11 +15,19 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             // Top Navigation Bar
             HStack(spacing: 10) {
-                Button(action: onCloseSettings) {
+                Button(action: {
+                    if isShowingAbout {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            isShowingAbout = false
+                        }
+                    } else {
+                        onCloseSettings()
+                    }
+                }) {
                     HStack(spacing: 5) {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 11.5, weight: .bold))
-                        Text("Back")
+                        Text(isShowingAbout ? "Settings" : "Back")
                             .font(.system(size: 12.5, weight: .bold))
                     }
                     .foregroundColor(palette.textPrimary)
@@ -35,7 +44,7 @@ struct SettingsView: View {
 
                 Spacer()
 
-                Text("Keyboardy Settings")
+                Text(isShowingAbout ? "About Keyboardy" : "Keyboardy Settings")
                     .font(.system(size: 14, weight: .black, design: .rounded))
                     .foregroundColor(palette.textPrimary)
 
@@ -58,6 +67,20 @@ struct SettingsView: View {
                     RoundedRectangle(cornerRadius: 12)
                         .stroke((prefs.isAccessibilityGranted ? palette.successGreen : Color.orange).opacity(0.5), lineWidth: 1)
                 )
+
+                // (i) Icon Button to the right of the status pill
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        isShowingAbout.toggle()
+                    }
+                }) {
+                    Image(systemName: isShowingAbout ? "info.circle.fill" : "info.circle")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(palette.accentBlue)
+                        .frame(width: 22, height: 22)
+                }
+                .buttonStyle(.plain)
+                .help(isShowingAbout ? "Back to Settings" : "About Keyboardy & What's New")
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -65,8 +88,24 @@ struct SettingsView: View {
 
             Divider().background(palette.border)
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+            if isShowingAbout {
+                aboutScrollView
+            } else {
+                mainSettingsScrollView
+            }
+        }
+        .background(palette.background)
+        .preferredColorScheme(prefs.isDarkMode ? .dark : .light)
+        .onAppear {
+            prefs.isAccessibilityGranted = ImageCommitService.shared.isAccessibilityTrusted()
+        }
+    }
+
+    // MARK: - Main Settings Content
+
+    private var mainSettingsScrollView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
 
                     // =====================================================
                     // SECTION 1: SHORTCUTS & TRIGGERS
@@ -401,117 +440,178 @@ struct SettingsView: View {
                             )
                         }
                     }
-
-                    // =====================================================
-                    // SECTION 5: BETA VERSION & IMPROVEMENTS TRACKER
-                    // =====================================================
-                    sectionGroup(header: "BETA VERSION & WHAT'S NEW") {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Keyboardy for macOS")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundColor(palette.textPrimary)
-                                Text("Active Beta Build")
-                                    .font(.system(size: 10.5))
-                                    .foregroundColor(palette.textSecondary)
-                            }
-
-                            Spacer()
-
-                            Text(KeyboardyVersion.detailedDisplayString)
-                                .font(.system(size: 10.5, weight: .black, design: .monospaced))
-                                .foregroundColor(palette.accentBlue)
-                                .padding(.horizontal, 9)
-                                .padding(.vertical, 4)
-                                .background(palette.accentBlue.opacity(0.12))
-                                .cornerRadius(8)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(palette.accentBlue.opacity(0.4), lineWidth: 1)
-                                )
-                        }
-
-                        rowDivider
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Recent Improvements in this Beta:")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(palette.textPrimary)
-
-                            ForEach(KeyboardyVersion.recentImprovements, id: \.title) { item in
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(item.title)
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundColor(palette.textPrimary)
-                                    Text(item.detail)
-                                        .font(.system(size: 10))
-                                        .foregroundColor(palette.textSecondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                .padding(.vertical, 1)
-                            }
-                        }
-
-                        rowDivider
-
-                        HStack {
-                            Button(action: {
-                                if let url = URL(string: "https://github.com/medusko/Keyboardy/blob/main/CHANGELOG.md") {
-                                    NSWorkspace.shared.open(url)
-                                }
-                            }) {
-                                HStack(spacing: 5) {
-                                    Image(systemName: "doc.text.magnifyingglass")
-                                        .font(.system(size: 11, weight: .bold))
-                                    Text("Full Changelog")
-                                        .font(.system(size: 11, weight: .bold))
-                                }
-                                .foregroundColor(palette.accentBlue)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(palette.surfaceVariant)
-                                .cornerRadius(7)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 7)
-                                        .stroke(palette.border, lineWidth: 1)
-                                )
-                            }
-                            .buttonStyle(.plain)
-
-                            Spacer()
-
-                            Button(action: {
-                                if let url = URL(string: "https://github.com/medusko/Keyboardy/releases") {
-                                    NSWorkspace.shared.open(url)
-                                }
-                            }) {
-                                HStack(spacing: 5) {
-                                    Image(systemName: "arrow.down.circle")
-                                        .font(.system(size: 11, weight: .bold))
-                                    Text("All Releases")
-                                        .font(.system(size: 11, weight: .bold))
-                                }
-                                .foregroundColor(palette.textSecondary)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(palette.surfaceVariant)
-                                .cornerRadius(7)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 7)
-                                        .stroke(palette.border, lineWidth: 1)
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
                 }
                 .padding(14)
             }
         }
-        .background(palette.background)
-        .preferredColorScheme(prefs.isDarkMode ? .dark : .light)
-        .onAppear {
-            prefs.isAccessibilityGranted = ImageCommitService.shared.isAccessibilityTrusted()
+    }
+
+    // MARK: - About Keyboardy & What's New Content
+
+    private var aboutScrollView: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                // SECTION: ABOUT KEYBOARDY (Mirroring Android layout & info)
+                sectionGroup(header: "ABOUT KEYBOARDY") {
+                    HStack(spacing: 12) {
+                        Image(nsImage: StatusBarBadgeRenderer.makeStatusBarImage(style: .keyboardyAppIcon))
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: 34, height: 34)
+                            .padding(6)
+                            .background(palette.surfaceVariant)
+                            .cornerRadius(10)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(palette.border, lineWidth: 1)
+                            )
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Keyboardy for macOS")
+                                .font(.system(size: 14, weight: .black, design: .rounded))
+                                .foregroundColor(palette.textPrimary)
+                            Text("Zero-step auxiliary Google Image & GIF search")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(palette.textSecondary)
+                        }
+
+                        Spacer()
+
+                        Text(KeyboardyVersion.displayString)
+                            .font(.system(size: 11, weight: .black, design: .monospaced))
+                            .foregroundColor(palette.accentBlue)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 4)
+                            .background(palette.accentBlue.opacity(0.12))
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(palette.accentBlue.opacity(0.4), lineWidth: 1)
+                            )
+                    }
+
+                    rowDivider
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("About")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(palette.accentBlue)
+
+                        Text("Keyboardy is a zero-step auxiliary Google Image & GIF search companion engineered to eliminate manual downloading, browser tabs, and file-picking when sharing pictures in Slack, Messages, Discord, WhatsApp, and other chat apps.\n\nTrigger Keyboardy from any app using your global hotkey (\(prefs.activeHotkeyShortLabel)), search full-screen across our Hybrid Google WebView + Instant Web engine, and tap any image or animated GIF to insert it directly into your conversation via 1-click auto-paste (⌘V)—or drag and drop anywhere.")
+                            .font(.system(size: 11.5))
+                            .foregroundColor(palette.textPrimary)
+                            .lineSpacing(3)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Text("Keyboardy \(KeyboardyVersion.detailedDisplayString) • Built for macOS 14+ • Apple Silicon & Intel")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(palette.textSecondary)
+                            .padding(.top, 4)
+                    }
+                }
+
+                // SECTION: BETA VERSION & WHAT'S NEW (Content and links moved under About)
+                sectionGroup(header: "BETA VERSION & WHAT'S NEW") {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Keyboardy for macOS")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(palette.textPrimary)
+                            Text("Active Beta Build")
+                                .font(.system(size: 10.5))
+                                .foregroundColor(palette.textSecondary)
+                        }
+
+                        Spacer()
+
+                        Text(KeyboardyVersion.detailedDisplayString)
+                            .font(.system(size: 10.5, weight: .black, design: .monospaced))
+                            .foregroundColor(palette.accentBlue)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 4)
+                            .background(palette.accentBlue.opacity(0.12))
+                            .cornerRadius(8)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(palette.accentBlue.opacity(0.4), lineWidth: 1)
+                            )
+                    }
+
+                    rowDivider
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Recent Improvements in this Beta:")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(palette.textPrimary)
+
+                        ForEach(KeyboardyVersion.recentImprovements, id: \.title) { item in
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(item.title)
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(palette.textPrimary)
+                                Text(item.detail)
+                                    .font(.system(size: 10))
+                                    .foregroundColor(palette.textSecondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .padding(.vertical, 1)
+                        }
+                    }
+
+                    rowDivider
+
+                    HStack {
+                        Button(action: {
+                            if let url = URL(string: "https://github.com/medusko/Keyboardy/blob/main/CHANGELOG.md") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }) {
+                            HStack(spacing: 5) {
+                                Image(systemName: "doc.text.magnifyingglass")
+                                    .font(.system(size: 11, weight: .bold))
+                                Text("Full Changelog")
+                                    .font(.system(size: 11, weight: .bold))
+                            }
+                            .foregroundColor(palette.accentBlue)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(palette.surfaceVariant)
+                            .cornerRadius(7)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 7)
+                                    .stroke(palette.border, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        Spacer()
+
+                        Button(action: {
+                            if let url = URL(string: "https://github.com/medusko/Keyboardy/releases") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }) {
+                            HStack(spacing: 5) {
+                                Image(systemName: "arrow.down.circle")
+                                    .font(.system(size: 11, weight: .bold))
+                                Text("All Releases")
+                                    .font(.system(size: 11, weight: .bold))
+                            }
+                            .foregroundColor(palette.textSecondary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(palette.surfaceVariant)
+                            .cornerRadius(7)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 7)
+                                    .stroke(palette.border, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .padding(14)
         }
     }
 

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [android-v1.05] - 2026-11-04
+
+### Changed & Fixed
+- **Full-Width Rounded Blue Boundary Line Across the Top:**
+  - Removed the drawer-style pill bar and restored the prominent blue line running across the entire top of the keyboard (`MATCH_PARENT` with 12dp horizontal margin).
+  - Rounded off both ends/edges of the blue line for a smooth, modern aesthetic.
+- **True Transparent Background Behind Top Boundary:**
+  - Positioned the blue boundary line in a transparent container (`ime_top_boundary`) with transparent IME window backing, so the underlying host app is clearly visible behind and above the blue line.
+- **Curved Keyboard Body Sheet:**
+  - Wrapped keyboard controls into `keyboard_body_sheet` with 16dp rounded top corners in standard mode, cleanly demarcating the keyboard from the host application.
+
+---
+
 ## [android-v1.04] - 2026-11-04
 
 ### Changed & Fixed

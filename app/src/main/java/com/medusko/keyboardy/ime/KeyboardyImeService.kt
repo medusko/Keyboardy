@@ -89,6 +89,7 @@ class KeyboardyImeService : InputMethodService() {
     private var ivSettingsIcon: ImageView? = null
     private var imeTopBoundary: LinearLayout? = null
     private var imeTopLine: View? = null
+    private var keyboardBodySheet: LinearLayout? = null
 
     private var selectionActionBar: LinearLayout? = null
     private var btnCtxPaste: TextView? = null
@@ -173,6 +174,7 @@ class KeyboardyImeService : InputMethodService() {
         ivSettingsIcon = root.findViewById(R.id.iv_settings_icon)
         imeTopBoundary = root.findViewById(R.id.ime_top_boundary)
         imeTopLine = root.findViewById(R.id.ime_top_line)
+        keyboardBodySheet = root.findViewById(R.id.keyboard_body_sheet)
 
         selectionActionBar = root.findViewById(R.id.selection_action_bar)
         btnCtxPaste = root.findViewById(R.id.btn_ctx_paste)
@@ -552,44 +554,49 @@ class KeyboardyImeService : InputMethodService() {
             (screenHeightPx * 0.74f).toInt().coerceAtLeast(dpToPx(420))
         }
 
-        // Set IME dialog window background to transparent for seamless rounded corner cutout
+        // Set IME dialog window background to transparent for seamless transparency behind the top line
         window?.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
 
-        // Top Blue Bar: in non-full screen mode, modern rounded capsule with transparency behind it
+        // Root container is transparent so host app content is visible behind the top boundary
+        rootImeContainer?.let { root ->
+            root.setBackgroundColor(Color.TRANSPARENT)
+            val lp = root.layoutParams
+            if (lp != null) {
+                lp.height = targetContainerHeightPx
+                root.layoutParams = lp
+            }
+            root.requestLayout()
+        }
+
+        // Top Blue Bar: goes across the top with rounded off edges and transparent background behind it
+        imeTopBoundary?.let { boundary ->
+            val horizPadding = if (isFull) 0 else dpToPx(12)
+            val topPadding = if (isFull) 0 else dpToPx(6)
+            val bottomPadding = if (isFull) 0 else dpToPx(5)
+            boundary.setPadding(horizPadding, topPadding, horizPadding, bottomPadding)
+        }
+
         imeTopLine?.let { line ->
             val lp = line.layoutParams as? LinearLayout.LayoutParams
             if (lp != null) {
-                if (isFull) {
-                    lp.width = LinearLayout.LayoutParams.MATCH_PARENT
-                    lp.height = dpToPx(2)
-                    lp.setMargins(0, 0, 0, 0)
-                    line.layoutParams = lp
-                    line.background = palette.createRoundedRect(
-                        fillColor = palette.accentBlue,
-                        cornerRadiusPx = 0f
-                    )
-                } else {
-                    lp.width = dpToPx(56)
-                    lp.height = dpToPx(4)
-                    lp.setMargins(0, dpToPx(7), 0, dpToPx(3))
-                    line.layoutParams = lp
-                    line.background = palette.createRoundedRect(
-                        fillColor = palette.accentBlue,
-                        cornerRadiusPx = dpToPx(3).toFloat()
-                    )
-                }
+                lp.width = LinearLayout.LayoutParams.MATCH_PARENT
+                lp.height = if (isFull) dpToPx(2) else dpToPx(3.5f.toInt().coerceAtLeast(3))
+                line.layoutParams = lp
             }
+            val lineRadius = if (isFull) 0f else dpToPx(2).toFloat()
+            line.background = palette.createRoundedRect(
+                fillColor = palette.accentBlue,
+                cornerRadiusPx = lineRadius
+            )
         }
 
-        rootImeContainer?.let { root ->
-            if (isFull) {
-                root.setBackgroundColor(palette.background)
-            } else {
-                // Modern rounded top sheet corners with transparency behind them
-                val topRadius = dpToPx(18).toFloat()
-                val bgDrawable = GradientDrawable().apply {
-                    shape = GradientDrawable.RECTANGLE
-                    setColor(palette.background)
+        // Main Keyboard Body Sheet: rounded off top edges in standard mode with palette background
+        keyboardBodySheet?.let { sheet ->
+            val topRadius = if (isFull) 0f else dpToPx(16).toFloat()
+            val sheetBg = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                setColor(palette.background)
+                if (topRadius > 0) {
                     cornerRadii = floatArrayOf(
                         topRadius, topRadius, // top-left
                         topRadius, topRadius, // top-right
@@ -597,14 +604,8 @@ class KeyboardyImeService : InputMethodService() {
                         0f, 0f                // bottom-left
                     )
                 }
-                root.background = bgDrawable
             }
-            val lp = root.layoutParams
-            if (lp != null) {
-                lp.height = targetContainerHeightPx
-                root.layoutParams = lp
-            }
-            root.requestLayout()
+            sheet.background = sheetBg
         }
 
         // Update Top Bar height
