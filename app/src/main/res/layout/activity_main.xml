@@ -512,6 +512,16 @@
                     android:text="Enable NSFW mode (turns off SafeSearch filtering for adult-themed images &amp; GIFs)"
                     android:textColor="#FFFFFF"
                     android:textSize="13sp" />
+
+                <CheckBox
+                    android:id="@+id/cb_full_screen_mode"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:checked="false"
+                    android:text="Full Screen Mode (expands Keyboardy to fill the entire display height for maximum image viewing)"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp" />
             </LinearLayout>
 
             <!-- ==================== SECTION 3: HELP ==================== -->

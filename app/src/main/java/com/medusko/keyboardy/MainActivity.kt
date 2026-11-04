@@ -100,6 +100,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cbAutoReturn: CheckBox
     private lateinit var cbAutoReadChat: CheckBox
     private lateinit var cbNsfwMode: CheckBox
+    private lateinit var cbFullScreenMode: CheckBox
 
     private lateinit var cardBadges: LinearLayout
     private lateinit var tvBadgesHeader: TextView
@@ -187,6 +188,7 @@ class MainActivity : AppCompatActivity() {
         cbAutoReturn = findViewById(R.id.cb_auto_return_gboard)
         cbAutoReadChat = findViewById(R.id.cb_auto_read_chat_text)
         cbNsfwMode = findViewById(R.id.cb_nsfw_mode)
+        cbFullScreenMode = findViewById(R.id.cb_full_screen_mode)
 
         cardBadges = findViewById(R.id.card_badges)
         tvBadgesHeader = findViewById(R.id.tv_badges_header)
@@ -228,6 +230,7 @@ class MainActivity : AppCompatActivity() {
         cbAutoReturn.isChecked = prefs.autoReturnToPreviousKeyboard
         cbAutoReadChat.isChecked = prefs.autoReadAndReplaceChatQuery
         cbNsfwMode.isChecked = prefs.nsfwModeEnabled
+        cbFullScreenMode.isChecked = prefs.isFullScreenMode
         etOptionalApiKey.setText(prefs.optionalApiKey)
 
         // Info IconButton -> Open Lagatron-style "About Keyboardy" Dialog
@@ -333,10 +336,14 @@ class MainActivity : AppCompatActivity() {
         cbNsfwMode.setOnCheckedChangeListener { _, isChecked ->
             prefs.nsfwModeEnabled = isChecked
         }
+        cbFullScreenMode.setOnCheckedChangeListener { _, isChecked ->
+            prefs.isFullScreenMode = isChecked
+        }
         btnSaveSettings.setOnClickListener {
             prefs.autoReturnToPreviousKeyboard = cbAutoReturn.isChecked
             prefs.autoReadAndReplaceChatQuery = cbAutoReadChat.isChecked
             prefs.nsfwModeEnabled = cbNsfwMode.isChecked
+            prefs.isFullScreenMode = cbFullScreenMode.isChecked
             prefs.optionalApiKey = etOptionalApiKey.text?.toString().orEmpty()
             updateQuotaStatsUi()
             Toast.makeText(this, "Preferences saved!", Toast.LENGTH_SHORT).show()
@@ -460,7 +467,7 @@ class MainActivity : AppCompatActivity() {
 
         // Version Footer matching Lagatron
         val footerText = TextView(this).apply {
-            text = "Keyboardy v1.02 • Built for Android 15 / Pixel"
+            text = "Keyboardy v1.03 • Built for Android 15 / Pixel"
             setTextColor(palette.textSecondary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
             typeface = Typeface.DEFAULT_BOLD
@@ -657,7 +664,7 @@ class MainActivity : AppCompatActivity() {
         tvQuotaTierNote.setTextColor(palette.textSecondary)
 
         // Checkboxes
-        for (cb in listOf(cbAutoReturn, cbAutoReadChat, cbNsfwMode)) {
+        for (cb in listOf(cbAutoReturn, cbAutoReadChat, cbNsfwMode, cbFullScreenMode)) {
             cb.setTextColor(palette.textPrimary)
             cb.buttonTintList = ColorStateList.valueOf(palette.accentBlue)
         }

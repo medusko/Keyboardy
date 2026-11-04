@@ -110,6 +110,10 @@ class KeyboardyPrefs(context: Context) {
         get() = prefs.getInt(KEY_GRID_COLUMNS, 3).coerceIn(1, 4)
         set(value) = prefs.edit().putInt(KEY_GRID_COLUMNS, value.coerceIn(1, 4)).apply()
 
+    var isFullScreenMode: Boolean
+        get() = prefs.getBoolean(KEY_FULL_SCREEN_MODE, false)
+        set(value) = prefs.edit().putBoolean(KEY_FULL_SCREEN_MODE, value).apply()
+
     fun cycleGridColumns(): Int {
         val next = when (gridColumns) {
             3 -> 4
@@ -250,6 +254,7 @@ class KeyboardyPrefs(context: Context) {
         private const val KEY_NSFW_MODE = "nsfw_mode_enabled"
         private const val KEY_ENGINE_MODE = "engine_mode"
         private const val KEY_GRID_COLUMNS = "grid_columns"
+        private const val KEY_FULL_SCREEN_MODE = "is_full_screen_mode"
         private const val KEY_OPTIONAL_API_KEY = "optional_api_key"
         private const val KEY_SEARCH_HISTORY_JSON = "search_history_json"
 

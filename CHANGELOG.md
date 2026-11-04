@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [android-v1.03] - 2026-11-04
+
+### Added
+- **Direct Keyboard Settings Access (Gear Button):**
+  - Added a dedicated Settings button (gear icon `⚙️`) directly in the keyboard's top navigation bar to the right of the Search History button. Tapping it seamlessly opens Keyboardy's full settings and chat sandbox activity.
+- **Transparent App Icon Exterior:**
+  - Converted the Android launcher and app icon (`ic_app_option_1.png`) to a 32-bit RGBA format with transparent exterior corners and smooth anti-aliased edges, completely eliminating the white exterior background box on Android launchers and app switchers.
+- **Top Boundary Line & Host App Touch-Return Indicator:**
+  - Added a vibrant divider line (`ime_top_line`) and centered pill grab bar (`ime_top_handle`) across the very top edge of the keyboard view. Clearly demarcates where Keyboardy ends so users know where to scroll or tap back into their active host app.
+- **Full Screen Mode Setting & Live Height Switcher:**
+  - Added a "Full Screen Mode" checkbox in Keyboardy Settings (`MainActivity`) and an on-the-fly height toggle chip (`⛶ Height: Standard` / `⛶ Height: Full`) directly in the keyboard's filter bar.
+  - Standard mode maintains ~74% height to keep host app conversation and input fields visible above, while Full Screen mode expands to ~96% screen height for immersive image and GIF browsing.
+
+---
+
 ## [android-v1.02] - 2026-11-04
 
 ### Added

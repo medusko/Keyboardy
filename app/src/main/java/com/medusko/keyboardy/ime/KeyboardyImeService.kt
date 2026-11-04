@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Color
 import android.graphics.Typeface
@@ -32,6 +33,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.medusko.keyboardy.MainActivity
 import com.medusko.keyboardy.R
 import com.medusko.keyboardy.prefs.KeyboardScale
 import com.medusko.keyboardy.prefs.KeyboardyPrefs
@@ -81,6 +83,11 @@ class KeyboardyImeService : InputMethodService() {
     private var btnClearQuery: ImageView? = null
     private var btnHistory: LinearLayout? = null
     private var ivHistoryIcon: ImageView? = null
+    private var btnSettings: LinearLayout? = null
+    private var ivSettingsIcon: ImageView? = null
+    private var imeTopBoundary: LinearLayout? = null
+    private var imeTopLine: View? = null
+    private var imeTopHandle: View? = null
 
     private var selectionActionBar: LinearLayout? = null
     private var btnCtxPaste: TextView? = null
@@ -104,6 +111,7 @@ class KeyboardyImeService : InputMethodService() {
     private var bottomNavSpacer: View? = null
     private var chipEngineMode: TextView? = null
     private var chipGridScale: TextView? = null
+    private var chipFullScreen: TextView? = null
     private val filterChipViews = mutableMapOf<SearchFilter, TextView>()
     private var gridLayoutManager: GridLayoutManager? = null
     private var vibrator: Vibrator? = null
@@ -160,6 +168,11 @@ class KeyboardyImeService : InputMethodService() {
         btnClearQuery = root.findViewById(R.id.btn_clear_query)
         btnHistory = root.findViewById(R.id.btn_history)
         ivHistoryIcon = root.findViewById(R.id.iv_history_icon)
+        btnSettings = root.findViewById(R.id.btn_settings)
+        ivSettingsIcon = root.findViewById(R.id.iv_settings_icon)
+        imeTopBoundary = root.findViewById(R.id.ime_top_boundary)
+        imeTopLine = root.findViewById(R.id.ime_top_line)
+        imeTopHandle = root.findViewById(R.id.ime_top_handle)
 
         selectionActionBar = root.findViewById(R.id.selection_action_bar)
         btnCtxPaste = root.findViewById(R.id.btn_ctx_paste)
@@ -183,6 +196,7 @@ class KeyboardyImeService : InputMethodService() {
         bottomNavSpacer = root.findViewById(R.id.bottom_nav_spacer)
         chipEngineMode = root.findViewById(R.id.chip_engine_mode)
         chipGridScale = root.findViewById(R.id.chip_grid_scale)
+        chipFullScreen = root.findViewById(R.id.chip_full_screen)
 
         val webViewHolder: FrameLayout = root.findViewById(R.id.headless_webview_holder)
 
@@ -223,6 +237,26 @@ class KeyboardyImeService : InputMethodService() {
             performTapHaptic(view)
             prefs.cycleGridColumns()
             applyScaleAndTheme()
+        }
+
+        // Fullscreen Toggle Chip (toggles between standard ~74% height and ~96% fullscreen)
+        chipFullScreen?.setOnClickListener { view ->
+            performTapHaptic(view)
+            prefs.isFullScreenMode = !prefs.isFullScreenMode
+            applyScaleAndTheme()
+        }
+
+        // Settings Button (⚙️) opens Keyboardy Settings
+        btnSettings?.setOnClickListener { view ->
+            performTapHaptic(view)
+            try {
+                val intent = Intent(this, MainActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
+                }
+                startActivity(intent)
+            } catch (e: Exception) {
+                Toast.makeText(this, "Opening Keyboardy Settings...", Toast.LENGTH_SHORT).show()
+            }
         }
 
         // Back to Gboard / Previous Keyboard button
@@ -507,10 +541,21 @@ class KeyboardyImeService : InputMethodService() {
         // Direct Bottom Bar Offset in pixels so every tap of -6 / +6 visibly moves the bottom of the keyboard!
         val bottomOffsetPx = dpToPx(prefs.bottomNavClearanceDp)
 
-        // Use 83% of screen height so the keyboard fills the screen for browsing images
-        // while staying 100% within the visible IME window frame (preventing bottom clipping!).
+        // Height: standard mode (~74% screen) leaves clear room to see and scroll host app content,
+        // while Full Screen Mode (~96% screen) maximizes search & thumbnail viewing area.
         val screenHeightPx = resources.displayMetrics.heightPixels
-        val targetContainerHeightPx = (screenHeightPx * 0.83f).toInt().coerceAtLeast(dpToPx(440))
+        val targetContainerHeightPx = if (prefs.isFullScreenMode) {
+            (screenHeightPx * 0.96f).toInt()
+        } else {
+            (screenHeightPx * 0.74f).toInt().coerceAtLeast(dpToPx(420))
+        }
+
+        // Top Boundary Line & Indicator (denotes top boundary between host app and keyboard)
+        imeTopLine?.setBackgroundColor(palette.accentBlue)
+        imeTopHandle?.background = palette.createRoundedRect(
+            fillColor = if (palette.isDark) Color.parseColor("#475569") else Color.parseColor("#94A3B8"),
+            cornerRadiusPx = 3f * density
+        )
 
         rootImeContainer?.let { root ->
             root.setBackgroundColor(palette.background)
@@ -557,6 +602,13 @@ class KeyboardyImeService : InputMethodService() {
             strokeWidthPx = strokePx
         )
         ivHistoryIcon?.setColorFilter(if (isHistoryVisible) Color.WHITE else palette.textPrimary)
+
+        btnSettings?.background = palette.createKeyDrawable(
+            isAccent = false,
+            cornerRadiusPx = 8f * density,
+            strokeWidthPx = strokePx
+        )
+        ivSettingsIcon?.setColorFilter(palette.textPrimary)
 
         searchBarContainer?.background = palette.createRoundedRect(
             fillColor = palette.surface,
@@ -632,6 +684,18 @@ class KeyboardyImeService : InputMethodService() {
             )
             setTextColor(palette.accentBlue)
             text = "⊞ ${prefs.gridColumns}x Grid"
+        }
+
+        chipFullScreen?.apply {
+            val isFull = prefs.isFullScreenMode
+            background = palette.createRoundedRect(
+                fillColor = if (isFull) palette.chipActiveBg else palette.chipInactiveBg,
+                cornerRadiusPx = 14f * density,
+                strokeWidthPx = strokePx,
+                strokeColor = if (isFull) palette.accentBluePressed else palette.accentBlue
+            )
+            setTextColor(if (isFull) palette.chipActiveText else palette.accentBlue)
+            text = if (isFull) "⛶ Height: Full" else "⛶ Height: Standard"
         }
 
         // Empty State Text
