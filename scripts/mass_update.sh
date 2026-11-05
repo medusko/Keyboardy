@@ -160,14 +160,16 @@ if [[ "$PLATFORM" == "android" || "$PLATFORM" == "all" ]]; then
     fi
   fi
 
-  # Check again if a device is connected
-  ATTACHED_DEVICES=$(adb devices | grep -E '\bdevice\b' | awk '{print $1}' || true)
-  if [[ -n "$ATTACHED_DEVICES" ]]; then
-    for DEV in $ATTACHED_DEVICES; do
-      echo "📲 Installing Keyboardy-Android-v${ANDROID_VERSION}.apk to device $DEV..."
-      adb -s "$DEV" install -r "Keyboardy-Android-v${ANDROID_VERSION}.apk"
-      echo "✅ Successfully installed on $DEV!"
-    done
+  # Check again if a device is connected (pick first active device target)
+  TARGET_DEV=$(adb devices | grep -E '\bdevice\b' | grep -v '_tcp' | head -n1 | awk '{print $1}')
+  if [[ -z "$TARGET_DEV" ]]; then
+    TARGET_DEV=$(adb devices | grep -E '\bdevice\b' | head -n1 | awk '{print $1}')
+  fi
+
+  if [[ -n "$TARGET_DEV" ]]; then
+    echo "📲 Installing Keyboardy-Android-v${ANDROID_VERSION}.apk to device $TARGET_DEV..."
+    adb -s "$TARGET_DEV" install -r "Keyboardy-Android-v${ANDROID_VERSION}.apk"
+    echo "✅ Successfully installed on $TARGET_DEV!"
   else
     echo "⚠️  No ADB device attached. To install wirelessly or via USB:"
     echo "   1) Plug in USB OR enable Wireless Debugging in Developer Options"

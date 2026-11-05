@@ -229,7 +229,13 @@ class MainActivity : AppCompatActivity() {
         // Load saved preferences
         cbAutoReturn.isChecked = prefs.autoReturnToPreviousKeyboard
         cbAutoReadChat.isChecked = prefs.autoReadAndReplaceChatQuery
-        cbNsfwMode.isChecked = prefs.nsfwModeEnabled
+        if (!BuildConfig.ENABLE_NSFW) {
+            cbNsfwMode.visibility = View.GONE
+            prefs.nsfwModeEnabled = false
+        } else {
+            cbNsfwMode.visibility = View.VISIBLE
+            cbNsfwMode.isChecked = prefs.nsfwModeEnabled
+        }
         cbFullScreenMode.isChecked = prefs.isFullScreenMode
         etOptionalApiKey.setText(prefs.optionalApiKey)
 
@@ -436,9 +442,9 @@ class MainActivity : AppCompatActivity() {
         container.addView(titleRow)
 
         val vName = try {
-            packageManager.getPackageInfo(packageName, 0).versionName ?: "1.0.1-RC1"
+            packageManager.getPackageInfo(packageName, 0).versionName ?: "1.0.1-RC1.1"
         } catch (_: Exception) {
-            "1.0.1-RC1"
+            "1.0.1-RC1.1"
         }
 
         val scrollArea = ScrollView(this).apply {
@@ -518,11 +524,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         val whatsNewText = TextView(this).apply {
-            text = "• Solid boundary bar directly on top of the keyboard area\n" +
-                   "• Modern rounded top corners with clean transparent background\n" +
+            text = "• Release Candidate 1.1: Dual distribution & open-source prep\n" +
+                   "• Compile-time NSFW & Ad flags for Google Play compliance\n" +
+                   "• Community support & GitHub Sponsor resource links\n" +
+                   "• Solid boundary bar directly on top of the keyboard area\n" +
                    "• Instant Settings button (⚙️) directly in keyboard top bar\n" +
-                   "• Auto-lowers keyboard when navigating to Settings\n" +
-                   "• Height toggle chip (Standard ~74% / Full Screen ~96%)\n" +
                    "• Transparent launcher app icon with smooth borders\n" +
                    "• Hybrid Google WebView + Instant Web engine with Tenor GIFs"
             setTextColor(palette.textPrimary)
@@ -532,38 +538,77 @@ class MainActivity : AppCompatActivity() {
         whatsNewBox.addView(whatsNewText)
         scrollContent.addView(whatsNewBox)
 
-        // Changelog Link Button
-        val changelogBtn = TextView(this).apply {
-            text = "View Full Changelog on GitHub ↗"
+        // LINKS & RESOURCES SECTION
+        val secLinksLabel = TextView(this).apply {
+            text = "Links & Resources"
             setTextColor(palette.accentBlue)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f)
             typeface = Typeface.DEFAULT_BOLD
             layoutParams = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply {
-                topMargin = dpToPx(8)
-            }
-            setOnClickListener {
-                try {
-                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/medusko/Keyboardy/blob/main/CHANGELOG.md"))
-                    startActivity(intent)
-                } catch (_: Exception) {}
+                topMargin = dpToPx(14)
+                bottomMargin = dpToPx(6)
             }
         }
-        scrollContent.addView(changelogBtn)
+        scrollContent.addView(secLinksLabel)
+
+        fun createLinkBtn(title: String, url: String): TextView {
+            return TextView(this).apply {
+                text = title
+                setTextColor(palette.accentBlue)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+                typeface = Typeface.DEFAULT_BOLD
+                gravity = Gravity.CENTER
+                setPadding(dpToPx(8), dpToPx(7), dpToPx(8), dpToPx(7))
+                background = palette.createRoundedRect(
+                    fillColor = palette.surfaceVariant,
+                    cornerRadiusPx = 8f * density,
+                    strokeWidthPx = strokePx,
+                    strokeColor = palette.border
+                )
+                layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    setMargins(dpToPx(2), 0, dpToPx(2), 0)
+                }
+                setOnClickListener {
+                    try {
+                        startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+                    } catch (_: Exception) {}
+                }
+            }
+        }
+
+        val linksRow1 = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        }
+        linksRow1.addView(createLinkBtn("Changelog ↗", "https://github.com/medusko/Keyboardy/blob/main/CHANGELOG.md"))
+        linksRow1.addView(createLinkBtn("Releases ↗", "https://github.com/medusko/Keyboardy/releases"))
+        scrollContent.addView(linksRow1)
+
+        val linksRow2 = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                topMargin = dpToPx(6)
+            }
+        }
+        linksRow2.addView(createLinkBtn("Source Code ↗", "https://github.com/medusko/Keyboardy"))
+        linksRow2.addView(createLinkBtn("Sponsor ☕ ↗", "https://github.com/sponsors/Zlatty"))
+        scrollContent.addView(linksRow2)
 
         // Version Footer
         val footerText = TextView(this).apply {
-            text = "Keyboardy v$vName (Build 8) • Release Candidate 1 • Built for Android 15 / Pixel"
+            text = "Keyboardy v$vName (Build 9) • Release Candidate 1.1 • Built for Android 15 / Pixel\nDesigned & Engineered by Medusko"
             setTextColor(palette.textSecondary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f)
             typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
             layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply {
-                topMargin = dpToPx(12)
+                topMargin = dpToPx(14)
                 bottomMargin = dpToPx(4)
             }
         }

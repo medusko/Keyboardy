@@ -11,15 +11,23 @@ android {
         applicationId = "com.medusko.keyboardy"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.0.1-RC1"
+        versionCode = 9
+        versionName = "1.0.1-RC1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("Boolean", "SHOW_ADS", "false")
+        buildConfigField("Boolean", "ENABLE_NSFW", "true")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

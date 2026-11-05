@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [android-v1.0.1-RC1.1] - 2026-11-04
+
+### 🌟 Release Candidate 1.1 Highlights
+- **Dual-Distribution & Play Store Compliance Foundation**:
+  - Integrated compile-time `BuildConfig` flags (`SHOW_ADS`, `ENABLE_NSFW`) supporting dual distribution flavors (Ad-supported Google Play vs. free & open-source GitHub builds).
+  - Dynamically hides NSFW configuration toggles if `ENABLE_NSFW` is disabled to ensure 100% compliance with Google Play Store sexually explicit content policies.
+- **Resource & Support Quick Links**:
+  - Enhanced About Keyboardy dialog with dedicated **Links & Resources** grid:
+    - *Full Changelog ↗*, *All Releases ↗*, *Source Code ↗*, and *Sponsor / Support ☕ ↗* linking directly to GitHub Sponsors.
+- **Build & Artifact Modernization**:
+  - Incremented version to **v1.0.1-RC1.1 (Build 9)**.
+  - Automated Release & Wireless ADB mass update workflow.
+
+---
+
 ## [macos-v1.0.1-RC1] - 2026-11-04
 
 ### Added & Enhanced
