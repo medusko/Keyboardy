@@ -509,7 +509,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:checked="false"
-                    android:text="Enable NSFW mode (turns off SafeSearch filtering for adult-themed images &amp; GIFs)"
+                    android:text="Unfiltered Mode (turns off SafeSearch filtering on Google Images &amp; Instant Web)"
                     android:textColor="#FFFFFF"
                     android:textSize="13sp" />
 

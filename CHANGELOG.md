@@ -10,15 +10,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [android-v1.0.1-RC1.1] - 2026-11-04
 
 ### 🌟 Release Candidate 1.1 Highlights
-- **Dual-Distribution & Play Store Compliance Foundation**:
+- **Unfiltered Mode Terminology & Play Store Compliance**:
+  - Replaced SafeSearch and explicit content labels with clean **"Unfiltered Mode"** toggle across UI and settings.
   - Integrated compile-time `BuildConfig` flags (`SHOW_ADS`, `ENABLE_NSFW`) supporting dual distribution flavors (Ad-supported Google Play vs. free & open-source GitHub builds).
-  - Dynamically hides NSFW configuration toggles if `ENABLE_NSFW` is disabled to ensure 100% compliance with Google Play Store sexually explicit content policies.
+  - Dynamically hides the Unfiltered Mode configuration toggle if disabled at compile time for 100% compliance with Google Play Store policies.
 - **Resource & Support Quick Links**:
   - Enhanced About Keyboardy dialog with dedicated **Links & Resources** grid:
     - *Full Changelog ↗*, *All Releases ↗*, *Source Code ↗*, and *Sponsor / Support ☕ ↗* linking directly to GitHub Sponsors.
 - **Build & Artifact Modernization**:
   - Incremented version to **v1.0.1-RC1.1 (Build 9)**.
   - Automated Release & Wireless ADB mass update workflow.
+
+---
+
+## [macos-v1.0.1-RC1.1] - 2026-11-04
+
+### 🌟 Release Candidate 1.1 Highlights
+- **Unfiltered Mode Terminology**:
+  - Renamed SafeSearch setting to **"Unfiltered Mode (SafeSearch Off)"** with descriptive help text.
+- **Community & Sponsorship Links**:
+  - Added dedicated **Sponsor ☕** resource action button in the macOS About view.
+- **Homebrew Cask Compatibility**:
+  - Packaged universal binary `.dmg` ready for installation via Homebrew Tap (`brew install --cask keyboardy`).
+- **Build & Artifact Modernization**:
+  - Incremented version to **v1.0.1-RC1.1 (Build 9)**.
 
 ---
 

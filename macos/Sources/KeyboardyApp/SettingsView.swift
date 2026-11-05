@@ -381,9 +381,9 @@ struct SettingsView: View {
 
                         rowDivider
 
-                        // Row 4: Unfiltered / NSFW Mode
+                        // Row 4: Unfiltered Mode
                         settingToggleRow(
-                            title: "Unfiltered Search (SafeSearch Off)",
+                            title: "Unfiltered Mode (SafeSearch Off)",
                             subtitle: "Disable SafeSearch filtering on Google Images and Instant Web",
                             isOn: $prefs.nsfwModeEnabled
                         )
@@ -641,6 +641,12 @@ struct SettingsView: View {
                             title: "Source Code",
                             icon: "curlybraces",
                             url: "https://github.com/medusko/Keyboardy"
+                        )
+
+                        linkButton(
+                            title: "Sponsor ☕",
+                            icon: "heart.fill",
+                            url: "https://github.com/sponsors/Zlatty"
                         )
                     }
 

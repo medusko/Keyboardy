@@ -1,8 +1,8 @@
 import Foundation
 
 public enum KeyboardyVersion {
-    public static let versionName = "1.0.1-RC1"
-    public static let buildNumber = "8"
+    public static let versionName = "1.0.1-RC1.1"
+    public static let buildNumber = "9"
     public static let releaseDate = "2026-11-04"
 
     public static var displayString: String {
@@ -14,6 +14,14 @@ public enum KeyboardyVersion {
     }
 
     public static let recentImprovements: [(title: String, detail: String)] = [
+        (
+            "🛡️ Unfiltered Mode Terminology",
+            "Updated SafeSearch toggle to 'Unfiltered Mode' across settings, aligning terminology with platform compliance standards."
+        ),
+        (
+            "☕ Community Sponsorship Links",
+            "Added direct GitHub Sponsor link in Links & Resources section to support open-source development."
+        ),
         (
             "ℹ️ Dedicated About View with Android Parity",
             "Added an (i) info button in Settings to the right of the status pill that presents the full 'About Keyboardy' description and build metadata mirroring the Android app."

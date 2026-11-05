@@ -525,7 +525,7 @@ class MainActivity : AppCompatActivity() {
 
         val whatsNewText = TextView(this).apply {
             text = "• Release Candidate 1.1: Dual distribution & open-source prep\n" +
-                   "• Compile-time NSFW & Ad flags for Google Play compliance\n" +
+                   "• Compile-time Unfiltered Mode & Ad flags for Google Play compliance\n" +
                    "• Community support & GitHub Sponsor resource links\n" +
                    "• Solid boundary bar directly on top of the keyboard area\n" +
                    "• Instant Settings button (⚙️) directly in keyboard top bar\n" +
