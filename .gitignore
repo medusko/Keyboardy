@@ -8,8 +8,12 @@
 .externalNativeBuild
 .cxx
 local.properties
+keystore.properties
+*.keystore
+*.jks
 app/build/
 macos/.build/
 macos/build/
 *.apk
-*.dm
+*.aab
+*.dmg
