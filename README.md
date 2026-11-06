@@ -4,12 +4,30 @@
 
 ---
 
-## 📥 Downloads (GitHub Releases)
+## 📥 Downloads & Installation
 
-We publish independent per-platform releases so Android and macOS can evolve at their own pace. All minor improvements and beta updates are tracked in detail in our [**CHANGELOG.md**](CHANGELOG.md):
+### 🍺 Install via Homebrew (macOS)
 
-- 💻 **[Download Keyboardy for macOS Beta (`Keyboardy-macOS-v1.0.1-beta.6.dmg` / `.zip`)](https://github.com/medusko/Keyboardy/releases/tag/macos-v1.0.1-beta.6)** *(Latest macOS Beta — eliminates duplicate insertion/double-paste, hardware-accurate single HID keystroke dispatch, and interactive test studio)*
-- 📱 **[Download Keyboardy for Android (`Keyboardy-Android-v1.02.apk`)](https://github.com/medusko/Keyboardy/releases/tag/android-v1.02)** *(Latest Android update — physical tactile haptic vibration, dynamic 1x/2x/3x/4x grid column scaling, uncropped full aspect-ratio preview loading, real-time spell-check & word suggestions)*
+The fastest and easiest way to install and keep Keyboardy updated on macOS:
+
+```bash
+brew install --cask medusko/tap/keyboardy
+```
+
+*Or add the tap first:*
+```bash
+brew tap medusko/tap
+brew install --cask keyboardy
+```
+
+---
+
+### 📦 Pre-built Binaries (GitHub Releases)
+
+We publish independent per-platform releases so Android and macOS can evolve at their own pace. All minor improvements and updates are tracked in detail in our [**CHANGELOG.md**](CHANGELOG.md):
+
+- 💻 **[Download Keyboardy for macOS (`Keyboardy-macOS-v1.0.1-RC1.1.dmg` / `.zip`)](https://github.com/medusko/Keyboardy/releases/tag/macos-v1.0.1-RC1.1)** *(Latest macOS RC — eliminates duplicate insertion/double-paste, hardware-accurate single HID keystroke dispatch, and interactive test studio)*
+- 📱 **[Download Keyboardy for Android (`Keyboardy-Android-v1.0.1-RC1.1.apk`)](https://github.com/medusko/Keyboardy/releases/tag/android-v1.0.1-RC1.1)** *(Latest Android RC — physical tactile haptic vibration, dynamic 1x/2x/3x/4x grid column scaling, uncropped full aspect-ratio preview loading, real-time spell-check & word suggestions)*
 - 📋 **[View All Releases & Full Changelog](CHANGELOG.md)**
 
 ---
@@ -70,12 +88,21 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ### 2. macOS (`macos/`)
 
+#### Option A: Homebrew (Recommended)
+```bash
+brew install --cask medusko/tap/keyboardy
+```
+
+#### Option B: Pre-built DMG / ZIP
+Download `Keyboardy-macOS-v1.0.1-RC1.1.dmg` from [GitHub Releases](https://github.com/medusko/Keyboardy/releases), mount the DMG, and drag `Keyboardy.app` to `/Applications`.
+
+#### Option C: Build from Source
 ```bash
 cd macos
 ./build_app.sh --package
 open build/Keyboardy.app
 ```
-This builds `macos/build/Keyboardy.app` along with release installers `Keyboardy-macOS-v1.0.0.dmg` and `Keyboardy-macOS-v1.0.0.zip`.
+This builds `macos/build/Keyboardy.app` along with release installers in `macos/build/`.
 
 ### 3. Testing with the Local Test Studio (`test_site/`)
 
