@@ -20,8 +20,8 @@ android {
     defaultConfig {
         applicationId = "com.medusko.keyboardy"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 9
+        targetSdk = 36
+        versionCode = 10
         versionName = "1.0.1-RC1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
