@@ -114,6 +114,14 @@ Click inside the message input box, trigger Keyboardy (`⌥ ⇧ Space` or menu b
 
 ---
 
+## 📬 Contact & Support
+
+- **Website:** [medusko.com](https://medusko.com)
+- **Support Contact:** [support@medusko.com](mailto:support@medusko.com)
+- **Social:** [@meduskodev on Twitter](https://twitter.com/meduskodev)
+
+---
+
 ## Publishing Per-Platform Releases on GitHub
 
 This repository uses independent tag prefixes (`.github/workflows/release-android.yml` and `.github/workflows/release-macos.yml`):
