@@ -682,6 +682,21 @@ class MainActivity : AppCompatActivity() {
         contactCard.addView(createContactRow("Social:", "@meduskodev on Twitter", "https://twitter.com/meduskodev"))
         scrollContent.addView(contactCard)
 
+        // Trademark & Legal Disclaimer
+        val disclaimerText = TextView(this).apply {
+            text = "Google, Android, Gboard, Google Messages, and Google Images are trademarks of Google LLC. Tenor is a trademark of Tenor, Inc. / Google LLC. Slack is a trademark of Slack Technologies, LLC / Salesforce, Inc. WhatsApp is a trademark of Meta Platforms, Inc. Discord is a trademark of Discord Inc. Keyboardy is an independent product developed by Medusko and is not affiliated with, endorsed by, or sponsored by Google LLC, Tenor, Slack, Meta, Discord, or any other referenced company. All trademarks and registered trademarks are the property of their respective owners."
+            setTextColor(palette.textSecondary)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
+            setLineSpacing(dpToPx(2).toFloat(), 1f)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dpToPx(12)
+            }
+        }
+        scrollContent.addView(disclaimerText)
+
         // Version Footer
         val footerText = TextView(this).apply {
             text = "Keyboardy v$vName (Build 9) • Release Candidate 1.1 • Built for Android 15 / Pixel\nDesigned & Engineered by Medusko"

@@ -318,10 +318,9 @@ struct SettingsView: View {
                             }
 
                             HStack(spacing: 8) {
-                                badgeOptionButton(.keyboardyGoldIcon, label: "Gold (RC2)")
-                                badgeOptionButton(.keyboardyClassicIcon, label: "Classic")
-                                badgeOptionButton(.keyboardyWhiteIcon, label: "White")
-                                badgeOptionButton(.keyboardyBlackIcon, label: "Black")
+                                badgeOptionButton(.keyboardyAppIcon, label: "App Icon")
+                                badgeOptionButton(.keyboardyWhiteIcon, label: "White (Night)")
+                                badgeOptionButton(.keyboardyBlackIcon, label: "Black (Light)")
                             }
                         }
 
@@ -343,26 +342,6 @@ struct SettingsView: View {
                                 }
                             }
                             .frame(width: 225)
-                        }
-
-                        rowDivider
-
-                        // Row: App Launcher & Dock Icon (Gold RC2 Default vs Classic)
-                        settingRow(
-                            title: "App Launcher & Dock Icon",
-                            subtitle: "Select between the new RC2 Gold emblem or the original Classic icon"
-                        ) {
-                            HStack(spacing: 5) {
-                                ForEach(AppLauncherIconStyle.allCases) { style in
-                                    segmentedPillButton(
-                                        title: style.displayName,
-                                        isSelected: prefs.appLauncherIcon == style
-                                    ) {
-                                        prefs.appLauncherIcon = style
-                                    }
-                                }
-                            }
-                            .frame(width: 250)
                         }
 
                         rowDivider
@@ -757,7 +736,15 @@ struct SettingsView: View {
                     }
                 }
 
-                // 5. FOOTER
+                // 5. TRADEMARK & LEGAL DISCLAIMER
+                sectionGroup(header: "TRADEMARKS & LEGAL NOTICE") {
+                    Text("Google, Android, Gboard, Google Messages, and Google Images are trademarks of Google LLC. Tenor is a trademark of Tenor, Inc. / Google LLC. Slack is a trademark of Slack Technologies, LLC / Salesforce, Inc. WhatsApp is a trademark of Meta Platforms, Inc. Discord is a trademark of Discord Inc. Keyboardy is an independent product developed by Medusko and is not affiliated with, endorsed by, or sponsored by Google LLC, Tenor, Slack, Meta, Discord, or any other referenced company. All trademarks and registered trademarks are the property of their respective owners.")
+                        .font(.system(size: 10))
+                        .foregroundColor(palette.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                // 6. FOOTER
                 HStack {
                     Spacer()
                     Text("Designed & Engineered for macOS by Medusko • Keyboardy \(KeyboardyVersion.detailedDisplayString)")
@@ -957,7 +944,7 @@ struct SettingsView: View {
                 return Color(red: 0.14, green: 0.16, blue: 0.20)
             case .keyboardyBlackIcon:
                 return Color(red: 0.93, green: 0.91, blue: 0.87)
-            case .keyboardyGoldIcon, .keyboardyClassicIcon:
+            case .keyboardyAppIcon:
                 return Color.clear
             }
         }()

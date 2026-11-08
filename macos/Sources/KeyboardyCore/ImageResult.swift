@@ -128,10 +128,9 @@ public enum AppThemeMode: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Configurable Menu Bar / Status Bar icon style: Gold Icon (RC2 Default), Classic Icon, White Icon, or Black Icon.
+/// Configurable Menu Bar / Status Bar icon style: Original full-color App Icon, White (Night) Icon, or Black (Light) Icon.
 public enum StatusBarBadgeStyle: String, CaseIterable, Identifiable, Sendable {
-    case keyboardyGoldIcon = "KEYBOARDY_GOLD_ICON"
-    case keyboardyClassicIcon = "KEYBOARDY_CLASSIC_ICON"
+    case keyboardyAppIcon = "KEYBOARDY_APP_ICON"
     case keyboardyWhiteIcon = "KEYBOARDY_WHITE_ICON"
     case keyboardyBlackIcon = "KEYBOARDY_BLACK_ICON"
 
@@ -139,10 +138,8 @@ public enum StatusBarBadgeStyle: String, CaseIterable, Identifiable, Sendable {
 
     public init?(rawValue: String) {
         switch rawValue {
-        case "KEYBOARDY_GOLD_ICON", "KEYBOARDY_APP_ICON":
-            self = .keyboardyGoldIcon
-        case "KEYBOARDY_CLASSIC_ICON":
-            self = .keyboardyClassicIcon
+        case "KEYBOARDY_APP_ICON", "KEYBOARDY_GOLD_ICON", "KEYBOARDY_CLASSIC_ICON":
+            self = .keyboardyAppIcon
         case "KEYBOARDY_WHITE_ICON":
             self = .keyboardyWhiteIcon
         case "KEYBOARDY_BLACK_ICON":
@@ -154,27 +151,9 @@ public enum StatusBarBadgeStyle: String, CaseIterable, Identifiable, Sendable {
 
     public var displayName: String {
         switch self {
-        case .keyboardyGoldIcon: return "Gold Icon"
-        case .keyboardyClassicIcon: return "Classic"
+        case .keyboardyAppIcon: return "App Icon"
         case .keyboardyWhiteIcon: return "White (Night)"
         case .keyboardyBlackIcon: return "Black (Light)"
-        }
-    }
-
-    public static var keyboardyAppIcon: StatusBarBadgeStyle { .keyboardyGoldIcon }
-}
-
-/// Configurable App Launcher & Dock Icon style: Gold (RC2 Default) or Classic (Original).
-public enum AppLauncherIconStyle: String, CaseIterable, Identifiable, Sendable {
-    case gold = "GOLD"
-    case classic = "CLASSIC"
-
-    public var id: String { rawValue }
-
-    public var displayName: String {
-        switch self {
-        case .gold: return "Gold (Default)"
-        case .classic: return "Classic (Original)"
         }
     }
 }

@@ -38,13 +38,6 @@ public final class KeyboardyPrefs: ObservableObject {
         }
     }
 
-    @Published public var appLauncherIcon: AppLauncherIconStyle {
-        didSet {
-            defaults.set(appLauncherIcon.rawValue, forKey: Keys.appLauncherIcon)
-            applyAppLauncherIcon(appLauncherIcon)
-        }
-    }
-
     @Published public var hotkeyPreset: HotkeyPreset {
         didSet { defaults.set(hotkeyPreset.rawValue, forKey: Keys.hotkeyPreset) }
     }
@@ -142,9 +135,6 @@ public final class KeyboardyPrefs: ObservableObject {
         } else {
             self.statusBarBadgeStyle = defaultIconForMode
         }
-
-        let launcherIconRaw = defaults.string(forKey: Keys.appLauncherIcon) ?? AppLauncherIconStyle.gold.rawValue
-        self.appLauncherIcon = AppLauncherIconStyle(rawValue: launcherIconRaw) ?? .gold
 
         // Default to ⌥⇧Space (Option + Shift + Space) so it never conflicts with Gemini (⌥Space) or Spotlight (⌘Space)
         let hotkeyRaw = defaults.string(forKey: Keys.hotkeyPreset) ?? HotkeyPreset.optShiftSpace.rawValue
@@ -326,19 +316,7 @@ public final class KeyboardyPrefs: ObservableObject {
         }
     }
 
-    public func applyAppLauncherIcon(_ style: AppLauncherIconStyle) {
-        let bundle = Bundle.main
-        let resourceName = (style == .classic) ? "AppIconClassic" : "AppIconGold"
-        if let iconUrl = bundle.url(forResource: resourceName, withExtension: "png"),
-           let image = NSImage(contentsOf: iconUrl) {
-            NSApplication.shared.applicationIconImage = image
-        } else {
-            NSApplication.shared.applicationIconImage = nil
-        }
-    }
-
     private enum Keys {
-        static let appLauncherIcon = "mac_app_launcher_icon_style"
         static let themeMode = "mac_theme_mode_v3"
         static let isDarkMode = "mac_is_dark_mode_v3"
         static let statusBarBadgeStyle = "mac_status_bar_badge_style_v3"

@@ -35,7 +35,6 @@ final class KeyboardyAppDelegate: NSObject, NSApplicationDelegate {
         setupBindingsAndTriggers()
         setupKeyboardShortcutsInsidePanel()
         checkAndPromptInitialPermissions()
-        prefs.applyAppLauncherIcon(prefs.appLauncherIcon)
     }
 
     private func checkAndPromptInitialPermissions() {

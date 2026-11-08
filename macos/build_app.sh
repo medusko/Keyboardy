@@ -29,14 +29,10 @@ mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 cp "$SCRIPT_DIR/.build/release/Keyboardy" "$MACOS_DIR/$APP_NAME"
 chmod +x "$MACOS_DIR/$APP_NAME"
 
-# Copy Gold and Classic icons into Resources for in-app runtime icon switching
-cp "$SCRIPT_DIR/Resources/AppIconGold.png" "$RESOURCES_DIR/AppIconGold.png"
-cp "$SCRIPT_DIR/Resources/AppIconClassic.png" "$RESOURCES_DIR/AppIconClassic.png"
-cp "$SCRIPT_DIR/Resources/AppIconGold.png" "$RESOURCES_DIR/StatusBarIcon.png"
-
-# Generate AppIcon.icns from the new Gold RC2 icon
-SOURCE_ICON="$SCRIPT_DIR/Resources/AppIconGold.png"
+# Generate AppIcon.icns and StatusBarIcon.png from the authentic retro Keyboardy icon
+SOURCE_ICON="$REPO_ROOT/app/src/main/res/drawable-nodpi/ic_app_option_1.png"
 if [[ -f "$SOURCE_ICON" ]]; then
+    cp "$SOURCE_ICON" "$RESOURCES_DIR/StatusBarIcon.png"
     ICONSET_DIR="$SCRIPT_DIR/build/AppIcon.iconset"
     rm -rf "$ICONSET_DIR"
     mkdir -p "$ICONSET_DIR"
