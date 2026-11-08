@@ -22,11 +22,9 @@ public final class KeyboardyPrefs: ObservableObject {
         didSet {
             defaults.set(isDarkMode, forKey: Keys.isDarkMode)
             guard !isUpdatingThemeInternally else { return }
-            // If user toggled Dark Mode directly (e.g. via switch or top-bar button), update themeMode & sync icon
             isUpdatingThemeInternally = true
             themeMode = isDarkMode ? .dark : .light
             defaults.set(themeMode.rawValue, forKey: Keys.themeMode)
-            statusBarBadgeStyle = isDarkMode ? .keyboardyWhiteIcon : .keyboardyBlackIcon
             isUpdatingThemeInternally = false
         }
     }
@@ -34,6 +32,16 @@ public final class KeyboardyPrefs: ObservableObject {
     @Published public var statusBarBadgeStyle: StatusBarBadgeStyle {
         didSet {
             defaults.set(statusBarBadgeStyle.rawValue, forKey: Keys.statusBarBadgeStyle)
+            if !isUpdatingThemeInternally {
+                defaults.set(true, forKey: Keys.hasCustomBadgeStyle)
+            }
+        }
+    }
+
+    @Published public var appLauncherIcon: AppLauncherIconStyle {
+        didSet {
+            defaults.set(appLauncherIcon.rawValue, forKey: Keys.appLauncherIcon)
+            applyAppLauncherIcon(appLauncherIcon)
         }
     }
 
@@ -125,17 +133,18 @@ public final class KeyboardyPrefs: ObservableObject {
         }
         self.isDarkMode = effectiveDark
 
-        // Night/Dark Mode -> White Icon (.keyboardyWhiteIcon)
-        // Light Mode      -> Black Icon (.keyboardyBlackIcon)
+        // Load saved status bar badge style; if explicitly set by user, preserve it!
         let defaultIconForMode: StatusBarBadgeStyle = effectiveDark ? .keyboardyWhiteIcon : .keyboardyBlackIcon
-        if let badgeRaw = defaults.string(forKey: Keys.statusBarBadgeStyle),
-           let savedStyle = StatusBarBadgeStyle(rawValue: badgeRaw),
-           savedStyle == .keyboardyAppIcon {
-            self.statusBarBadgeStyle = .keyboardyAppIcon
+        if defaults.bool(forKey: Keys.hasCustomBadgeStyle),
+           let badgeRaw = defaults.string(forKey: Keys.statusBarBadgeStyle),
+           let savedStyle = StatusBarBadgeStyle(rawValue: badgeRaw) {
+            self.statusBarBadgeStyle = savedStyle
         } else {
             self.statusBarBadgeStyle = defaultIconForMode
-            defaults.set(defaultIconForMode.rawValue, forKey: Keys.statusBarBadgeStyle)
         }
+
+        let launcherIconRaw = defaults.string(forKey: Keys.appLauncherIcon) ?? AppLauncherIconStyle.gold.rawValue
+        self.appLauncherIcon = AppLauncherIconStyle(rawValue: launcherIconRaw) ?? .gold
 
         // Default to ⌥⇧Space (Option + Shift + Space) so it never conflicts with Gemini (⌥Space) or Spotlight (⌘Space)
         let hotkeyRaw = defaults.string(forKey: Keys.hotkeyPreset) ?? HotkeyPreset.optShiftSpace.rawValue
@@ -204,7 +213,7 @@ public final class KeyboardyPrefs: ObservableObject {
             targetDark = false
         }
         isDarkMode = targetDark
-        if syncIcon {
+        if syncIcon && !defaults.bool(forKey: Keys.hasCustomBadgeStyle) {
             statusBarBadgeStyle = targetDark ? .keyboardyWhiteIcon : .keyboardyBlackIcon
         }
         isUpdatingThemeInternally = false
@@ -317,10 +326,23 @@ public final class KeyboardyPrefs: ObservableObject {
         }
     }
 
+    public func applyAppLauncherIcon(_ style: AppLauncherIconStyle) {
+        let bundle = Bundle.main
+        let resourceName = (style == .classic) ? "AppIconClassic" : "AppIconGold"
+        if let iconUrl = bundle.url(forResource: resourceName, withExtension: "png"),
+           let image = NSImage(contentsOf: iconUrl) {
+            NSApplication.shared.applicationIconImage = image
+        } else {
+            NSApplication.shared.applicationIconImage = nil
+        }
+    }
+
     private enum Keys {
+        static let appLauncherIcon = "mac_app_launcher_icon_style"
         static let themeMode = "mac_theme_mode_v3"
         static let isDarkMode = "mac_is_dark_mode_v3"
         static let statusBarBadgeStyle = "mac_status_bar_badge_style_v3"
+        static let hasCustomBadgeStyle = "mac_has_custom_badge_style_v1"
         static let hotkeyPreset = "mac_hotkey_preset_v2"
         static let customKeyCode = "mac_custom_key_code"
         static let customCarbonModifiers = "mac_custom_carbon_modifiers"

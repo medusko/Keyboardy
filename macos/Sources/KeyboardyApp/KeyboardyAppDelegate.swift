@@ -35,6 +35,7 @@ final class KeyboardyAppDelegate: NSObject, NSApplicationDelegate {
         setupBindingsAndTriggers()
         setupKeyboardShortcutsInsidePanel()
         checkAndPromptInitialPermissions()
+        prefs.applyAppLauncherIcon(prefs.appLauncherIcon)
     }
 
     private func checkAndPromptInitialPermissions() {
@@ -140,7 +141,7 @@ final class KeyboardyAppDelegate: NSObject, NSApplicationDelegate {
         let rootView = KeyboardyPickerView(viewModel: viewModel, prefs: prefs)
         let hostingController = NSHostingController(rootView: rootView)
 
-        popover.contentSize = NSSize(width: 500, height: 550)
+        popover.contentSize = NSSize(width: 625, height: 688)
         popover.behavior = .transient
         popover.animates = true
         popover.contentViewController = hostingController
@@ -148,7 +149,7 @@ final class KeyboardyAppDelegate: NSObject, NSApplicationDelegate {
         let panelView = KeyboardyPickerView(viewModel: viewModel, prefs: prefs)
         let panelHosting = NSHostingController(rootView: panelView)
         let panel = FloatingHudPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: 550),
+            contentRect: NSRect(x: 0, y: 0, width: 625, height: 688),
             styleMask: [.titled, .fullSizeContentView, .nonactivatingPanel],
             backing: .buffered,
             defer: false

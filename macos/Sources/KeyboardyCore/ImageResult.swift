@@ -128,19 +128,53 @@ public enum AppThemeMode: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Configurable Menu Bar / Status Bar icon style: Original Color App Icon, White Icon, or Black Icon.
+/// Configurable Menu Bar / Status Bar icon style: Gold Icon (RC2 Default), Classic Icon, White Icon, or Black Icon.
 public enum StatusBarBadgeStyle: String, CaseIterable, Identifiable, Sendable {
-    case keyboardyAppIcon = "KEYBOARDY_APP_ICON"
+    case keyboardyGoldIcon = "KEYBOARDY_GOLD_ICON"
+    case keyboardyClassicIcon = "KEYBOARDY_CLASSIC_ICON"
     case keyboardyWhiteIcon = "KEYBOARDY_WHITE_ICON"
     case keyboardyBlackIcon = "KEYBOARDY_BLACK_ICON"
 
     public var id: String { rawValue }
 
+    public init?(rawValue: String) {
+        switch rawValue {
+        case "KEYBOARDY_GOLD_ICON", "KEYBOARDY_APP_ICON":
+            self = .keyboardyGoldIcon
+        case "KEYBOARDY_CLASSIC_ICON":
+            self = .keyboardyClassicIcon
+        case "KEYBOARDY_WHITE_ICON":
+            self = .keyboardyWhiteIcon
+        case "KEYBOARDY_BLACK_ICON":
+            self = .keyboardyBlackIcon
+        default:
+            return nil
+        }
+    }
+
     public var displayName: String {
         switch self {
-        case .keyboardyAppIcon: return "App Icon"
-        case .keyboardyWhiteIcon: return "White Icon"
-        case .keyboardyBlackIcon: return "Black Icon"
+        case .keyboardyGoldIcon: return "Gold Icon"
+        case .keyboardyClassicIcon: return "Classic"
+        case .keyboardyWhiteIcon: return "White (Night)"
+        case .keyboardyBlackIcon: return "Black (Light)"
+        }
+    }
+
+    public static var keyboardyAppIcon: StatusBarBadgeStyle { .keyboardyGoldIcon }
+}
+
+/// Configurable App Launcher & Dock Icon style: Gold (RC2 Default) or Classic (Original).
+public enum AppLauncherIconStyle: String, CaseIterable, Identifiable, Sendable {
+    case gold = "GOLD"
+    case classic = "CLASSIC"
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .gold: return "Gold (Default)"
+        case .classic: return "Classic (Original)"
         }
     }
 }

@@ -318,9 +318,10 @@ struct SettingsView: View {
                             }
 
                             HStack(spacing: 8) {
-                                badgeOptionButton(.keyboardyAppIcon, label: "App Icon")
-                                badgeOptionButton(.keyboardyWhiteIcon, label: "White (Night)")
-                                badgeOptionButton(.keyboardyBlackIcon, label: "Black (Light)")
+                                badgeOptionButton(.keyboardyGoldIcon, label: "Gold (RC2)")
+                                badgeOptionButton(.keyboardyClassicIcon, label: "Classic")
+                                badgeOptionButton(.keyboardyWhiteIcon, label: "White")
+                                badgeOptionButton(.keyboardyBlackIcon, label: "Black")
                             }
                         }
 
@@ -342,6 +343,26 @@ struct SettingsView: View {
                                 }
                             }
                             .frame(width: 225)
+                        }
+
+                        rowDivider
+
+                        // Row: App Launcher & Dock Icon (Gold RC2 Default vs Classic)
+                        settingRow(
+                            title: "App Launcher & Dock Icon",
+                            subtitle: "Select between the new RC2 Gold emblem or the original Classic icon"
+                        ) {
+                            HStack(spacing: 5) {
+                                ForEach(AppLauncherIconStyle.allCases) { style in
+                                    segmentedPillButton(
+                                        title: style.displayName,
+                                        isSelected: prefs.appLauncherIcon == style
+                                    ) {
+                                        prefs.appLauncherIcon = style
+                                    }
+                                }
+                            }
+                            .frame(width: 250)
                         }
 
                         rowDivider
@@ -936,14 +957,14 @@ struct SettingsView: View {
                 return Color(red: 0.14, green: 0.16, blue: 0.20)
             case .keyboardyBlackIcon:
                 return Color(red: 0.93, green: 0.91, blue: 0.87)
-            case .keyboardyAppIcon:
+            case .keyboardyGoldIcon, .keyboardyClassicIcon:
                 return Color.clear
             }
         }()
         Button(action: { prefs.statusBarBadgeStyle = style }) {
-            HStack(spacing: 6) {
+            HStack(spacing: 5) {
                 ZStack {
-                    if style != .keyboardyAppIcon {
+                    if style == .keyboardyWhiteIcon || style == .keyboardyBlackIcon {
                         RoundedRectangle(cornerRadius: 4)
                             .fill(previewBackdrop)
                             .frame(width: 20, height: 20)

@@ -4,17 +4,24 @@ import KeyboardyCore
 
 enum StatusBarBadgeRenderer {
 
-    private static var cachedAppIcon: NSImage?
+    private static var cachedGoldIcon: NSImage?
+    private static var cachedClassicIcon: NSImage?
     private static var cachedWhiteIcon: NSImage?
     private static var cachedBlackIcon: NSImage?
 
     /// Generates a crisp Retina 20x20 pt menu bar image for the selected `StatusBarBadgeStyle`.
     static func makeStatusBarImage(style: StatusBarBadgeStyle) -> NSImage {
         switch style {
-        case .keyboardyAppIcon:
-            if let cached = cachedAppIcon { return cached }
-            let img = drawColorAppIcon()
-            cachedAppIcon = img
+        case .keyboardyGoldIcon:
+            if let cached = cachedGoldIcon { return cached }
+            let img = drawColorIcon(named: "AppIconGold")
+            cachedGoldIcon = img
+            return img
+
+        case .keyboardyClassicIcon:
+            if let cached = cachedClassicIcon { return cached }
+            let img = drawColorIcon(named: "AppIconClassic")
+            cachedClassicIcon = img
             return img
 
         case .keyboardyWhiteIcon:
@@ -33,13 +40,27 @@ enum StatusBarBadgeRenderer {
 
     /// Loads the authentic full-resolution app icon image for UI dialogs and About views.
     static func loadAppIconImage() -> NSImage {
+        if let img = loadNamedIconImage("AppIconGold") {
+            return img
+        }
         if let img = loadSourcePngImage() {
             return img
         }
-        return makeStatusBarImage(style: .keyboardyAppIcon)
+        return makeStatusBarImage(style: .keyboardyGoldIcon)
+    }
+
+    private static func loadNamedIconImage(_ name: String) -> NSImage? {
+        if let resourceURL = Bundle.main.url(forResource: name, withExtension: "png"),
+           let img = NSImage(contentsOf: resourceURL) {
+            return img
+        }
+        return nil
     }
 
     private static func loadSourcePngImage() -> NSImage? {
+        if let img = loadNamedIconImage("AppIconGold") {
+            return img
+        }
         if let resourceURL = Bundle.main.url(forResource: "StatusBarIcon", withExtension: "png"),
            let img = NSImage(contentsOf: resourceURL) {
             return img
@@ -48,7 +69,7 @@ enum StatusBarBadgeRenderer {
            let img = NSImage(contentsOf: icnsURL) {
             return img
         }
-        let fallbackPath = "app/src/main/res/drawable-nodpi/ic_app_option_1.png"
+        let fallbackPath = "app/src/main/res/drawable-nodpi/ic_app_gold.png"
         if FileManager.default.fileExists(atPath: fallbackPath),
            let img = NSImage(contentsOfFile: fallbackPath) {
             return img
@@ -56,11 +77,10 @@ enum StatusBarBadgeRenderer {
         return NSApp?.applicationIconImage
     }
 
-    /// Renders the full-color Android Keyboardy App Icon (`StatusBarIcon.png`), cropping inside the white outer corners
-    /// so no white border from the source PNG is ever visible.
-    private static func drawColorAppIcon() -> NSImage {
+    /// Renders the full-color Keyboardy App Icon (`AppIconGold` or `AppIconClassic`), cropped cleanly
+    private static func drawColorIcon(named name: String) -> NSImage {
         let targetSize = NSSize(width: 20, height: 20)
-        guard let rawIcon = loadSourcePngImage() else {
+        guard let rawIcon = loadNamedIconImage(name) ?? loadSourcePngImage() else {
             return drawMonochromeKeyboardyIcon(isWhite: true)
         }
 
@@ -70,11 +90,11 @@ enum StatusBarBadgeRenderer {
             let clipPath = NSBezierPath(roundedRect: innerRect, xRadius: 4.5, yRadius: 4.5)
             clipPath.addClip()
 
-            // Inset source rect by 6% to crop out the opaque white outer margin/corners of ic_app_option_1.png
             let srcW = rawIcon.size.width
             let srcH = rawIcon.size.height
-            let cropInsetX = srcW * 0.06
-            let cropInsetY = srcH * 0.06
+            let isClassic = (name == "AppIconClassic")
+            let cropInsetX = isClassic ? srcW * 0.06 : 0.0
+            let cropInsetY = isClassic ? srcH * 0.06 : 0.0
             let srcRect = NSRect(
                 x: cropInsetX,
                 y: cropInsetY,

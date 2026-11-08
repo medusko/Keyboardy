@@ -43,7 +43,7 @@ struct KeyboardyPickerView: View {
                 mainSearchContent
             }
         }
-        .frame(width: 500, height: 550)
+        .frame(width: 625, height: 688)
         .preferredColorScheme(prefs.isDarkMode ? .dark : .light)
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {

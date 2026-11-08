@@ -1,7 +1,7 @@
 import Foundation
 
 public enum KeyboardyVersion {
-    public static let versionName = "1.0.1-RC1.1"
+    public static let versionName = "1.0.1-RC2-Beta"
     public static let buildNumber = "9"
     public static let releaseDate = "2026-11-04"
 

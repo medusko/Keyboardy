@@ -1,9 +1,11 @@
 package com.medusko.keyboardy
 
 import android.app.Dialog
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
@@ -102,6 +104,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cbNsfwMode: CheckBox
     private lateinit var cbFullScreenMode: CheckBox
 
+    private lateinit var cardAppIcon: LinearLayout
+    private lateinit var tvAppIconHeader: TextView
+    private lateinit var tvAppIconDesc: TextView
+    private lateinit var btnIconGold: LinearLayout
+    private lateinit var tvIconGoldTitle: TextView
+    private lateinit var tvIconGoldBadge: TextView
+    private lateinit var btnIconClassic: LinearLayout
+    private lateinit var tvIconClassicTitle: TextView
+    private lateinit var tvIconClassicBadge: TextView
+
     private lateinit var cardBadges: LinearLayout
     private lateinit var tvBadgesHeader: TextView
     private lateinit var tvBadgesDesc: TextView
@@ -182,6 +194,23 @@ class MainActivity : AppCompatActivity() {
         ivSandboxReceived = findViewById(R.id.iv_sandbox_received)
         tvSandboxReceivedInfo = findViewById(R.id.tv_sandbox_received_info)
         etChatSandbox = findViewById(R.id.et_chat_sandbox)
+
+        cardAppIcon = findViewById(R.id.card_app_icon)
+        tvAppIconHeader = findViewById(R.id.tv_app_icon_header)
+        tvAppIconDesc = findViewById(R.id.tv_app_icon_desc)
+        btnIconGold = findViewById(R.id.btn_icon_gold)
+        tvIconGoldTitle = findViewById(R.id.tv_icon_gold_title)
+        tvIconGoldBadge = findViewById(R.id.tv_icon_gold_badge)
+        btnIconClassic = findViewById(R.id.btn_icon_classic)
+        tvIconClassicTitle = findViewById(R.id.tv_icon_classic_title)
+        tvIconClassicBadge = findViewById(R.id.tv_icon_classic_badge)
+
+        btnIconGold.setOnClickListener {
+            setAppIconStyle(useClassic = false)
+        }
+        btnIconClassic.setOnClickListener {
+            setAppIconStyle(useClassic = true)
+        }
 
         cardSettings = findViewById(R.id.card_settings)
         tvSettingsHeader = findViewById(R.id.tv_settings_header)
@@ -738,8 +767,8 @@ class MainActivity : AppCompatActivity() {
             sec.setTextColor(palette.accentBlue)
         }
 
-        // Style all 7 Cards
-        val cards = listOf(cardSetup, cardScale, cardGridScale, cardSandbox, cardSettings, cardBadges, cardQuota)
+        // Style all Cards
+        val cards = listOf(cardSetup, cardScale, cardGridScale, cardSandbox, cardAppIcon, cardSettings, cardBadges, cardQuota)
         for (card in cards) {
             card.background = palette.createRoundedRect(
                 fillColor = palette.surface,
@@ -755,6 +784,7 @@ class MainActivity : AppCompatActivity() {
             tvScaleHeader,
             tvGridScaleHeader,
             tvSandboxHeader,
+            tvAppIconHeader,
             tvSettingsHeader,
             tvBadgesHeader,
             tvQuotaHeader,
@@ -763,7 +793,7 @@ class MainActivity : AppCompatActivity() {
         for (h in headers) {
             h.setTextColor(palette.accentBlue)
         }
-        val descriptions = listOf(tvSetupDesc, tvScaleDesc, tvGridScaleDesc, tvSandboxDesc, tvBadgesDesc, tvApiKeyLabel)
+        val descriptions = listOf(tvSetupDesc, tvScaleDesc, tvGridScaleDesc, tvSandboxDesc, tvAppIconDesc, tvBadgesDesc, tvApiKeyLabel)
         for (d in descriptions) {
             d.setTextColor(palette.textSecondary)
         }
@@ -867,6 +897,68 @@ class MainActivity : AppCompatActivity() {
 
         updateImeStatusBanner()
         updateQuotaStatsUi()
+        updateAppIconUi()
+    }
+
+    private fun setAppIconStyle(useClassic: Boolean) {
+        if (prefs.useClassicIcon == useClassic) return
+        prefs.useClassicIcon = useClassic
+
+        val pm = packageManager
+        val defaultAlias = ComponentName(this, "${packageName}.MainActivityDefault")
+        val classicAlias = ComponentName(this, "${packageName}.MainActivityClassic")
+
+        val (enableComp, disableComp) = if (useClassic) {
+            classicAlias to defaultAlias
+        } else {
+            defaultAlias to classicAlias
+        }
+
+        try {
+            pm.setComponentEnabledSetting(
+                enableComp,
+                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                PackageManager.DONT_KILL_APP
+            )
+            pm.setComponentEnabledSetting(
+                disableComp,
+                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                PackageManager.DONT_KILL_APP
+            )
+            val iconName = if (useClassic) "Classic (Original)" else "Gold (RC2 Default)"
+            Toast.makeText(this, "Launcher icon updated to $iconName", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            android.util.Log.e("Keyboardy", "Failed to switch app icon: ${e.message}")
+        }
+
+        updateAppIconUi()
+    }
+
+    private fun updateAppIconUi() {
+        val palette = ThemePalette.forMode(prefs.isDarkMode)
+        val density = resources.displayMetrics.density
+        val strokePx = (1.5f * density).toInt().coerceAtLeast(1)
+        val useClassic = prefs.useClassicIcon
+
+        val goldSelected = !useClassic
+        btnIconGold.background = palette.createRoundedRect(
+            fillColor = if (goldSelected) palette.surfaceVariant else palette.surface,
+            cornerRadiusPx = 12f * density,
+            strokeWidthPx = if (goldSelected) strokePx + 1 else strokePx,
+            strokeColor = if (goldSelected) palette.accentBlue else palette.border
+        )
+        tvIconGoldTitle.setTextColor(if (goldSelected) palette.accentBlue else palette.textPrimary)
+        tvIconGoldBadge.setTextColor(if (goldSelected) palette.accentBlue else palette.textSecondary)
+
+        val classicSelected = useClassic
+        btnIconClassic.background = palette.createRoundedRect(
+            fillColor = if (classicSelected) palette.surfaceVariant else palette.surface,
+            cornerRadiusPx = 12f * density,
+            strokeWidthPx = if (classicSelected) strokePx + 1 else strokePx,
+            strokeColor = if (classicSelected) palette.accentBlue else palette.border
+        )
+        tvIconClassicTitle.setTextColor(if (classicSelected) palette.accentBlue else palette.textPrimary)
+        tvIconClassicBadge.setTextColor(if (classicSelected) palette.accentBlue else palette.textSecondary)
     }
 
     private fun updateImeStatusBanner() {
