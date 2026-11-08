@@ -597,6 +597,62 @@ class MainActivity : AppCompatActivity() {
         linksRow2.addView(createLinkBtn("Sponsor ☕ ↗", "https://github.com/sponsors/Zlatty"))
         scrollContent.addView(linksRow2)
 
+        // Contact & Social Information Card
+        val contactCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dpToPx(12), dpToPx(10), dpToPx(12), dpToPx(10))
+            background = palette.createRoundedRect(
+                fillColor = palette.surfaceVariant,
+                cornerRadiusPx = 10f * density,
+                strokeWidthPx = strokePx,
+                strokeColor = palette.border
+            )
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dpToPx(8)
+            }
+        }
+
+        fun createContactRow(label: String, value: String, url: String?): LinearLayout {
+            return LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = dpToPx(2)
+                    bottomMargin = dpToPx(2)
+                }
+                addView(TextView(this@MainActivity).apply {
+                    text = label
+                    setTextColor(palette.textSecondary)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+                    typeface = Typeface.DEFAULT_BOLD
+                    layoutParams = LinearLayout.LayoutParams(dpToPx(72), ViewGroup.LayoutParams.WRAP_CONTENT)
+                })
+                addView(TextView(this@MainActivity).apply {
+                    text = value
+                    setTextColor(if (url != null) palette.accentBlue else palette.textPrimary)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f)
+                    if (url != null) {
+                        typeface = Typeface.DEFAULT_BOLD
+                        setOnClickListener {
+                            try {
+                                startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+                            } catch (_: Exception) {}
+                        }
+                    }
+                })
+            }
+        }
+
+        contactCard.addView(createContactRow("Website:", "medusko.com", "https://medusko.com"))
+        contactCard.addView(createContactRow("Support:", "support@medusko.com", "mailto:support@medusko.com"))
+        contactCard.addView(createContactRow("Social:", "@meduskodev on Twitter", "https://twitter.com/meduskodev"))
+        scrollContent.addView(contactCard)
+
         // Version Footer
         val footerText = TextView(this).apply {
             text = "Keyboardy v$vName (Build 9) • Release Candidate 1.1 • Built for Android 15 / Pixel\nDesigned & Engineered by Medusko"
