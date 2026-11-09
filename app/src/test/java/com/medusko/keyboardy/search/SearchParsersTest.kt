@@ -1,8 +1,11 @@
 package com.medusko.keyboardy.search
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.ByteArrayInputStream
 
 class SearchParsersTest {
 
@@ -60,5 +63,31 @@ class SearchParsersTest {
         assertEquals("cat gif", SearchFilter.GIF.buildEffectiveQuery("cat"))
         assertEquals("cat gif", SearchFilter.GIF.buildEffectiveQuery("cat gif"))
         assertEquals("dog meme", SearchFilter.MEME.buildEffectiveQuery("dog"))
+    }
+
+    @Test
+    fun `isSafeHttpUrl accepts public http and https urls and rejects local or non-http urls`() {
+        assertTrue(SearchParsers.isSafeHttpUrl("https://media.tenor.com/abc/funny.gif"))
+        assertTrue(SearchParsers.isSafeHttpUrl("http://example.com/photo.jpg"))
+
+        assertFalse(SearchParsers.isSafeHttpUrl("file:///etc/passwd"))
+        assertFalse(SearchParsers.isSafeHttpUrl("javascript:alert(1)"))
+        assertFalse(SearchParsers.isSafeHttpUrl("http://localhost:8080/img.png"))
+        assertFalse(SearchParsers.isSafeHttpUrl("http://127.0.0.1/img.png"))
+        assertFalse(SearchParsers.isSafeHttpUrl("http://169.254.169.254/latest/meta-data/"))
+        assertFalse(SearchParsers.isSafeHttpUrl("http://192.168.1.1/admin.png"))
+        assertFalse(SearchParsers.isSafeHttpUrl("http://10.0.0.1/test.gif"))
+        assertFalse(SearchParsers.isSafeHttpUrl("http://172.16.0.1/test.gif"))
+        assertFalse(SearchParsers.isSafeHttpUrl("http://[::1]/test.gif"))
+    }
+
+    @Test
+    fun `readBoundedBytes enforces size limit`() {
+        val data = ByteArray(1024) { 0x42 }
+        val ok = SearchParsers.readBoundedBytes(ByteArrayInputStream(data), 2048)
+        assertEquals(1024, ok?.size)
+
+        val tooBig = SearchParsers.readBoundedBytes(ByteArrayInputStream(data), 512)
+        assertNull(tooBig)
     }
 }

@@ -146,6 +146,7 @@ class ImageSearchRepository(
         urlStr: String,
         extraHeaders: Map<String, String> = emptyMap()
     ): String {
+        if (!SearchParsers.isSafeHttpUrl(urlStr)) return ""
         val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = 4500
@@ -161,10 +162,24 @@ class ImageSearchRepository(
             }
         }
         return try {
-            conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            if (conn.responseCode in 200..299 &&
+                SearchParsers.isSafeHttpUrl(conn.url.toString()) &&
+                conn.contentLengthLong <= MAX_TEXT_RESPONSE_BYTES
+            ) {
+                val bytes = conn.inputStream.use {
+                    SearchParsers.readBoundedBytes(it, MAX_TEXT_RESPONSE_BYTES)
+                }
+                bytes?.toString(Charsets.UTF_8).orEmpty()
+            } else {
+                ""
+            }
         } finally {
             conn.disconnect()
         }
+    }
+
+    companion object {
+        private const val MAX_TEXT_RESPONSE_BYTES = 5 * 1024 * 1024 // 5 MB
     }
 
     private fun mergeUnique(

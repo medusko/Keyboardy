@@ -108,6 +108,9 @@ object SpellAndSuggestionEngine {
         "receipt", "definitely", "tomorrow", "separate", "special", "beautiful", "amazing"
     )
 
+    private val VOCABULARY_SET: Set<String> = VOCABULARY.toHashSet()
+    private val WHITESPACE_REGEX = Regex("\\s+")
+
     /**
      * Synchronously returns instant suggestions (0ms latency, runs locally on Main thread).
      * Includes typo auto-corrections and prefix completions.
@@ -118,7 +121,7 @@ object SpellAndSuggestionEngine {
             return DEFAULT_SUGGESTIONS
         }
 
-        val lastWord = trimmed.split("\\s+".toRegex()).lastOrNull()?.filter { it.isLetter() }.orEmpty()
+        val lastWord = trimmed.split(WHITESPACE_REGEX).lastOrNull()?.filter { it.isLetter() }.orEmpty()
         if (lastWord.isEmpty()) {
             return emptyList()
         }
@@ -134,7 +137,7 @@ object SpellAndSuggestionEngine {
         }
 
         // 2. Exact match in vocabulary (if user typed a known word)
-        if (VOCABULARY.contains(lastWord) && seen.add(lastWord)) {
+        if (VOCABULARY_SET.contains(lastWord) && seen.add(lastWord)) {
             results.add(SuggestionItem(text = lastWord, isSpellCorrection = false))
         }
 
@@ -190,20 +193,24 @@ object SpellAndSuggestionEngine {
                 conn.connectTimeout = 800
                 conn.readTimeout = 800
                 conn.setRequestProperty("User-Agent", "Mozilla/5.0")
-                if (conn.responseCode == 200) {
-                    val body = conn.inputStream.bufferedReader().use { it.readText() }
-                    val jsonArray = JSONArray(body)
-                    val suggestionsArray = jsonArray.optJSONArray(1) ?: JSONArray()
-                    val items = mutableListOf<String>()
-                    for (i in 0 until min(suggestionsArray.length(), 6)) {
-                        val text = suggestionsArray.optString(i, "").trim()
-                        if (text.isNotEmpty() && !text.equals(trimmed, ignoreCase = true)) {
-                            items.add(text)
+                try {
+                    if (conn.responseCode == 200) {
+                        val body = conn.inputStream.bufferedReader().use { it.readText() }
+                        val jsonArray = JSONArray(body)
+                        val suggestionsArray = jsonArray.optJSONArray(1) ?: JSONArray()
+                        val items = mutableListOf<String>()
+                        for (i in 0 until min(suggestionsArray.length(), 6)) {
+                            val text = suggestionsArray.optString(i, "").trim()
+                            if (text.isNotEmpty() && !text.equals(trimmed, ignoreCase = true)) {
+                                items.add(text)
+                            }
                         }
+                        items
+                    } else {
+                        emptyList()
                     }
-                    items
-                } else {
-                    emptyList()
+                } finally {
+                    conn.disconnect()
                 }
             } catch (_: Exception) {
                 emptyList()
@@ -245,19 +252,22 @@ object SpellAndSuggestionEngine {
     }
 
     private fun levenshteinDistance(s1: String, s2: String): Int {
-        val dp = Array(s1.length + 1) { IntArray(s2.length + 1) }
-        for (i in 0..s1.length) dp[i][0] = i
-        for (j in 0..s2.length) dp[0][j] = j
+        var prev = IntArray(s2.length + 1) { it }
+        var curr = IntArray(s2.length + 1)
 
         for (i in 1..s1.length) {
+            curr[0] = i
             for (j in 1..s2.length) {
                 val cost = if (s1[i - 1] == s2[j - 1]) 0 else 1
-                dp[i][j] = min(
-                    min(dp[i - 1][j] + 1, dp[i][j - 1] + 1),
-                    dp[i - 1][j - 1] + cost
+                curr[j] = min(
+                    min(prev[j] + 1, curr[j - 1] + 1),
+                    prev[j - 1] + cost
                 )
             }
+            val tmp = prev
+            prev = curr
+            curr = tmp
         }
-        return dp[s1.length][s2.length]
+        return prev[s2.length]
     }
 }

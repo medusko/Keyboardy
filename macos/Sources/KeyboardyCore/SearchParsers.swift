@@ -80,7 +80,7 @@ public enum SearchParsers {
                         )
                     )
                 }
-            } else if rawUrl.hasPrefix("http"), seenTenorIds.insert(rawUrl).inserted {
+            } else if isSafeHttpUrl(rawUrl), seenTenorIds.insert(rawUrl).inserted {
                 results.append(
                     ImageResult(
                         id: "tenor_\(results.count)_\(rawUrl.hashValue)",
@@ -147,7 +147,7 @@ public enum SearchParsers {
             let rawTitle = (obj["t"] as? String ?? "Image").trimmingCharacters(in: .whitespacesAndNewlines)
             let title = rawTitle.isEmpty ? "Image" : rawTitle
 
-            if fullUrl.hasPrefix("http"), seenUrls.insert(fullUrl).inserted {
+            if isSafeHttpUrl(fullUrl), seenUrls.insert(fullUrl).inserted {
                 let lowerFull = fullUrl.lowercased()
                 let isKnownStaticExt = lowerFull.hasSuffix(".jpg") ||
                     lowerFull.hasSuffix(".jpeg") ||
@@ -166,7 +166,7 @@ public enum SearchParsers {
                 if let tenorPair = normalizeTenorGifUrls(fullUrl) {
                     effectiveThumb = tenorPair.animatedThumb
                 } else {
-                    effectiveThumb = thumbUrl.isEmpty ? fullUrl : thumbUrl
+                    effectiveThumb = (!thumbUrl.isEmpty && isSafeHttpUrl(thumbUrl)) ? thumbUrl : fullUrl
                 }
 
                 results.append(
@@ -218,7 +218,7 @@ public enum SearchParsers {
             let title = rawTitle.isEmpty ? "Google Image" : rawTitle
             let primaryUrl = fullUrl.isEmpty ? thumbUrl : fullUrl
 
-            guard primaryUrl.hasPrefix("http"), seen.insert(primaryUrl).inserted else { continue }
+            guard isSafeHttpUrl(primaryUrl), seen.insert(primaryUrl).inserted else { continue }
 
             let itemIsGif = (item["isGif"] as? Bool) ?? false
             let lowerPrimary = primaryUrl.lowercased()
@@ -238,7 +238,7 @@ public enum SearchParsers {
             if let tenorPair = normalizeTenorGifUrls(primaryUrl) {
                 effectiveThumb = tenorPair.animatedThumb
             } else {
-                effectiveThumb = thumbUrl.isEmpty ? primaryUrl : thumbUrl
+                effectiveThumb = (!thumbUrl.isEmpty && isSafeHttpUrl(thumbUrl)) ? thumbUrl : primaryUrl
             }
             let srcLabel = (item["source"] as? String) ?? "G"
 
@@ -268,13 +268,13 @@ public enum SearchParsers {
             guard match.numberOfRanges >= 3 else { continue }
             let thumb = decodeUnicodeEscapes(nsHtml.substring(with: match.range(at: 1)))
             let full = decodeUnicodeEscapes(nsHtml.substring(with: match.range(at: 2)))
-            if full.hasPrefix("http"), !full.contains("gstatic.com"), seen.insert(full).inserted {
+            if isSafeHttpUrl(full), !full.contains("gstatic.com"), seen.insert(full).inserted {
                 let isGif = forceGifHint || full.lowercased().contains(".gif")
                 results.append(
                     ImageResult(
                         id: "ghtml_\(results.count)_\(full.hashValue)",
                         title: "Google Image",
-                        thumbnailUrl: thumb,
+                        thumbnailUrl: isSafeHttpUrl(thumb) ? thumb : full,
                         fullImageUrl: full,
                         isAnimatedGif: isGif,
                         sourceLabel: "G"
@@ -287,7 +287,7 @@ public enum SearchParsers {
             let thumbMatches = googleThumbOnlyRegex.matches(in: html, options: [], range: fullRange)
             for match in thumbMatches {
                 let thumb = decodeUnicodeEscapes(nsHtml.substring(with: match.range))
-                if seen.insert(thumb).inserted {
+                if isSafeHttpUrl(thumb), seen.insert(thumb).inserted {
                     results.append(
                         ImageResult(
                             id: "gthumb_\(results.count)_\(thumb.hashValue)",
@@ -319,13 +319,13 @@ public enum SearchParsers {
             let rawTitle = (obj["title"] as? String ?? "Google Image").trimmingCharacters(in: .whitespacesAndNewlines)
             let title = rawTitle.isEmpty ? "Google Image" : rawTitle
             let primary = full.isEmpty ? thumb : full
-            guard primary.hasPrefix("http") else { continue }
+            guard isSafeHttpUrl(primary) else { continue }
             let isGif = forceGifHint || primary.lowercased().contains(".gif")
             results.append(
                 ImageResult(
                     id: "serp_\(i)_\(primary.hashValue)",
                     title: title,
-                    thumbnailUrl: thumb.isEmpty ? primary : thumb,
+                    thumbnailUrl: (!thumb.isEmpty && isSafeHttpUrl(thumb)) ? thumb : primary,
                     fullImageUrl: primary,
                     isAnimatedGif: isGif,
                     sourceLabel: "G"
@@ -352,13 +352,13 @@ public enum SearchParsers {
             let rawTitle = (obj["title"] as? String ?? "Brave Image").trimmingCharacters(in: .whitespacesAndNewlines)
             let title = rawTitle.isEmpty ? "Brave Image" : rawTitle
             let primary = full.isEmpty ? thumb : full
-            guard primary.hasPrefix("http") else { continue }
+            guard isSafeHttpUrl(primary) else { continue }
             let isGif = forceGifHint || primary.lowercased().contains(".gif")
             results.append(
                 ImageResult(
                     id: "brave_\(i)_\(primary.hashValue)",
                     title: title,
-                    thumbnailUrl: thumb.isEmpty ? primary : thumb,
+                    thumbnailUrl: (!thumb.isEmpty && isSafeHttpUrl(thumb)) ? thumb : primary,
                     fullImageUrl: primary,
                     isAnimatedGif: isGif,
                     sourceLabel: "B"
@@ -366,6 +366,68 @@ public enum SearchParsers {
             )
         }
         return results
+    }
+
+    /// Validates that a URL uses http/https and does not target loopback, link-local, or private LAN addresses.
+    public static func isSafeHttpUrl(_ urlStr: String) -> Bool {
+        let trimmed = urlStr.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let components = URLComponents(string: trimmed),
+              let scheme = components.scheme?.lowercased(),
+              scheme == "http" || scheme == "https",
+              let rawHost = components.host?.trimmingCharacters(in: CharacterSet(charactersIn: "[]")).lowercased(),
+              !rawHost.isEmpty else {
+            return false
+        }
+
+        if rawHost == "localhost" ||
+            rawHost.hasSuffix(".localhost") ||
+            rawHost.hasSuffix(".local") ||
+            rawHost == "::1" ||
+            rawHost == "0:0:0:0:0:0:0:1" ||
+            rawHost == "0.0.0.0" ||
+            rawHost.hasPrefix("fe80:") ||
+            rawHost.hasPrefix("fc00:") ||
+            rawHost.hasPrefix("fd00:") {
+            return false
+        }
+
+        let parts = rawHost.split(separator: ".", omittingEmptySubsequences: false)
+        if parts.count == 4,
+           let a = Int(parts[0]), (0...255).contains(a),
+           let b = Int(parts[1]), (0...255).contains(b),
+           let c = Int(parts[2]), (0...255).contains(c),
+           let d = Int(parts[3]), (0...255).contains(d) {
+            _ = (c, d)
+            if a == 0 || a == 10 || a == 127 { return false }
+            if a == 169 && b == 254 { return false }
+            if a == 192 && b == 168 { return false }
+            if a == 172 && (16...31).contains(b) { return false }
+        }
+
+        return true
+    }
+
+    /// Performs an HTTP(S) request after validating URL safety (including across redirects),
+    /// enforcing `Content-Length <= maxBytes`, and bounding streamed response bytes to `maxBytes`.
+    public static func fetchBoundedData(for req: URLRequest, maxBytes: Int) async -> Data? {
+        guard maxBytes > 0,
+              let initialUrl = req.url?.absoluteString,
+              isSafeHttpUrl(initialUrl) else {
+            return nil
+        }
+
+        let taskBox = LockedTaskBox()
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                let delegate = BoundedDataDelegate(maxBytes: maxBytes, continuation: continuation)
+                let task = URLSession.shared.dataTask(with: req)
+                task.delegate = delegate
+                taskBox.setAndStart(task)
+            }
+        } onCancel: {
+            taskBox.cancel()
+        }
     }
 
     /// Inspects magic bytes of downloaded image data to return the accurate (mimeType, fileExtension).
@@ -419,5 +481,115 @@ public enum SearchParsers {
             .replacingOccurrences(of: "\\u003d", with: "=")
             .replacingOccurrences(of: "\\u0026", with: "&")
             .replacingOccurrences(of: "\\/", with: "/")
+    }
+}
+
+private final class LockedTaskBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var task: URLSessionDataTask?
+    private var isCancelled = false
+
+    func setAndStart(_ newTask: URLSessionDataTask) {
+        let shouldCancel = lock.withLock { () -> Bool in
+            self.task = newTask
+            return isCancelled
+        }
+        if shouldCancel {
+            newTask.cancel()
+        } else {
+            newTask.resume()
+        }
+    }
+
+    func cancel() {
+        let existing = lock.withLock { () -> URLSessionDataTask? in
+            isCancelled = true
+            return task
+        }
+        existing?.cancel()
+    }
+}
+
+private final class BoundedDataDelegate: NSObject, URLSessionDataDelegate, @unchecked Sendable {
+    private let maxBytes: Int
+    private let lock = NSLock()
+    private var buffer = Data()
+    private var exceededOrInvalid = false
+    private var continuation: CheckedContinuation<Data?, Never>?
+
+    init(maxBytes: Int, continuation: CheckedContinuation<Data?, Never>) {
+        self.maxBytes = maxBytes
+        self.continuation = continuation
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        guard let nextUrl = request.url?.absoluteString,
+              SearchParsers.isSafeHttpUrl(nextUrl) else {
+            lock.withLock { exceededOrInvalid = true }
+            task.cancel()
+            completionHandler(nil)
+            return
+        }
+        completionHandler(request)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        dataTask: URLSessionDataTask,
+        didReceive response: URLResponse,
+        completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
+    ) {
+        guard let http = response as? HTTPURLResponse,
+              (200...299).contains(http.statusCode),
+              let finalUrl = http.url?.absoluteString,
+              SearchParsers.isSafeHttpUrl(finalUrl) else {
+            lock.withLock { exceededOrInvalid = true }
+            completionHandler(.cancel)
+            return
+        }
+        if http.expectedContentLength > Int64(maxBytes) {
+            lock.withLock { exceededOrInvalid = true }
+            completionHandler(.cancel)
+            return
+        }
+        if http.expectedContentLength > 0 {
+            lock.withLock {
+                buffer.reserveCapacity(min(Int(http.expectedContentLength), maxBytes))
+            }
+        }
+        completionHandler(.allow)
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        let shouldCancel = lock.withLock { () -> Bool in
+            if exceededOrInvalid || buffer.count + data.count > maxBytes {
+                exceededOrInvalid = true
+                buffer.removeAll(keepingCapacity: false)
+                return true
+            }
+            buffer.append(data)
+            return false
+        }
+        if shouldCancel {
+            dataTask.cancel()
+        }
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        let (cont, result) = lock.withLock { () -> (CheckedContinuation<Data?, Never>?, Data?) in
+            let c = continuation
+            continuation = nil
+            if error != nil || exceededOrInvalid {
+                return (c, nil)
+            }
+            return (c, buffer)
+        }
+        cont?.resume(returning: result)
     }
 }

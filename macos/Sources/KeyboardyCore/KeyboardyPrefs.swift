@@ -293,14 +293,24 @@ public final class KeyboardyPrefs: ObservableObject {
         imagesInsertedTotal = defaults.integer(forKey: Keys.insertsTotal)
     }
 
-    private func ensureQuotaDatesCurrent() {
-        let formatterDay = DateFormatter()
-        formatterDay.dateFormat = "yyyy-MM-dd"
-        let todayStr = formatterDay.string(from: Date())
+    private static let formatterDay: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
 
-        let formatterMonth = DateFormatter()
-        formatterMonth.dateFormat = "yyyy-MM"
-        let monthStr = formatterMonth.string(from: Date())
+    private static let formatterMonth: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM"
+        return f
+    }()
+
+    private func ensureQuotaDatesCurrent() {
+        let now = Date()
+        let todayStr = Self.formatterDay.string(from: now)
+        let monthStr = Self.formatterMonth.string(from: now)
 
         let savedDay = defaults.string(forKey: Keys.quotaDayDate) ?? ""
         let savedMonth = defaults.string(forKey: Keys.quotaMonthDate) ?? ""

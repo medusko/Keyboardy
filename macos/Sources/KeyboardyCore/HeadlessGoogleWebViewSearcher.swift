@@ -93,20 +93,47 @@ public final class HeadlessGoogleWebViewSearcher: NSObject, WKNavigationDelegate
             // Clear any previous search DOM before navigating so stale results can never be scraped
             wv.evaluateJavaScript("if (document.body) { document.body.innerHTML = ''; }", completionHandler: nil)
 
-            let timeout = DispatchWorkItem { [weak self] in
-                Task { @MainActor in
-                    guard let self = self, self.activeSearchId == searchId else { return }
-                    self.extractAndFinish(searchId: searchId, forceComplete: true)
-                }
-            }
-            self.timeoutWorkItem = timeout
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4.5, execute: timeout)
+            self.scheduleTimeout(for: searchId, delay: 4.5)
 
             var request = URLRequest(url: initialUrl)
             request.timeoutInterval = 4.2
             request.setValue("en-US,en;q=0.9", forHTTPHeaderField: "Accept-Language")
             wv.load(request)
         }
+    }
+
+    private func scheduleTimeout(for searchId: UUID, delay: TimeInterval = 4.5) {
+        timeoutWorkItem?.cancel()
+        let timeout = DispatchWorkItem { [weak self] in
+            Task { @MainActor in
+                guard let self = self, self.activeSearchId == searchId else { return }
+                self.extractAndFinish(searchId: searchId, forceComplete: true)
+            }
+        }
+        timeoutWorkItem = timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: timeout)
+    }
+
+    public func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationAction: WKNavigationAction,
+        decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+    ) {
+        guard let url = navigationAction.request.url,
+              let scheme = url.scheme?.lowercased() else {
+            decisionHandler(.cancel)
+            return
+        }
+        if scheme == "about" {
+            decisionHandler(.allow)
+            return
+        }
+        if (scheme == "http" || scheme == "https"),
+           SearchParsers.isSafeHttpUrl(url.absoluteString) {
+            decisionHandler(.allow)
+            return
+        }
+        decisionHandler(.cancel)
     }
 
     public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -121,6 +148,7 @@ public final class HeadlessGoogleWebViewSearcher: NSObject, WKNavigationDelegate
             didFallbackToBing = true
             check1WorkItem?.cancel()
             check2WorkItem?.cancel()
+            scheduleTimeout(for: searchId, delay: 4.5)
             var req = URLRequest(url: fallbackUrl)
             req.timeoutInterval = 4.0
             req.setValue("en-US,en;q=0.9", forHTTPHeaderField: "Accept-Language")
@@ -151,9 +179,10 @@ public final class HeadlessGoogleWebViewSearcher: NSObject, WKNavigationDelegate
     }
 
     public func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-        guard webView === self.webView else { return }
+        guard webView === self.webView, let searchId = self.activeSearchId else { return }
         if !didFallbackToBing, let fallbackUrl = currentFallbackBingUrl {
             didFallbackToBing = true
+            scheduleTimeout(for: searchId, delay: 4.5)
             webView.load(URLRequest(url: fallbackUrl))
             return
         }
@@ -161,9 +190,10 @@ public final class HeadlessGoogleWebViewSearcher: NSObject, WKNavigationDelegate
     }
 
     public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-        guard webView === self.webView else { return }
+        guard webView === self.webView, let searchId = self.activeSearchId else { return }
         if !didFallbackToBing, let fallbackUrl = currentFallbackBingUrl {
             didFallbackToBing = true
+            scheduleTimeout(for: searchId, delay: 4.5)
             webView.load(URLRequest(url: fallbackUrl))
             return
         }
@@ -190,6 +220,7 @@ public final class HeadlessGoogleWebViewSearcher: NSObject, WKNavigationDelegate
                     if !self.didFallbackToBing, let fallbackUrl = self.currentFallbackBingUrl, let wv = self.webView {
                         self.googleRateLimitedUntil = Date().addingTimeInterval(300)
                         self.didFallbackToBing = true
+                        self.scheduleTimeout(for: searchId, delay: 4.5)
                         wv.load(URLRequest(url: fallbackUrl))
                         return
                     }

@@ -8,13 +8,16 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import coil.ImageLoader
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
+import coil.memory.MemoryCache
 import coil.request.ImageRequest
 import com.medusko.keyboardy.R
 import com.medusko.keyboardy.search.ImageResult
+import com.medusko.keyboardy.search.SearchParsers
 import com.medusko.keyboardy.theme.ThemePalette
 
 class ImageGridAdapter(
@@ -28,6 +31,11 @@ class ImageGridAdapter(
     private var palette: ThemePalette = ThemePalette.DARK
 
     private val imageLoader: ImageLoader = ImageLoader.Builder(context.applicationContext)
+        .memoryCache {
+            MemoryCache.Builder(context.applicationContext)
+                .maxSizePercent(0.15)
+                .build()
+        }
         .components {
             if (Build.VERSION.SDK_INT >= 28) {
                 add(ImageDecoderDecoder.Factory())
@@ -48,10 +56,26 @@ class ImageGridAdapter(
     }
 
     fun submitList(newItems: List<ImageResult>) {
+        val oldList = items.toList()
+        val prevLoadingId = loadingItemId
+        loadingItemId = null
+        val diff = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
+            override fun getOldListSize(): Int = oldList.size
+            override fun getNewListSize(): Int = newItems.size
+
+            override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+                return oldList[oldItemPosition].fullImageUrl == newItems[newItemPosition].fullImageUrl
+            }
+
+            override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
+                val oldItem = oldList[oldItemPosition]
+                val newItem = newItems[newItemPosition]
+                return oldItem == newItem && oldItem.id != prevLoadingId
+            }
+        })
         items.clear()
         items.addAll(newItems)
-        loadingItemId = null
-        notifyDataSetChanged()
+        diff.dispatchUpdatesTo(this)
     }
 
     fun setLoadingItem(id: String?) {
@@ -105,10 +129,20 @@ class ImageGridAdapter(
             overlayLoading.visibility = if (isLoading) View.VISIBLE else View.GONE
             ivThumbnail.scaleType = ImageView.ScaleType.FIT_CENTER
 
-            val primaryUrl = item.fullImageUrl.takeIf { it.isNotBlank() && it.startsWith("http") }
-            val fallbackUrl = item.thumbnailUrl.takeIf { it.isNotBlank() && it.startsWith("http") }
-            // Prefer full uncropped image or uncropped Tenor/Bing stream so cropped thumbnails never crop the preview
-            val initialUrl = primaryUrl ?: fallbackUrl ?: ""
+            val fullUrl = item.fullImageUrl.takeIf { SearchParsers.isSafeHttpUrl(it) }
+            val thumbUrl = item.thumbnailUrl.takeIf { SearchParsers.isSafeHttpUrl(it) }
+            // For static images (or Tenor AAAAM animated GIF thumbnails), load thumbnailUrl first for fast grid rendering.
+            // For non-Tenor animated GIFs where thumbnailUrl is a static frame, load fullUrl first so the GIF animates in the grid.
+            val thumbIsAnimated = thumbUrl?.lowercase()?.contains(".gif") == true
+            val initialUrl: String
+            val secondaryUrl: String?
+            if (!item.isAnimatedGif || thumbIsAnimated) {
+                initialUrl = thumbUrl ?: fullUrl ?: ""
+                secondaryUrl = if (initialUrl == thumbUrl) fullUrl else thumbUrl
+            } else {
+                initialUrl = fullUrl ?: thumbUrl ?: ""
+                secondaryUrl = if (initialUrl == fullUrl) thumbUrl else fullUrl
+            }
 
             val request = ImageRequest.Builder(itemView.context)
                 .data(initialUrl)
@@ -116,9 +150,9 @@ class ImageGridAdapter(
                 .crossfade(true)
                 .listener(
                     onError = { _, _ ->
-                        if (initialUrl != fallbackUrl && !fallbackUrl.isNullOrEmpty()) {
+                        if (initialUrl != secondaryUrl && !secondaryUrl.isNullOrEmpty()) {
                             val fallbackReq = ImageRequest.Builder(itemView.context)
-                                .data(fallbackUrl)
+                                .data(secondaryUrl)
                                 .target(ivThumbnail)
                                 .build()
                             imageLoader.enqueue(fallbackReq)

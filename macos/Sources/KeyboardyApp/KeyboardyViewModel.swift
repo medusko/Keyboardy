@@ -315,7 +315,10 @@ final class KeyboardyViewModel: ObservableObject {
             let prepared = ImageCommitService.prepareImageDataAndExtension(rawData: rawData)
             if let fileURL = ImageCommitService.saveToSharedTempDirectory(data: prepared.data, ext: prepared.ext) {
                 let provider = NSItemProvider(contentsOf: fileURL) ?? NSItemProvider(object: fileURL as NSURL)
-                provider.suggestedName = "Keyboardy_\(item.id).\(prepared.ext)"
+                let safeId = item.id
+                    .replacingOccurrences(of: #"[^A-Za-z0-9_\-]"#, with: "_", options: .regularExpression)
+                    .prefix(64)
+                provider.suggestedName = "Keyboardy_\(safeId.isEmpty ? "image" : String(safeId)).\(prepared.ext)"
                 KeyboardyPrefs.shared.recordImageInserted()
                 return provider
             }

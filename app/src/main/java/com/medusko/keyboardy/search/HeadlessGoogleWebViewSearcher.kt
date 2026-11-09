@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.view.ViewGroup
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -22,6 +23,7 @@ class HeadlessGoogleWebViewSearcher(
 ) {
     private var webView: WebView? = null
     private val mainHandler = Handler(Looper.getMainLooper())
+    private var activeSearchId: Long = 0L
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun getOrCreateWebView(): WebView {
@@ -30,6 +32,9 @@ class HeadlessGoogleWebViewSearcher(
         val wv = WebView(context.applicationContext).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
+            settings.allowFileAccess = false
+            settings.allowContentAccess = false
+            settings.setSupportMultipleWindows(false)
             settings.loadsImagesAutomatically = false // Faster! We only need the image URLs from DOM/scripts
             settings.blockNetworkImage = true
             settings.cacheMode = WebSettings.LOAD_DEFAULT
@@ -63,6 +68,9 @@ class HeadlessGoogleWebViewSearcher(
         val safeParam = if (nsfwMode) "off" else "active"
         val targetUrl = "https://www.google.com/search?q=$encoded&udm=2&hl=en&safe=$safeParam$tbsParam"
 
+        val searchId = ++activeSearchId
+        mainHandler.removeCallbacksAndMessages(null)
+
         withTimeoutOrNull(5500L) {
             suspendCancellableCoroutine { cont ->
                 val wv = try {
@@ -75,9 +83,9 @@ class HeadlessGoogleWebViewSearcher(
                 var completed = false
 
                 fun extractAndFinish() {
-                    if (completed || !cont.isActive) return
+                    if (completed || !cont.isActive || activeSearchId != searchId) return
                     wv.evaluateJavascript(EXTRACTION_JS) { rawJson ->
-                        if (completed || !cont.isActive) return@evaluateJavascript
+                        if (completed || !cont.isActive || activeSearchId != searchId) return@evaluateJavascript
                         val parsed = SearchParsers.parseGoogleWebViewJson(
                             rawEvaluateJsResult = rawJson ?: "",
                             forceGifHint = filter.animatedOnly
@@ -93,20 +101,24 @@ class HeadlessGoogleWebViewSearcher(
                     override fun shouldOverrideUrlLoading(
                         view: WebView?,
                         request: WebResourceRequest?
-                    ): Boolean = false
+                    ): Boolean {
+                        val reqUrl = request?.url?.toString().orEmpty()
+                        return !SearchParsers.isSafeHttpUrl(reqUrl)
+                    }
 
                     override fun onPageFinished(view: WebView?, url: String?) {
                         super.onPageFinished(view, url)
+                        if (activeSearchId != searchId) return
                         // Allow 350ms for Google's inline script hydration after redirect/load
                         mainHandler.postDelayed({
                             extractAndFinish()
                         }, 350L)
 
-                        // Second check at 1100ms in case Google did an enablejs redirect
+                        // Second check at 1150ms in case Google did an enablejs redirect
                         mainHandler.postDelayed({
-                            if (!completed && cont.isActive) {
+                            if (!completed && cont.isActive && activeSearchId == searchId) {
                                 wv.evaluateJavascript(EXTRACTION_JS) { rawJson ->
-                                    if (!completed && cont.isActive) {
+                                    if (!completed && cont.isActive && activeSearchId == searchId) {
                                         completed = true
                                         cont.resume(
                                             SearchParsers.parseGoogleWebViewJson(
@@ -119,12 +131,36 @@ class HeadlessGoogleWebViewSearcher(
                             }
                         }, 1150L)
                     }
+
+                    override fun onRenderProcessGone(
+                        view: WebView?,
+                        detail: RenderProcessGoneDetail?
+                    ): Boolean {
+                        mainHandler.removeCallbacksAndMessages(null)
+                        try {
+                            (view?.parent as? ViewGroup)?.removeView(view)
+                            view?.destroy()
+                        } catch (_: Exception) {
+                        }
+                        if (webView === view) {
+                            webView = null
+                        }
+                        if (!completed && cont.isActive) {
+                            completed = true
+                            cont.resume(emptyList())
+                        }
+                        return true
+                    }
                 }
 
                 cont.invokeOnCancellation {
-                    stopActiveLoading()
+                    if (activeSearchId == searchId) {
+                        stopActiveLoading()
+                    }
                 }
 
+                wv.stopLoading()
+                wv.evaluateJavascript("if (document.body) { document.body.innerHTML = ''; }", null)
                 wv.loadUrl(targetUrl)
             }
         } ?: emptyList()
@@ -135,6 +171,7 @@ class HeadlessGoogleWebViewSearcher(
      * so that typing and UI operations are never stalled.
      */
     fun stopActiveLoading() {
+        activeSearchId++
         mainHandler.removeCallbacksAndMessages(null)
         try {
             webView?.stopLoading()

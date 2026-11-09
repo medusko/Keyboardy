@@ -2,6 +2,9 @@ package com.medusko.keyboardy.search
 
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import java.net.URL
 
 object SearchParsers {
 
@@ -49,11 +52,11 @@ object SearchParsers {
                 val thumbUrl = obj.optString("turl").trim()
                 val title = obj.optString("t", "Image").trim()
 
-                if (fullUrl.startsWith("http") && seenUrls.add(fullUrl)) {
+                if (isSafeHttpUrl(fullUrl) && seenUrls.add(fullUrl)) {
                     val tenorPair = normalizeTenorGifUrls(fullUrl)
                     val effectiveThumb = when {
                         tenorPair != null -> tenorPair.first
-                        thumbUrl.isNotEmpty() -> thumbUrl
+                        thumbUrl.isNotEmpty() && isSafeHttpUrl(thumbUrl) -> thumbUrl
                             .replace("&amp;c=7", "&amp;c=0")
                             .replace("&c=7", "&c=0")
                         else -> fullUrl
@@ -106,7 +109,7 @@ object SearchParsers {
                 val thumbUrl = item.optString("thumb").trim()
                 val title = item.optString("title", "Google Image").trim()
                 val primaryUrl = fullUrl.ifEmpty { thumbUrl }
-                if (!primaryUrl.startsWith("http") || !seen.add(primaryUrl)) continue
+                if (!isSafeHttpUrl(primaryUrl) || !seen.add(primaryUrl)) continue
 
                 val isGif = forceGifHint ||
                     item.optBoolean("isGif", false) ||
@@ -117,7 +120,7 @@ object SearchParsers {
                     ImageResult(
                         id = "gweb_${i}_${primaryUrl.hashCode()}",
                         title = title,
-                        thumbnailUrl = thumbUrl.ifEmpty { primaryUrl },
+                        thumbnailUrl = thumbUrl.takeIf { isSafeHttpUrl(it) } ?: primaryUrl,
                         fullImageUrl = primaryUrl,
                         isAnimatedGif = isGif,
                         sourceLabel = "G"
@@ -140,13 +143,13 @@ object SearchParsers {
         for (match in GOOGLE_SCRIPT_PAIR_REGEX.findAll(html)) {
             val thumb = decodeUnicodeEscapes(match.groupValues[1])
             val full = decodeUnicodeEscapes(match.groupValues[2])
-            if (full.startsWith("http") && !full.contains("gstatic.com") && seen.add(full)) {
+            if (isSafeHttpUrl(full) && !full.contains("gstatic.com") && seen.add(full)) {
                 val isGif = forceGifHint || full.lowercase().contains(".gif")
                 results.add(
                     ImageResult(
                         id = "ghtml_${results.size}_${full.hashCode()}",
                         title = "Google Image",
-                        thumbnailUrl = thumb,
+                        thumbnailUrl = thumb.takeIf { isSafeHttpUrl(it) } ?: full,
                         fullImageUrl = full,
                         isAnimatedGif = isGif,
                         sourceLabel = "G"
@@ -158,7 +161,7 @@ object SearchParsers {
         if (results.isEmpty()) {
             for (match in GOOGLE_THUMB_ONLY_REGEX.findAll(html)) {
                 val thumb = decodeUnicodeEscapes(match.value)
-                if (seen.add(thumb)) {
+                if (isSafeHttpUrl(thumb) && seen.add(thumb)) {
                     results.add(
                         ImageResult(
                             id = "gthumb_${results.size}_${thumb.hashCode()}",
@@ -190,13 +193,13 @@ object SearchParsers {
                 val thumb = obj.optString("thumbnail").trim()
                 val title = obj.optString("title", "Google Image").trim()
                 val primary = full.ifEmpty { thumb }
-                if (!primary.startsWith("http")) continue
+                if (!isSafeHttpUrl(primary)) continue
                 val isGif = forceGifHint || primary.lowercase().contains(".gif")
                 results.add(
                     ImageResult(
                         id = "serp_${i}_${primary.hashCode()}",
                         title = title,
-                        thumbnailUrl = thumb.ifEmpty { primary },
+                        thumbnailUrl = thumb.takeIf { isSafeHttpUrl(it) } ?: primary,
                         fullImageUrl = primary,
                         isAnimatedGif = isGif,
                         sourceLabel = "G"
@@ -224,13 +227,13 @@ object SearchParsers {
                 val thumb = thumbObj?.optString("src")?.trim().orEmpty()
                 val title = obj.optString("title", "Brave Image").trim()
                 val primary = full.ifEmpty { thumb }
-                if (!primary.startsWith("http")) continue
+                if (!isSafeHttpUrl(primary)) continue
                 val isGif = forceGifHint || primary.lowercase().contains(".gif")
                 results.add(
                     ImageResult(
                         id = "brave_${i}_${primary.hashCode()}",
                         title = title,
-                        thumbnailUrl = thumb.ifEmpty { primary },
+                        thumbnailUrl = thumb.takeIf { isSafeHttpUrl(it) } ?: primary,
                         fullImageUrl = primary,
                         isAnimatedGif = isGif,
                         sourceLabel = "B"
@@ -298,5 +301,63 @@ object SearchParsers {
             .replace("\\u003d", "=")
             .replace("\\u0026", "&")
             .replace("\\/", "/")
+    }
+
+    /**
+     * Validates that a URL uses http/https and does not target loopback, link-local, or private LAN addresses.
+     */
+    fun isSafeHttpUrl(urlStr: String): Boolean {
+        val trimmed = urlStr.trim()
+        if (trimmed.isEmpty()) return false
+        val parsed = try {
+            URL(trimmed)
+        } catch (_: Exception) {
+            return false
+        }
+        val scheme = parsed.protocol?.lowercase() ?: return false
+        if (scheme != "http" && scheme != "https") return false
+
+        val rawHost = parsed.host?.trim()?.lowercase()?.removePrefix("[")?.removeSuffix("]") ?: return false
+        if (rawHost.isEmpty()) return false
+        if (rawHost == "localhost" ||
+            rawHost.endsWith(".localhost") ||
+            rawHost.endsWith(".local") ||
+            rawHost == "::1" ||
+            rawHost == "0:0:0:0:0:0:0:1" ||
+            rawHost == "0.0.0.0" ||
+            rawHost.startsWith("fe80:") ||
+            rawHost.startsWith("fc00:") ||
+            rawHost.startsWith("fd00:")
+        ) {
+            return false
+        }
+
+        val parts = rawHost.split('.')
+        if (parts.size == 4 && parts.all { it.toIntOrNull() in 0..255 }) {
+            val a = parts[0].toInt()
+            val b = parts[1].toInt()
+            if (a == 0 || a == 10 || a == 127) return false
+            if (a == 169 && b == 254) return false
+            if (a == 192 && b == 168) return false
+            if (a == 172 && b in 16..31) return false
+        }
+        return true
+    }
+
+    /**
+     * Reads at most [maxBytes] from [input], returning null if the stream exceeds [maxBytes].
+     */
+    fun readBoundedBytes(input: InputStream, maxBytes: Int): ByteArray? {
+        val out = ByteArrayOutputStream()
+        val buf = ByteArray(8192)
+        var total = 0
+        while (true) {
+            val n = input.read(buf)
+            if (n < 0) break
+            total += n
+            if (total > maxBytes) return null
+            out.write(buf, 0, n)
+        }
+        return out.toByteArray()
     }
 }

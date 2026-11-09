@@ -105,6 +105,7 @@ public final class ImageCommitService {
         let savedTextClipboard = NSPasteboard.general.string(forType: .string)
 
         Self.writeToPasteboard(fileURL: fileURL, data: prepared.data, mimeType: prepared.mimeType, ext: prepared.ext)
+        let expectedChangeCount = NSPasteboard.general.changeCount
 
         let myPid = ProcessInfo.processInfo.processIdentifier
         let resolvedApp: NSRunningApplication? = targetApp ?? NSWorkspace.shared.runningApplications.first(where: {
@@ -134,19 +135,21 @@ public final class ImageCommitService {
 
         if clearTargetQueryBeforePaste && trusted {
             // Select all & delete the temporary query text in the focused chat input before pasting
-            Self.synthesizeSelectAllAndDelete(targetPid: app.processIdentifier)
+            await Self.synthesizeSelectAllAndDelete(targetPid: app.processIdentifier)
             try? await Task.sleep(nanoseconds: 40_000_000)
         }
 
         // Synthesize Cmd+V (Paste) with full modifier + key hold sequence delivered to HID tap and target PID
-        Self.synthesizePasteKeystroke(targetPid: app.processIdentifier)
+        await Self.synthesizePasteKeystroke(targetPid: app.processIdentifier)
 
         if restoreClipboardAfterPaste, let previousText = savedTextClipboard {
             // Wait 3.0s before restoring old text clipboard so Slack/Discord/Messages/browsers finish reading the pasted image/GIF
             try? await Task.sleep(nanoseconds: 3_000_000_000)
             let pb = NSPasteboard.general
-            pb.clearContents()
-            pb.setString(previousText, forType: .string)
+            if pb.changeCount == expectedChangeCount {
+                pb.clearContents()
+                pb.setString(previousText, forType: .string)
+            }
         }
 
         if trusted {
@@ -191,12 +194,16 @@ public final class ImageCommitService {
         return (rawData, mimeType, ext)
     }
 
+    private static let maxImageBytes = 25 * 1024 * 1024 // 25 MB
+
     public nonisolated static func saveToSharedTempDirectory(data: Data, ext: String) -> URL? {
         let fm = FileManager.default
         let dir = fm.temporaryDirectory.appendingPathComponent("keyboardy_shared", isDirectory: true)
         do {
             if !fm.fileExists(atPath: dir.path) {
-                try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+                try fm.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            } else {
+                try? fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: dir.path)
             }
             // Prune cached images older than 10 minutes
             let cutoff = Date().addingTimeInterval(-600)
@@ -210,9 +217,12 @@ public final class ImageCommitService {
                 }
             }
 
-            let filename = "keyboardy_\(Int(Date().timeIntervalSince1970 * 1000)).\(ext)"
+            let safeExt = ext.replacingOccurrences(of: #"[^A-Za-z0-9]"#, with: "", options: .regularExpression)
+            let resolvedExt = safeExt.isEmpty ? "jpg" : safeExt
+            let filename = "keyboardy_\(Int(Date().timeIntervalSince1970 * 1000)).\(resolvedExt)"
             let targetURL = dir.appendingPathComponent(filename)
             try data.write(to: targetURL, options: .atomic)
+            try? fm.setAttributes([.posixPermissions: 0o600], ofItemAtPath: targetURL.path)
             return targetURL
         } catch {
             return nil
@@ -249,7 +259,7 @@ public final class ImageCommitService {
     /// dispatched exclusively via the system HID event tap (.cghidEventTap) to the active frontmost window.
     /// Note: We do NOT dual-dispatch to postToPid because sending to both HID and PID produces duplicate
     /// keystrokes in Chromium, Electron, Safari, and AppKit applications.
-    public nonisolated static func synthesizePasteKeystroke(targetPid: pid_t? = nil) {
+    public nonisolated static func synthesizePasteKeystroke(targetPid: pid_t? = nil) async {
         guard let src = CGEventSource(stateID: .combinedSessionState) else { return }
 
         let cmdKeyCode = CGKeyCode(55) // kVK_Command
@@ -261,7 +271,7 @@ public final class ImageCommitService {
             cmdDown.post(tap: .cghidEventTap)
         }
 
-        usleep(15_000) // 15ms delay
+        try? await Task.sleep(nanoseconds: 15_000_000) // 15ms delay
 
         // 2. 'V' down
         if let vDown = CGEvent(keyboardEventSource: src, virtualKey: vKeyCode, keyDown: true) {
@@ -269,7 +279,7 @@ public final class ImageCommitService {
             vDown.post(tap: .cghidEventTap)
         }
 
-        usleep(35_000) // 35ms hold so the target app's event loop registers the keypress
+        try? await Task.sleep(nanoseconds: 35_000_000) // 35ms hold so the target app's event loop registers the keypress
 
         // 3. 'V' up
         if let vUp = CGEvent(keyboardEventSource: src, virtualKey: vKeyCode, keyDown: false) {
@@ -277,7 +287,7 @@ public final class ImageCommitService {
             vUp.post(tap: .cghidEventTap)
         }
 
-        usleep(15_000) // 15ms delay
+        try? await Task.sleep(nanoseconds: 15_000_000) // 15ms delay
 
         // 4. Command up
         if let cmdUp = CGEvent(keyboardEventSource: src, virtualKey: cmdKeyCode, keyDown: false) {
@@ -288,7 +298,7 @@ public final class ImageCommitService {
 
     /// Synthesizes ⌘A (Select All) followed by Delete with reliable hold delays to clear temporary query text.
     /// Dispatched via the system HID tap (.cghidEventTap) to avoid duplicate key events.
-    private nonisolated static func synthesizeSelectAllAndDelete(targetPid: pid_t? = nil) {
+    private nonisolated static func synthesizeSelectAllAndDelete(targetPid: pid_t? = nil) async {
         guard let src = CGEventSource(stateID: .combinedSessionState) else { return }
 
         let cmdKeyCode = CGKeyCode(55) // kVK_Command
@@ -300,29 +310,29 @@ public final class ImageCommitService {
             cmdDown.flags = .maskCommand
             cmdDown.post(tap: .cghidEventTap)
         }
-        usleep(10_000)
+        try? await Task.sleep(nanoseconds: 10_000_000)
         if let aDown = CGEvent(keyboardEventSource: src, virtualKey: aKeyCode, keyDown: true) {
             aDown.flags = .maskCommand
             aDown.post(tap: .cghidEventTap)
         }
-        usleep(25_000)
+        try? await Task.sleep(nanoseconds: 25_000_000)
         if let aUp = CGEvent(keyboardEventSource: src, virtualKey: aKeyCode, keyDown: false) {
             aUp.flags = .maskCommand
             aUp.post(tap: .cghidEventTap)
         }
-        usleep(10_000)
+        try? await Task.sleep(nanoseconds: 10_000_000)
         if let cmdUp = CGEvent(keyboardEventSource: src, virtualKey: cmdKeyCode, keyDown: false) {
             cmdUp.flags = []
             cmdUp.post(tap: .cghidEventTap)
         }
-        usleep(25_000)
+        try? await Task.sleep(nanoseconds: 25_000_000)
 
         // Delete
         if let delDown = CGEvent(keyboardEventSource: src, virtualKey: deleteKeyCode, keyDown: true) {
             delDown.flags = []
             delDown.post(tap: .cghidEventTap)
         }
-        usleep(25_000)
+        try? await Task.sleep(nanoseconds: 25_000_000)
         if let delUp = CGEvent(keyboardEventSource: src, virtualKey: deleteKeyCode, keyDown: false) {
             delUp.flags = []
             delUp.post(tap: .cghidEventTap)
@@ -330,7 +340,8 @@ public final class ImageCommitService {
     }
 
     private nonisolated static func downloadBytes(urlStr: String) async -> Data? {
-        guard urlStr.hasPrefix("http"), let url = URL(string: urlStr) else { return nil }
+        guard SearchParsers.isSafeHttpUrl(urlStr),
+              let url = URL(string: urlStr) else { return nil }
         var req = URLRequest(url: url)
         req.httpMethod = "GET"
         req.timeoutInterval = 5.0
@@ -340,14 +351,6 @@ public final class ImageCommitService {
         )
         req.setValue("image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8", forHTTPHeaderField: "Accept")
 
-        do {
-            let (data, response) = try await URLSession.shared.data(for: req)
-            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
-                return nil
-            }
-            return data
-        } catch {
-            return nil
-        }
+        return await SearchParsers.fetchBoundedData(for: req, maxBytes: maxImageBytes)
     }
 }

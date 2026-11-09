@@ -588,7 +588,7 @@ struct SettingsView: View {
                             Text("Keyboardy for macOS \(KeyboardyVersion.displayString)")
                                 .font(.system(size: 12.5, weight: .bold))
                                 .foregroundColor(palette.textPrimary)
-                            Text("Release Candidate 1 • \(KeyboardyVersion.releaseDate)")
+                            Text("Release Candidate 2 • \(KeyboardyVersion.releaseDate)")
                                 .font(.system(size: 10.5))
                                 .foregroundColor(palette.textSecondary)
                         }

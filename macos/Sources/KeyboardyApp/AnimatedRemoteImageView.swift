@@ -13,6 +13,10 @@ struct DecodedImagePayload: @unchecked Sendable {
     var isAnimated: Bool {
         frames.count > 1 && totalDuration > 0
     }
+
+    var byteCost: Int {
+        max(frames.reduce(0) { $0 + ($1.bytesPerRow * $1.height) }, 1)
+    }
 }
 
 private final class DecodedImagePayloadBox: NSObject {
@@ -24,6 +28,7 @@ private final class DecodedImagePayloadBox: NSObject {
 
 final class RemoteImageCache: @unchecked Sendable {
     static let shared = RemoteImageCache()
+    private static let maxImageBytes = 25 * 1024 * 1024 // 25 MB
     private let dataCache = NSCache<NSString, NSData>()
     private let payloadCache = NSCache<NSString, DecodedImagePayloadBox>()
     private let lock = NSLock()
@@ -33,6 +38,7 @@ final class RemoteImageCache: @unchecked Sendable {
         dataCache.countLimit = 250
         dataCache.totalCostLimit = 180 * 1024 * 1024 // 180 MB
         payloadCache.countLimit = 120
+        payloadCache.totalCostLimit = 150 * 1024 * 1024 // 150 MB
     }
 
     func data(for url: String) -> Data? {
@@ -49,20 +55,20 @@ final class RemoteImageCache: @unchecked Sendable {
         }
         if let cachedData = data(for: url),
            let decoded = Self.decodePayload(from: cachedData) {
-            payloadCache.setObject(DecodedImagePayloadBox(decoded), forKey: url as NSString)
+            payloadCache.setObject(DecodedImagePayloadBox(decoded), forKey: url as NSString, cost: decoded.byteCost)
             return decoded
         }
         return nil
     }
 
     func storeDecodedPayload(_ payload: DecodedImagePayload, for url: String) {
-        payloadCache.setObject(DecodedImagePayloadBox(payload), forKey: url as NSString)
+        payloadCache.setObject(DecodedImagePayloadBox(payload), forKey: url as NSString, cost: payload.byteCost)
     }
 
-    /// Deduplicated download + decode so progressive grid updates never cancel an in-flight GIF download.
-    func fetchAndDecode(urlStr: String, timeout: TimeInterval) async -> DecodedImagePayload? {
-        if let existing = decodedPayload(for: urlStr) {
-            return existing
+    /// Lightweight raw-bytes prefetch that deduplicates network fetches and caches raw `Data` without decoding frames.
+    func prefetchData(urlStr: String, timeout: TimeInterval) async -> Data? {
+        if let existingData = data(for: urlStr) {
+            return existingData
         }
 
         let downloadTask: Task<Data?, Never> = lock.withLock {
@@ -81,10 +87,22 @@ final class RemoteImageCache: @unchecked Sendable {
             inFlightTasks.removeValue(forKey: urlStr)
         }
 
-        guard let data = fetchedData, data.count < 20 * 1024 * 1024 else {
+        guard let data = fetchedData, data.count <= Self.maxImageBytes else {
             return nil
         }
         store(data, for: urlStr)
+        return data
+    }
+
+    /// Deduplicated download + decode so progressive grid updates never cancel an in-flight GIF download.
+    func fetchAndDecode(urlStr: String, timeout: TimeInterval) async -> DecodedImagePayload? {
+        if let existing = decodedPayload(for: urlStr) {
+            return existing
+        }
+
+        guard let data = await prefetchData(urlStr: urlStr, timeout: timeout) else {
+            return nil
+        }
 
         let decoded = await Task.detached(priority: .userInitiated) {
             Self.decodePayload(from: data)
@@ -97,23 +115,17 @@ final class RemoteImageCache: @unchecked Sendable {
     }
 
     private static func performNetworkFetch(urlStr: String, timeout: TimeInterval) async -> Data? {
-        guard urlStr.hasPrefix("http"), let url = URL(string: urlStr) else { return nil }
+        guard SearchParsers.isSafeHttpUrl(urlStr),
+              let url = URL(string: urlStr) else { return nil }
         var req = URLRequest(url: url)
+        req.httpMethod = "GET"
         req.timeoutInterval = timeout
         req.setValue(
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
             forHTTPHeaderField: "User-Agent"
         )
         req.setValue("image/gif,image/webp,image/apng,image/*,*/*;q=0.8", forHTTPHeaderField: "Accept")
-        do {
-            let (data, response) = try await URLSession.shared.data(for: req)
-            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
-                return nil
-            }
-            return data
-        } catch {
-            return nil
-        }
+        return await SearchParsers.fetchBoundedData(for: req, maxBytes: maxImageBytes)
     }
 
     /// Decodes either a single-frame image or a multi-frame animated GIF / WebP using ImageIO (`CGImageSource`).
@@ -125,7 +137,13 @@ final class RemoteImageCache: @unchecked Sendable {
         guard totalCount > 0 else { return nil }
 
         if totalCount == 1 {
-            guard let cgImg = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
+            let singleThumbOptions: [CFString: Any] = [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceThumbnailMaxPixelSize: 512,
+                kCGImageSourceCreateThumbnailWithTransform: true
+            ]
+            guard let cgImg = CGImageSourceCreateThumbnailAtIndex(source, 0, singleThumbOptions as CFDictionary)
+                ?? CGImageSourceCreateImageAtIndex(source, 0, nil) else { return nil }
             return DecodedImagePayload(frames: [cgImg], frameDelays: [0.0], keyTimes: [0.0], totalDuration: 0)
         }
 
@@ -315,13 +333,13 @@ final class AspectFitImageContainerView: NSView, NSDraggingSource {
         mouseDownPoint = convert(event.locationInWindow, from: nil)
         didStartDrag = false
 
-        // Pre-warm full-resolution image/GIF in background in case user drags or clicks
+        // Pre-warm full-resolution image/GIF raw bytes in background in case user drags or clicks
         if let item = currentItem,
            item.fullImageUrl != item.thumbnailUrl,
            RemoteImageCache.shared.data(for: item.fullImageUrl) == nil {
             let fullUrl = item.fullImageUrl
             Task.detached(priority: .userInitiated) {
-                _ = await RemoteImageCache.shared.fetchAndDecode(urlStr: fullUrl, timeout: 6.0)
+                _ = await RemoteImageCache.shared.prefetchData(urlStr: fullUrl, timeout: 6.0)
             }
         }
     }

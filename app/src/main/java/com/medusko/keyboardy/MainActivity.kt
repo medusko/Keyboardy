@@ -471,10 +471,11 @@ class MainActivity : AppCompatActivity() {
         container.addView(titleRow)
 
         val vName = try {
-            packageManager.getPackageInfo(packageName, 0).versionName ?: "1.0.1-RC1.1"
+            packageManager.getPackageInfo(packageName, 0).versionName ?: BuildConfig.VERSION_NAME
         } catch (_: Exception) {
-            "1.0.1-RC1.1"
+            BuildConfig.VERSION_NAME
         }
+        val vCode = BuildConfig.VERSION_CODE
 
         val scrollArea = ScrollView(this).apply {
             isFillViewport = true
@@ -520,9 +521,9 @@ class MainActivity : AppCompatActivity() {
         }
         scrollContent.addView(bodyText)
 
-        // Section Label: "Release Candidate 1 & What's New"
+        // Section Label: "Release Candidate 2 & What's New"
         val sectionRcLabel = TextView(this).apply {
-            text = "Release Candidate 1 & What's New"
+            text = "Release Candidate 2 & What's New"
             setTextColor(palette.accentBlue)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f)
             typeface = Typeface.DEFAULT_BOLD
@@ -553,7 +554,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         val whatsNewText = TextView(this).apply {
-            text = "• Release Candidate 1.1: Dual distribution & open-source prep\n" +
+            text = "• Release Candidate 2: Gold & Classic launcher icon selector\n" +
                    "• Compile-time Unfiltered Mode & Ad flags for Google Play compliance\n" +
                    "• Community support & GitHub Sponsor resource links\n" +
                    "• Solid boundary bar directly on top of the keyboard area\n" +
@@ -699,7 +700,7 @@ class MainActivity : AppCompatActivity() {
 
         // Version Footer
         val footerText = TextView(this).apply {
-            text = "Keyboardy v$vName (Build 9) • Release Candidate 1.1 • Built for Android 15 / Pixel\nDesigned & Engineered by Medusko"
+            text = "Keyboardy v$vName (Build $vCode) • Release Candidate 2 • Built for Android 15 / Pixel\nDesigned & Engineered by Medusko"
             setTextColor(palette.textSecondary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f)
             typeface = Typeface.DEFAULT_BOLD

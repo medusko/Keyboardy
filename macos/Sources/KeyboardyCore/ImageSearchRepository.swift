@@ -244,11 +244,14 @@ public final class ImageSearchRepository {
         return []
     }
 
+    private static let maxTextResponseBytes = 5 * 1024 * 1024 // 5 MB
+
     private nonisolated static func httpGetString(
         _ urlStr: String,
         extraHeaders: [String: String] = [:]
     ) async -> String? {
-        guard let url = URL(string: urlStr) else { return nil }
+        guard SearchParsers.isSafeHttpUrl(urlStr),
+              let url = URL(string: urlStr) else { return nil }
         var req = URLRequest(url: url)
         req.httpMethod = "GET"
         req.timeoutInterval = 4.5
@@ -261,15 +264,10 @@ public final class ImageSearchRepository {
             req.setValue(v, forHTTPHeaderField: k)
         }
 
-        do {
-            let (data, response) = try await URLSession.shared.data(for: req)
-            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
-                return nil
-            }
-            return String(data: data, encoding: .utf8)
-        } catch {
+        guard let data = await SearchParsers.fetchBoundedData(for: req, maxBytes: maxTextResponseBytes) else {
             return nil
         }
+        return String(data: data, encoding: .utf8)
     }
 
     public nonisolated static func mergeUnique(

@@ -59,11 +59,15 @@ class ImageCommitHelper(private val context: Context) {
                 try {
                     val bmp = BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size)
                     if (bmp != null) {
-                        val out = ByteArrayOutputStream()
-                        bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
-                        finalBytes = out.toByteArray()
-                        mimeType = "image/png"
-                        ext = "png"
+                        try {
+                            val out = ByteArrayOutputStream()
+                            bmp.compress(Bitmap.CompressFormat.PNG, 100, out)
+                            finalBytes = out.toByteArray()
+                            mimeType = "image/png"
+                            ext = "png"
+                        } finally {
+                            bmp.recycle()
+                        }
                     }
                 } catch (_: Exception) {
                 }
@@ -149,7 +153,7 @@ class ImageCommitHelper(private val context: Context) {
     }
 
     private fun downloadBytes(urlStr: String): ByteArray? {
-        if (!urlStr.startsWith("http")) return null
+        if (!SearchParsers.isSafeHttpUrl(urlStr)) return null
         val conn = try {
             (URL(urlStr).openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"
@@ -167,8 +171,11 @@ class ImageCommitHelper(private val context: Context) {
         }
 
         return try {
-            if (conn.responseCode in 200..299) {
-                conn.inputStream.use { it.readBytes() }
+            if (conn.responseCode in 200..299 &&
+                SearchParsers.isSafeHttpUrl(conn.url.toString()) &&
+                conn.contentLengthLong <= MAX_IMAGE_BYTES
+            ) {
+                conn.inputStream.use { SearchParsers.readBoundedBytes(it, MAX_IMAGE_BYTES) }
             } else {
                 null
             }
@@ -177,5 +184,9 @@ class ImageCommitHelper(private val context: Context) {
         } finally {
             conn.disconnect()
         }
+    }
+
+    companion object {
+        private const val MAX_IMAGE_BYTES = 25 * 1024 * 1024 // 25 MB
     }
 }

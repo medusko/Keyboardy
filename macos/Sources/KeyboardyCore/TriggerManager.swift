@@ -13,6 +13,7 @@ public final class TriggerManager {
     private var eventHandlerRef: EventHandlerRef?
     private var globalKeyMonitor: Any?
     private var rollingTypedBuffer: String = ""
+    private var lastKeyDownTime: TimeInterval = 0
 
     private init() {
         installCarbonEventHandlerIfNeeded()
@@ -150,6 +151,18 @@ public final class TriggerManager {
         let prefix = prefs.inlineTriggerPrefix
         guard !prefix.isEmpty else { return }
 
+        let now = ProcessInfo.processInfo.systemUptime
+        if lastKeyDownTime > 0 && (now - lastKeyDownTime) > 5.0 {
+            rollingTypedBuffer = ""
+        }
+        lastKeyDownTime = now
+
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if !flags.intersection([.command, .control]).isEmpty {
+            rollingTypedBuffer = ""
+            return
+        }
+
         if event.keyCode == 51 { // Backspace
             if !rollingTypedBuffer.isEmpty {
                 rollingTypedBuffer.removeLast()
@@ -157,7 +170,8 @@ public final class TriggerManager {
             return
         }
 
-        if event.keyCode == 53 { // Escape
+        // Reset on Return (36), Tab (48), Escape (53), Keypad Enter (76), or Arrow Keys (123..126)
+        if [36, 48, 53, 76, 123, 124, 125, 126].contains(Int(event.keyCode)) {
             rollingTypedBuffer = ""
             return
         }
