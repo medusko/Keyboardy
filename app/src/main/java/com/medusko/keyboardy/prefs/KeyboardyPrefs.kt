@@ -194,10 +194,6 @@ class KeyboardyPrefs(private val context: Context) {
         get() = settingsPrefs.getBoolean(KEY_FULL_SCREEN_MODE, false)
         set(value) = settingsPrefs.edit().putBoolean(KEY_FULL_SCREEN_MODE, value).apply()
 
-    var useClassicIcon: Boolean
-        get() = settingsPrefs.getBoolean(KEY_USE_CLASSIC_ICON, false)
-        set(value) = settingsPrefs.edit().putBoolean(KEY_USE_CLASSIC_ICON, value).apply()
-
     fun cycleGridColumns(): Int {
         val next = when (gridColumns) {
             3 -> 4
@@ -342,7 +338,6 @@ class KeyboardyPrefs(private val context: Context) {
         const val KEY_ENGINE_MODE = "engine_mode"
         const val KEY_GRID_COLUMNS = "grid_columns"
         const val KEY_FULL_SCREEN_MODE = "is_full_screen_mode"
-        const val KEY_USE_CLASSIC_ICON = "use_classic_icon"
 
         const val KEY_OPTIONAL_API_KEY = "optional_api_key"
         const val KEY_SEARCH_HISTORY_JSON = "search_history_json"

@@ -34,22 +34,44 @@ class ImageSearchRepository(
             null
         }
 
+        // 2. When GIFs or Reactions are requested, also fetch fast looping Tenor GIFs in parallel
+        val tenorDeferred = if (filter.animatedOnly) {
+            async(Dispatchers.IO) {
+                fetchTenorGifImages(query)
+            }
+        } else {
+            null
+        }
+
+        fun refineForFilter(items: List<ImageResult>): List<ImageResult> =
+            SearchParsers.filterAndPrioritizeByType(
+                items = items,
+                forceGifHint = filter.animatedOnly,
+                forceTransparentHint = filter.transparentOnly
+            )
+
         when (engineMode) {
             SearchEngineMode.INSTANT_HTTP -> {
                 val fast = fetchInstantHttpImages(effectiveQuery, filter, nsfwMode)
+                val tenorItems = tenorDeferred?.await().orEmpty()
                 val apiItems = apiDeferred?.await().orEmpty()
-                val merged = mergeUnique(apiItems, fast)
+                val merged = refineForFilter(mergeUnique(apiItems + tenorItems, fast))
                 onProgressiveResults(merged)
                 merged
             }
 
             SearchEngineMode.GOOGLE_WEBVIEW -> {
                 val googleItems = headlessGoogleSearcher.searchGoogleImages(query, filter, nsfwMode)
-                val finalItems = if (googleItems.isNotEmpty()) {
-                    googleItems
-                } else {
-                    fetchInstantHttpImages(effectiveQuery, filter, nsfwMode)
-                }
+                val tenorItems = tenorDeferred?.await().orEmpty()
+                val apiItems = apiDeferred?.await().orEmpty()
+                val primary = mergeUnique(apiItems + tenorItems, googleItems)
+                val finalItems = refineForFilter(
+                    if (primary.isNotEmpty()) {
+                        primary
+                    } else {
+                        fetchInstantHttpImages(effectiveQuery, filter, nsfwMode)
+                    }
+                )
                 onProgressiveResults(finalItems)
                 finalItems
             }
@@ -64,21 +86,40 @@ class ImageSearchRepository(
 
                 // Emit instant results (~150ms) right away so the grid populates immediately!
                 val fastResults = instantDeferred.await()
+                val tenorResults = tenorDeferred?.await().orEmpty()
                 val apiResults = apiDeferred?.await().orEmpty()
-                val initialList = mergeUnique(apiResults, fastResults)
+                val initialList = refineForFilter(mergeUnique(apiResults + tenorResults, fastResults))
                 if (initialList.isNotEmpty()) {
                     onProgressiveResults(initialList)
                 }
 
                 // Await Google Headless WebView results and interleave/merge them
                 val googleResults = googleDeferred.await()
-                val combined = interleaveResults(
-                    primary = apiResults + googleResults,
-                    secondary = fastResults
+                val combined = refineForFilter(
+                    interleaveResults(
+                        primary = apiResults + tenorResults + googleResults,
+                        secondary = fastResults
+                    )
                 )
                 onProgressiveResults(combined)
                 combined
             }
+        }
+    }
+
+    private suspend fun fetchTenorGifImages(query: String): List<ImageResult> {
+        return try {
+            val stripped = query
+                .replace(Regex("\\bgifs?\\b", RegexOption.IGNORE_CASE), "")
+                .trim()
+            val baseQuery = stripped.ifEmpty { query.trim() }
+            if (baseQuery.isEmpty()) return emptyList()
+            val slug = baseQuery.split(Regex("\\s+")).filter { it.isNotEmpty() }.joinToString("-")
+            val encodedSlug = URLEncoder.encode(slug, "UTF-8").replace("+", "-")
+            val html = httpGetString("https://tenor.com/search/$encodedSlug-gifs")
+            SearchParsers.parseTenorSearchHtml(html)
+        } catch (_: Exception) {
+            emptyList()
         }
     }
 
@@ -103,7 +144,11 @@ class ImageSearchRepository(
             val url =
                 "https://www.bing.com/images/async?q=$encoded&first=0&count=35&adlt=$adltParam$qftFilter"
             val html = httpGetString(url, extraHeaders = headers)
-            SearchParsers.parseBingAsyncImagesHtml(html, forceGifHint = filter.animatedOnly)
+            SearchParsers.parseBingAsyncImagesHtml(
+                html = html,
+                forceGifHint = filter.animatedOnly,
+                forceTransparentHint = filter.transparentOnly
+            )
         } catch (_: Exception) {
             emptyList()
         }
@@ -118,12 +163,20 @@ class ImageSearchRepository(
         val encoded = URLEncoder.encode(effectiveQuery, "UTF-8")
         return try {
             if (apiKey.length >= 40 && apiKey.all { it.isLetterOrDigit() }) {
-                val tbs = if (filter.animatedOnly) "&tbs=itp:animated" else ""
+                val tbs = when {
+                    filter.animatedOnly -> "&tbs=itp:animated"
+                    filter.transparentOnly -> "&tbs=ic:trans"
+                    else -> ""
+                }
                 val safe = if (nsfwMode) "off" else "active"
                 val serpUrl =
                     "https://serpapi.com/search.json?engine=google_images&q=$encoded&safe=$safe$tbs&api_key=$apiKey"
                 val json = httpGetString(serpUrl)
-                val parsed = SearchParsers.parseSerpApiImagesJson(json, filter.animatedOnly)
+                val parsed = SearchParsers.parseSerpApiImagesJson(
+                    jsonStr = json,
+                    forceGifHint = filter.animatedOnly,
+                    forceTransparentHint = filter.transparentOnly
+                )
                 if (parsed.isNotEmpty()) return parsed
             }
             val braveSafe = if (nsfwMode) "off" else "moderate"
@@ -133,7 +186,11 @@ class ImageSearchRepository(
                 braveUrl,
                 extraHeaders = mapOf("X-Subscription-Token" to apiKey)
             )
-            SearchParsers.parseBraveImagesJson(json, filter.animatedOnly)
+            SearchParsers.parseBraveImagesJson(
+                jsonStr = json,
+                forceGifHint = filter.animatedOnly,
+                forceTransparentHint = filter.transparentOnly
+            )
         } catch (_: Exception) {
             emptyList()
         }

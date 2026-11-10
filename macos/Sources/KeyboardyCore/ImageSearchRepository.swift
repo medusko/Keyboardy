@@ -185,7 +185,7 @@ public final class ImageSearchRepository {
         guard let html = await httpGetString(urlStr) else {
             return []
         }
-        let parsed = SearchParsers.parseBingAsyncImagesHtml(html, forceGifHint: wantAnimated)
+        let parsed = SearchParsers.parseBingAsyncImagesHtml(html, forceGifHint: wantAnimated, forceTransparentHint: filter.transparentOnly)
 
         // Guard against Bing /images/async anti-scraper poisoning (where Bing returns 1 item or unrelated stock items):
         let checkQuery = rawQuery.isEmpty ? effectiveQuery : rawQuery

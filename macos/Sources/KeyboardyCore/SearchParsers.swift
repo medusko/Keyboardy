@@ -122,12 +122,57 @@ public enum SearchParsers {
         return results
     }
 
+    private static func extractUrlExtension(_ url: String) -> String {
+        let clean = url.split(separator: "?", maxSplits: 1).first.map(String.init) ?? url
+        let noHash = clean.split(separator: "#", maxSplits: 1).first.map(String.init) ?? clean
+        let lastSegment = noHash.split(separator: "/").last.map(String.init) ?? noHash
+        guard let dotIdx = lastSegment.lastIndex(of: ".") else { return "" }
+        return String(lastSegment[lastSegment.index(after: dotIdx)...]).lowercased()
+    }
+
+    public static func filterAndPrioritizeByType(
+        _ items: [ImageResult],
+        forceGifHint: Bool = false,
+        forceTransparentHint: Bool = false
+    ) -> [ImageResult] {
+        guard !items.isEmpty else { return [] }
+        if forceTransparentHint {
+            let opaqueExts: Set<String> = ["jpg", "jpeg", "jpe", "bmp"]
+            let tagged = items.map { item in
+                item.isTransparent ? item : ImageResult(
+                    id: item.id,
+                    title: item.title,
+                    thumbnailUrl: item.thumbnailUrl,
+                    fullImageUrl: item.fullImageUrl,
+                    isAnimatedGif: item.isAnimatedGif,
+                    sourceLabel: item.sourceLabel,
+                    isTransparent: true
+                )
+            }
+            let nonOpaque = tagged.filter { !opaqueExts.contains(extractUrlExtension($0.fullImageUrl)) }
+            let candidates = nonOpaque.isEmpty ? tagged : nonOpaque
+            return candidates.sorted { a, b in
+                func rank(_ item: ImageResult) -> Int {
+                    let ext = extractUrlExtension(item.fullImageUrl)
+                    switch ext {
+                    case "png": return 0
+                    case "webp": return 1
+                    case "gif": return 2
+                    default: return opaqueExts.contains(ext) ? 4 : 3
+                    }
+                }
+                return rank(a) < rank(b)
+            }
+        }
+        return items
+    }
+
     /// Parses the HTML fragment returned by https://www.bing.com/images/async?q=...
     /// Each image card embeds a JSON object inside m="{...}" with:
     ///  - murl: Direct full-resolution image or animated GIF URL
     ///  - turl: Fast thumbnail URL
     ///  - t: Title description
-    public static func parseBingAsyncImagesHtml(_ html: String, forceGifHint: Bool = false) -> [ImageResult] {
+    public static func parseBingAsyncImagesHtml(_ html: String, forceGifHint: Bool = false, forceTransparentHint: Bool = false) -> [ImageResult] {
         var results: [ImageResult] = []
         var seenUrls = Set<String>()
         let nsHtml = html as NSString
@@ -176,17 +221,18 @@ public enum SearchParsers {
                         thumbnailUrl: effectiveThumb,
                         fullImageUrl: fullUrl,
                         isAnimatedGif: isGif,
-                        sourceLabel: "⚡"
+                        sourceLabel: "⚡",
+                        isTransparent: forceTransparentHint
                     )
                 )
             }
         }
-        return results
+        return filterAndPrioritizeByType(results, forceGifHint: forceGifHint, forceTransparentHint: forceTransparentHint)
     }
 
     /// Parses JSON array returned by HeadlessGoogleWebViewSearcher.evaluateJavaScript().
     /// Expected format: [{"thumb":"https://...","full":"https://...","title":"...","isGif":true}, ...]
-    public static func parseGoogleWebViewJson(_ rawEvaluateJsResult: String, forceGifHint: Bool = false) -> [ImageResult] {
+    public static func parseGoogleWebViewJson(_ rawEvaluateJsResult: String, forceGifHint: Bool = false, forceTransparentHint: Bool = false) -> [ImageResult] {
         var results: [ImageResult] = []
         var seen = Set<String>()
         let trimmed = rawEvaluateJsResult.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -249,11 +295,12 @@ public enum SearchParsers {
                     thumbnailUrl: effectiveThumb,
                     fullImageUrl: primaryUrl,
                     isAnimatedGif: isGif,
-                    sourceLabel: srcLabel
+                    sourceLabel: srcLabel,
+                    isTransparent: forceTransparentHint
                 )
             )
         }
-        return results
+        return filterAndPrioritizeByType(results, forceGifHint: forceGifHint, forceTransparentHint: forceTransparentHint)
     }
 
     /// Parses raw Google Images HTML/script blocks if fetched directly.

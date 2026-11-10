@@ -8,6 +8,7 @@ public struct ImageResult: Identifiable, Equatable, Hashable, Sendable {
     public let fullImageUrl: String
     public let isAnimatedGif: Bool
     public let sourceLabel: String
+    public let isTransparent: Bool
 
     public init(
         id: String,
@@ -15,7 +16,8 @@ public struct ImageResult: Identifiable, Equatable, Hashable, Sendable {
         thumbnailUrl: String,
         fullImageUrl: String,
         isAnimatedGif: Bool,
-        sourceLabel: String
+        sourceLabel: String,
+        isTransparent: Bool = false
     ) {
         self.id = id
         self.title = title
@@ -23,6 +25,7 @@ public struct ImageResult: Identifiable, Equatable, Hashable, Sendable {
         self.fullImageUrl = fullImageUrl
         self.isAnimatedGif = isAnimatedGif
         self.sourceLabel = sourceLabel
+        self.isTransparent = isTransparent
     }
 }
 

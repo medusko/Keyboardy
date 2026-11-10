@@ -1,6 +1,14 @@
 package com.medusko.keyboardy.ime
 
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.ColorFilter
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.PixelFormat
+import android.graphics.RectF
+import android.graphics.drawable.Drawable
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -45,7 +53,8 @@ class ImageGridAdapter(
             override fun getNewListSize(): Int = newItems.size
 
             override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
-                return oldList[oldItemPosition].fullImageUrl == newItems[newItemPosition].fullImageUrl
+                return oldList[oldItemPosition].fullImageUrl == newItems[newItemPosition].fullImageUrl &&
+                    oldList[oldItemPosition].isTransparent == newItems[newItemPosition].isTransparent
             }
 
             override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
@@ -98,12 +107,22 @@ class ImageGridAdapter(
                 itemView.layoutParams = lp
             }
             val density = itemView.resources.displayMetrics.density
-            itemView.background = palette.createRoundedRect(
-                fillColor = palette.surfaceVariant,
-                cornerRadiusPx = 8f * density,
-                strokeWidthPx = (1f * density).toInt(),
-                strokeColor = palette.border
-            )
+            itemView.background = if (item.isTransparent) {
+                TransparencyCheckerboardDrawable(
+                    isDark = palette.isDark,
+                    cornerRadiusPx = 8f * density,
+                    strokeWidthPx = (1f * density),
+                    strokeColor = palette.border,
+                    cellSizePx = (8f * density).toInt().coerceAtLeast(6)
+                )
+            } else {
+                palette.createRoundedRect(
+                    fillColor = palette.surfaceVariant,
+                    cornerRadiusPx = 8f * density,
+                    strokeWidthPx = (1f * density).toInt(),
+                    strokeColor = palette.border
+                )
+            }
 
             tvBadgeGif.visibility = if (item.isAnimatedGif) View.VISIBLE else View.GONE
             tvBadgeSource.text = item.sourceLabel
@@ -112,12 +131,15 @@ class ImageGridAdapter(
 
             val fullUrl = item.fullImageUrl.takeIf { SearchParsers.isSafeHttpUrl(it) }
             val thumbUrl = item.thumbnailUrl.takeIf { SearchParsers.isSafeHttpUrl(it) }
-            // For static images (or Tenor AAAAM animated GIF thumbnails), load thumbnailUrl first for fast grid rendering.
-            // For non-Tenor animated GIFs where thumbnailUrl is a static frame, load fullUrl first so the GIF animates in the grid.
+            // Bing/Google thumbnails flatten transparent PNGs into opaque white-background JPEGs.
+            // When transparent results are requested, load the full PNG/WebP directly so alpha renders cleanly.
             val thumbIsAnimated = thumbUrl?.lowercase()?.contains(".gif") == true
             val initialUrl: String
             val secondaryUrl: String?
-            if (!item.isAnimatedGif || thumbIsAnimated) {
+            if (item.isTransparent) {
+                initialUrl = fullUrl ?: thumbUrl ?: ""
+                secondaryUrl = if (initialUrl == fullUrl) thumbUrl else fullUrl
+            } else if (!item.isAnimatedGif || thumbIsAnimated) {
                 initialUrl = thumbUrl ?: fullUrl ?: ""
                 secondaryUrl = if (initialUrl == thumbUrl) fullUrl else thumbUrl
             } else {
@@ -125,7 +147,12 @@ class ImageGridAdapter(
                 secondaryUrl = if (initialUrl == fullUrl) thumbUrl else fullUrl
             }
 
-            val request = ImageRequest.Builder(itemView.context)
+            if (ivThumbnail.tag != initialUrl) {
+                ivThumbnail.setImageDrawable(null)
+                ivThumbnail.tag = initialUrl
+            }
+
+            val reqBuilder = ImageRequest.Builder(itemView.context)
                 .data(initialUrl)
                 .target(ivThumbnail)
                 .crossfade(true)
@@ -140,8 +167,10 @@ class ImageGridAdapter(
                         }
                     }
                 )
-                .build()
-            imageLoader.enqueue(request)
+            if (item.isTransparent) {
+                reqBuilder.size(512)
+            }
+            imageLoader.enqueue(reqBuilder.build())
 
             itemView.setOnClickListener {
                 if (loadingItemId == null) {
@@ -149,5 +178,80 @@ class ImageGridAdapter(
                 }
             }
         }
+    }
+
+    /**
+     * Subtle rounded checkerboard background for transparent image results so alpha transparency is clearly visible.
+     */
+    private class TransparencyCheckerboardDrawable(
+        isDark: Boolean,
+        private val cornerRadiusPx: Float,
+        private val strokeWidthPx: Float,
+        strokeColor: Int,
+        private val cellSizePx: Int
+    ) : Drawable() {
+        private val lightSquarePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isDark) Color.parseColor("#232938") else Color.parseColor("#EFE9DD")
+        }
+        private val darkSquarePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = if (isDark) Color.parseColor("#1A1F2B") else Color.parseColor("#E1D9C8")
+        }
+        private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = strokeWidthPx
+            color = strokeColor
+        }
+        private val clipPath = Path()
+        private val rectF = RectF()
+
+        override fun draw(canvas: Canvas) {
+            val b = bounds
+            rectF.set(b)
+            clipPath.reset()
+            clipPath.addRoundRect(rectF, cornerRadiusPx, cornerRadiusPx, Path.Direction.CW)
+
+            val save = canvas.save()
+            canvas.clipPath(clipPath)
+            canvas.drawRect(rectF, lightSquarePaint)
+
+            var row = 0
+            var y = b.top
+            while (y < b.bottom) {
+                var col = if (row % 2 == 0) 1 else 0
+                var x = b.left + col * cellSizePx
+                while (x < b.right) {
+                    canvas.drawRect(
+                        x.toFloat(),
+                        y.toFloat(),
+                        minOf(x + cellSizePx, b.right).toFloat(),
+                        minOf(y + cellSizePx, b.bottom).toFloat(),
+                        darkSquarePaint
+                    )
+                    x += cellSizePx * 2
+                }
+                row++
+                y += cellSizePx
+            }
+            canvas.restoreToCount(save)
+
+            val halfStroke = strokeWidthPx / 2f
+            rectF.inset(halfStroke, halfStroke)
+            canvas.drawRoundRect(rectF, cornerRadiusPx, cornerRadiusPx, borderPaint)
+        }
+
+        override fun setAlpha(alpha: Int) {
+            lightSquarePaint.alpha = alpha
+            darkSquarePaint.alpha = alpha
+            borderPaint.alpha = alpha
+        }
+
+        override fun setColorFilter(colorFilter: ColorFilter?) {
+            lightSquarePaint.colorFilter = colorFilter
+            darkSquarePaint.colorFilter = colorFilter
+            borderPaint.colorFilter = colorFilter
+        }
+
+        @Deprecated("Deprecated in Java")
+        override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
     }
 }

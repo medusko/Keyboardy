@@ -378,10 +378,14 @@ class KeyboardyImeService : InputMethodService() {
         for ((filter, chipView) in filterChipViews) {
             chipView.setOnClickListener { view ->
                 performTapHaptic(view)
+                val filterChanged = currentFilter != filter
                 currentFilter = filter
                 setHistoryPanelVisible(false)
                 applyStyleIfChanged()
                 if (getCurrentQuery().isNotBlank()) {
+                    if (filterChanged) {
+                        gridAdapter?.submitList(emptyList())
+                    }
                     triggerSearch(immediate = true, hideKeyboardOnStart = true)
                 }
             }
@@ -393,6 +397,7 @@ class KeyboardyImeService : InputMethodService() {
             prefs.engineMode = prefs.engineMode.next()
             updateEngineChipUi()
             if (getCurrentQuery().isNotBlank()) {
+                gridAdapter?.submitList(emptyList())
                 triggerSearch(immediate = true, hideKeyboardOnStart = false)
             }
         }
@@ -1005,6 +1010,9 @@ class KeyboardyImeService : InputMethodService() {
         headlessGoogleSearcher?.stopActiveLoading()
         progressSearching?.visibility = View.GONE
 
+        val filterToRun = currentFilter
+        val engineToRun = prefs.engineMode
+
         searchJob = serviceScope.launch {
             if (!immediate) {
                 // Debounce search while typing by ~550ms so typing is silky smooth
@@ -1013,15 +1021,18 @@ class KeyboardyImeService : InputMethodService() {
                     return@launch
                 }
             }
+            if (filterToRun != currentFilter || engineToRun != prefs.engineMode || queryToRun != getCurrentQuery().trim()) {
+                return@launch
+            }
             progressSearching?.visibility = View.VISIBLE
             if (gridAdapter?.itemCount == 0) {
                 emptyStateContainer?.visibility = View.VISIBLE
-                tvStatusMessage?.text = "Searching ${prefs.engineMode.displayName} for \"$queryToRun\"..."
+                tvStatusMessage?.text = "Searching ${engineToRun.displayName} (${filterToRun.displayLabel}) for \"$queryToRun\"..."
             }
 
             // Record search execution count (once per distinct query/filter execution), except in incognito sessions
             if (!incognito) {
-                val countKey = "${queryToRun.lowercase()}|${currentFilter.name}|${prefs.engineMode.name}|${prefs.nsfwModeEnabled}"
+                val countKey = "${queryToRun.lowercase()}|${filterToRun.name}|${engineToRun.name}|${prefs.nsfwModeEnabled}"
                 if (countKey != lastCountedSearchQuery) {
                     lastCountedSearchQuery = countKey
                     prefs.recordSearchExecuted()
@@ -1031,11 +1042,14 @@ class KeyboardyImeService : InputMethodService() {
             val repo = searchRepository ?: return@launch
             val finalResults = repo.searchImages(
                 query = queryToRun,
-                filter = currentFilter,
-                engineMode = prefs.engineMode,
+                filter = filterToRun,
+                engineMode = engineToRun,
                 nsfwMode = prefs.nsfwModeEnabled,
                 optionalApiKey = prefs.optionalApiKey,
                 onProgressiveResults = { partialResults ->
+                    if (filterToRun != currentFilter || engineToRun != prefs.engineMode || queryToRun != getCurrentQuery().trim()) {
+                        return@searchImages
+                    }
                     if (partialResults.isNotEmpty()) {
                         emptyStateContainer?.visibility = View.GONE
                         gridAdapter?.submitList(partialResults)
@@ -1043,6 +1057,9 @@ class KeyboardyImeService : InputMethodService() {
                 }
             )
 
+            if (filterToRun != currentFilter || engineToRun != prefs.engineMode || queryToRun != getCurrentQuery().trim()) {
+                return@launch
+            }
             progressSearching?.visibility = View.GONE
             if (finalResults.isEmpty()) {
                 emptyStateContainer?.visibility = View.VISIBLE

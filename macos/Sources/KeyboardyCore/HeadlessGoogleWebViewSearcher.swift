@@ -7,6 +7,7 @@ public final class HeadlessGoogleWebViewSearcher: NSObject, WKNavigationDelegate
     private var activeSearchId: UUID?
     private var activeContinuation: CheckedContinuation<[ImageResult], Never>?
     private var currentForceGifHint: Bool = false
+    private var currentForceTransparentHint: Bool = false
     private var currentFallbackBingUrl: URL?
     private var didFallbackToBing: Bool = false
     private var googleRateLimitedUntil: Date = .distantPast
@@ -85,6 +86,7 @@ public final class HeadlessGoogleWebViewSearcher: NSObject, WKNavigationDelegate
         return await withCheckedContinuation { continuation in
             self.activeContinuation = continuation
             self.currentForceGifHint = animatedRequested
+            self.currentForceTransparentHint = filter.transparentOnly
             self.currentFallbackBingUrl = bingUrl
             self.didFallbackToBing = shouldStartWithBing
 
@@ -205,6 +207,7 @@ public final class HeadlessGoogleWebViewSearcher: NSObject, WKNavigationDelegate
               activeContinuation != nil,
               let wv = webView else { return }
         let gifHint = currentForceGifHint
+        let transHint = currentForceTransparentHint
 
         wv.evaluateJavaScript(Self.extractionJS) { [weak self] result, _ in
             Task { @MainActor in
@@ -212,7 +215,7 @@ public final class HeadlessGoogleWebViewSearcher: NSObject, WKNavigationDelegate
                       self.activeSearchId == searchId,
                       self.activeContinuation != nil else { return }
                 let rawJson = (result as? String) ?? ""
-                let parsed = SearchParsers.parseGoogleWebViewJson(rawJson, forceGifHint: gifHint)
+                let parsed = SearchParsers.parseGoogleWebViewJson(rawJson, forceGifHint: gifHint, forceTransparentHint: transHint)
                 if !parsed.isEmpty {
                     self.finishCurrentContinuation(with: parsed)
                 } else if forceComplete {

@@ -19,6 +19,10 @@ object SearchParsers {
     private val GOOGLE_THUMB_ONLY_REGEX = Regex(
         """https://encrypted-tbn0\.gstatic\.com/images\?q=tbn:[A-Za-z0-9_\-:]+"""
     )
+    private val TENOR_IMG_TAG_REGEX = Regex(
+        """<img[^>]+src="(https://media[0-9]*\.tenor\.com/[^"]+\.gif)"[^>]*alt="([^"]*)"""",
+        RegexOption.IGNORE_CASE
+    )
 
     /**
      * Converts any Tenor GIF URL into its fast ~100KB animated preview URL (`AAAAM`) and full HD URL (`AAAAC`).
@@ -34,13 +38,146 @@ object SearchParsers {
     }
 
     /**
+     * Parses Tenor search HTML into fast-loading animated GIF results using Tenor's ~100KB AAAAM preview.
+     */
+    fun parseTenorSearchHtml(html: String): List<ImageResult> {
+        val results = mutableListOf<ImageResult>()
+        val seenThumbUrls = mutableSetOf<String>()
+
+        for (match in TENOR_IMG_TAG_REGEX.findAll(html)) {
+            val rawUrl = match.groupValues[1]
+            if (rawUrl.contains("/assets/") || rawUrl.contains("tenor-logo")) continue
+            val rawAlt = unescapeHtmlEntities(match.groupValues[2]).trim()
+            val title = rawAlt.ifEmpty { "Tenor GIF" }
+            val pair = normalizeTenorGifUrls(rawUrl)
+            if (pair != null) {
+                if (seenThumbUrls.add(pair.first)) {
+                    results.add(
+                        ImageResult(
+                            id = "tenor_${results.size}_${pair.first.hashCode()}",
+                            title = title,
+                            thumbnailUrl = pair.first,
+                            fullImageUrl = pair.second,
+                            isAnimatedGif = true,
+                            sourceLabel = "GIF"
+                        )
+                    )
+                }
+            } else if (isSafeHttpUrl(rawUrl) && seenThumbUrls.add(rawUrl)) {
+                results.add(
+                    ImageResult(
+                        id = "tenor_${results.size}_${rawUrl.hashCode()}",
+                        title = title,
+                        thumbnailUrl = rawUrl,
+                        fullImageUrl = rawUrl,
+                        isAnimatedGif = true,
+                        sourceLabel = "GIF"
+                    )
+                )
+            }
+        }
+
+        for (match in TENOR_URL_ID_REGEX.findAll(html)) {
+            val tenorId = match.groupValues[1]
+            val slug = match.groupValues[2]
+            val thumb = "https://media.tenor.com/${tenorId}AAAAM/$slug"
+            val full = "https://media1.tenor.com/m/${tenorId}AAAAC/$slug"
+            if (seenThumbUrls.add(thumb)) {
+                val readable = slug.removeSuffix(".gif").replace('-', ' ').trim()
+                results.add(
+                    ImageResult(
+                        id = "tenor_${results.size}_${thumb.hashCode()}",
+                        title = readable.ifEmpty { "Tenor GIF" },
+                        thumbnailUrl = thumb,
+                        fullImageUrl = full,
+                        isAnimatedGif = true,
+                        sourceLabel = "GIF"
+                    )
+                )
+            }
+        }
+        return results
+    }
+
+    private fun extractUrlExtension(url: String): String {
+        val clean = url.substringBefore('?').substringBefore('#').lowercase()
+        val lastSlash = clean.lastIndexOf('/')
+        val filename = if (lastSlash >= 0) clean.substring(lastSlash + 1) else clean
+        val dot = filename.lastIndexOf('.')
+        return if (dot >= 0 && dot < filename.length - 1) filename.substring(dot + 1) else ""
+    }
+
+    private fun isStaticNonGifExt(ext: String): Boolean =
+        ext in setOf("jpg", "jpeg", "jpe", "png", "bmp", "ico")
+
+    private fun isOpaqueFormatExt(ext: String): Boolean =
+        ext in setOf("jpg", "jpeg", "jpe", "bmp")
+
+    private fun isTransparentFormatExt(ext: String): Boolean =
+        ext in setOf("png", "webp", "gif")
+
+    /**
+     * Enforces image-type filtering and ordering (e.g. drops opaque .jpg/.jpeg when transparent PNG/WebP
+     * results are available, and prioritizes genuine .gif URLs when animated GIFs are requested).
+     */
+    fun filterAndPrioritizeByType(
+        items: List<ImageResult>,
+        forceGifHint: Boolean = false,
+        forceTransparentHint: Boolean = false
+    ): List<ImageResult> {
+        if (items.isEmpty()) return emptyList()
+
+        if (forceTransparentHint) {
+            val tagged = items.map { item ->
+                if (item.isTransparent) item else item.copy(isTransparent = true)
+            }
+            val nonOpaque = tagged.filter { !isOpaqueFormatExt(extractUrlExtension(it.fullImageUrl)) }
+            val candidates = if (nonOpaque.isNotEmpty()) nonOpaque else tagged
+            return candidates.sortedBy { item ->
+                val ext = extractUrlExtension(item.fullImageUrl)
+                when {
+                    ext == "png" -> 0
+                    ext == "webp" -> 1
+                    isTransparentFormatExt(ext) -> 2
+                    !isOpaqueFormatExt(ext) -> 3
+                    else -> 4
+                }
+            }
+        }
+
+        if (forceGifHint) {
+            val genuineGifs = items.filter { item ->
+                val ext = extractUrlExtension(item.fullImageUrl)
+                val lower = item.fullImageUrl.lowercase()
+                ext == "gif" || lower.contains("tenor.com") || (!isStaticNonGifExt(ext) && item.isAnimatedGif)
+            }
+            val candidates = if (genuineGifs.isNotEmpty()) genuineGifs else items
+            return candidates.sortedBy { item ->
+                val ext = extractUrlExtension(item.fullImageUrl)
+                when {
+                    item.fullImageUrl.lowercase().contains("tenor.com") -> 0
+                    ext == "gif" || item.fullImageUrl.lowercase().contains(".gif") -> 1
+                    !isStaticNonGifExt(ext) -> 2
+                    else -> 3
+                }
+            }
+        }
+
+        return items
+    }
+
+    /**
      * Parses the HTML fragment returned by https://www.bing.com/images/async?q=...
      * Each image card embeds a JSON object inside m="{...}" with:
      *  - murl: Direct full-resolution image or animated GIF URL
      *  - turl: Fast thumbnail URL
      *  - t: Title description
      */
-    fun parseBingAsyncImagesHtml(html: String, forceGifHint: Boolean = false): List<ImageResult> {
+    fun parseBingAsyncImagesHtml(
+        html: String,
+        forceGifHint: Boolean = false,
+        forceTransparentHint: Boolean = false
+    ): List<ImageResult> {
         val results = mutableListOf<ImageResult>()
         val seenUrls = mutableSetOf<String>()
 
@@ -63,9 +200,12 @@ object SearchParsers {
                         else -> fullUrl
                     }
                     val effectiveFull = tenorPair?.second ?: fullUrl
-                    val isGif = forceGifHint ||
+                    val ext = extractUrlExtension(effectiveFull)
+                    val isGif = !isStaticNonGifExt(ext) && (
                         effectiveFull.lowercase().contains(".gif") ||
-                        title.lowercase().contains("gif")
+                            forceGifHint ||
+                            title.lowercase().contains("gif")
+                        )
 
                     results.add(
                         ImageResult(
@@ -74,7 +214,8 @@ object SearchParsers {
                             thumbnailUrl = effectiveThumb,
                             fullImageUrl = effectiveFull,
                             isAnimatedGif = isGif,
-                            sourceLabel = "⚡"
+                            sourceLabel = "⚡",
+                            isTransparent = forceTransparentHint
                         )
                     )
                 }
@@ -82,14 +223,18 @@ object SearchParsers {
                 // Ignore malformed item and continue
             }
         }
-        return results
+        return filterAndPrioritizeByType(results, forceGifHint = forceGifHint, forceTransparentHint = forceTransparentHint)
     }
 
     /**
      * Parses JSON array returned by HeadlessGoogleWebViewSearcher.evaluateJavascript().
      * Expected format: [{"thumb":"https://...","full":"https://...","title":"...","isGif":true}, ...]
      */
-    fun parseGoogleWebViewJson(rawEvaluateJsResult: String, forceGifHint: Boolean = false): List<ImageResult> {
+    fun parseGoogleWebViewJson(
+        rawEvaluateJsResult: String,
+        forceGifHint: Boolean = false,
+        forceTransparentHint: Boolean = false
+    ): List<ImageResult> {
         val results = mutableListOf<ImageResult>()
         val seen = mutableSetOf<String>()
         try {
@@ -112,10 +257,14 @@ object SearchParsers {
                 val primaryUrl = fullUrl.ifEmpty { thumbUrl }
                 if (!isSafeImageUrl(primaryUrl) || !seen.add(primaryUrl)) continue
 
-                val isGif = forceGifHint ||
+                val ext = extractUrlExtension(primaryUrl)
+                val isGif = !isStaticNonGifExt(ext) && (
                     item.optBoolean("isGif", false) ||
-                    primaryUrl.lowercase().contains(".gif") ||
-                    title.lowercase().contains("gif")
+                        primaryUrl.lowercase().contains(".gif") ||
+                        forceGifHint ||
+                        title.lowercase().contains("gif")
+                    )
+                val sourceLabel = item.optString("source", "G").ifBlank { "G" }
 
                 results.add(
                     ImageResult(
@@ -124,20 +273,25 @@ object SearchParsers {
                         thumbnailUrl = thumbUrl.takeIf { isSafeImageUrl(it) } ?: primaryUrl,
                         fullImageUrl = primaryUrl,
                         isAnimatedGif = isGif,
-                        sourceLabel = "G"
+                        sourceLabel = sourceLabel,
+                        isTransparent = forceTransparentHint
                     )
                 )
             }
         } catch (_: Exception) {
             // Return whatever was parsed so far
         }
-        return results
+        return filterAndPrioritizeByType(results, forceGifHint = forceGifHint, forceTransparentHint = forceTransparentHint)
     }
 
     /**
      * Parses raw Google Images HTML/script blocks if fetched directly.
      */
-    fun parseGoogleImagesHtml(html: String, forceGifHint: Boolean = false): List<ImageResult> {
+    fun parseGoogleImagesHtml(
+        html: String,
+        forceGifHint: Boolean = false,
+        forceTransparentHint: Boolean = false
+    ): List<ImageResult> {
         val results = mutableListOf<ImageResult>()
         val seen = mutableSetOf<String>()
 
@@ -145,7 +299,8 @@ object SearchParsers {
             val thumb = decodeUnicodeEscapes(match.groupValues[1])
             val full = decodeUnicodeEscapes(match.groupValues[2])
             if (isSafeImageUrl(full) && !full.contains("gstatic.com") && seen.add(full)) {
-                val isGif = forceGifHint || full.lowercase().contains(".gif")
+                val ext = extractUrlExtension(full)
+                val isGif = !isStaticNonGifExt(ext) && (forceGifHint || full.lowercase().contains(".gif"))
                 results.add(
                     ImageResult(
                         id = "ghtml_${results.size}_${full.hashCode()}",
@@ -153,7 +308,8 @@ object SearchParsers {
                         thumbnailUrl = thumb.takeIf { isSafeImageUrl(it) } ?: full,
                         fullImageUrl = full,
                         isAnimatedGif = isGif,
-                        sourceLabel = "G"
+                        sourceLabel = "G",
+                        isTransparent = forceTransparentHint
                     )
                 )
             }
@@ -170,20 +326,25 @@ object SearchParsers {
                             thumbnailUrl = thumb,
                             fullImageUrl = thumb,
                             isAnimatedGif = false,
-                            sourceLabel = "G"
+                            sourceLabel = "G",
+                            isTransparent = forceTransparentHint
                         )
                     )
                 }
             }
         }
 
-        return results
+        return filterAndPrioritizeByType(results, forceGifHint = forceGifHint, forceTransparentHint = forceTransparentHint)
     }
 
     /**
      * Parses optional SerpApi (engine=google_images) JSON response.
      */
-    fun parseSerpApiImagesJson(jsonStr: String, forceGifHint: Boolean = false): List<ImageResult> {
+    fun parseSerpApiImagesJson(
+        jsonStr: String,
+        forceGifHint: Boolean = false,
+        forceTransparentHint: Boolean = false
+    ): List<ImageResult> {
         val results = mutableListOf<ImageResult>()
         try {
             val root = JSONObject(jsonStr)
@@ -195,7 +356,8 @@ object SearchParsers {
                 val title = obj.optString("title", "Google Image").trim()
                 val primary = full.ifEmpty { thumb }
                 if (!isSafeHttpUrl(primary)) continue
-                val isGif = forceGifHint || primary.lowercase().contains(".gif")
+                val ext = extractUrlExtension(primary)
+                val isGif = !isStaticNonGifExt(ext) && (forceGifHint || primary.lowercase().contains(".gif"))
                 results.add(
                     ImageResult(
                         id = "serp_${i}_${primary.hashCode()}",
@@ -203,19 +365,24 @@ object SearchParsers {
                         thumbnailUrl = thumb.takeIf { isSafeHttpUrl(it) } ?: primary,
                         fullImageUrl = primary,
                         isAnimatedGif = isGif,
-                        sourceLabel = "G"
+                        sourceLabel = "G",
+                        isTransparent = forceTransparentHint
                     )
                 )
             }
         } catch (_: Exception) {
         }
-        return results
+        return filterAndPrioritizeByType(results, forceGifHint = forceGifHint, forceTransparentHint = forceTransparentHint)
     }
 
     /**
      * Parses optional Brave Search Images API JSON response.
      */
-    fun parseBraveImagesJson(jsonStr: String, forceGifHint: Boolean = false): List<ImageResult> {
+    fun parseBraveImagesJson(
+        jsonStr: String,
+        forceGifHint: Boolean = false,
+        forceTransparentHint: Boolean = false
+    ): List<ImageResult> {
         val results = mutableListOf<ImageResult>()
         try {
             val root = JSONObject(jsonStr)
@@ -229,7 +396,8 @@ object SearchParsers {
                 val title = obj.optString("title", "Brave Image").trim()
                 val primary = full.ifEmpty { thumb }
                 if (!isSafeHttpUrl(primary)) continue
-                val isGif = forceGifHint || primary.lowercase().contains(".gif")
+                val ext = extractUrlExtension(primary)
+                val isGif = !isStaticNonGifExt(ext) && (forceGifHint || primary.lowercase().contains(".gif"))
                 results.add(
                     ImageResult(
                         id = "brave_${i}_${primary.hashCode()}",
@@ -237,13 +405,14 @@ object SearchParsers {
                         thumbnailUrl = thumb.takeIf { isSafeHttpUrl(it) } ?: primary,
                         fullImageUrl = primary,
                         isAnimatedGif = isGif,
-                        sourceLabel = "B"
+                        sourceLabel = "B",
+                        isTransparent = forceTransparentHint
                     )
                 )
             }
         } catch (_: Exception) {
         }
-        return results
+        return filterAndPrioritizeByType(results, forceGifHint = forceGifHint, forceTransparentHint = forceTransparentHint)
     }
 
     /**

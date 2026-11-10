@@ -459,6 +459,26 @@ struct AnimatedRemoteImageView: NSViewRepresentable {
                 return
             }
 
+            // For transparent PNG/WebP results, load fullUrl first so alpha transparency renders cleanly (thumbnails flatten to opaque JPEG).
+            if item.isTransparent {
+                loadTask = Task { [weak self] in
+                    var fullSucceeded = false
+                    if let fullPayload = await RemoteImageCache.shared.fetchAndDecode(urlStr: fullUrl, timeout: 6.5) {
+                        fullSucceeded = true
+                        if !Task.isCancelled, let self = self, self.currentFullUrl == fullUrl {
+                            self.containerView?.applyDecodedPayload(fullPayload)
+                        }
+                    }
+                    guard !Task.isCancelled, !fullSucceeded, fullUrl != thumbUrl else { return }
+                    if let thumbPayload = await RemoteImageCache.shared.fetchAndDecode(urlStr: thumbUrl, timeout: 4.5) {
+                        if !Task.isCancelled, let self = self, self.currentFullUrl == fullUrl {
+                            self.containerView?.applyDecodedPayload(thumbPayload)
+                        }
+                    }
+                }
+                return
+            }
+
             // 2. If thumbnail is already decoded in memory, display it immediately!
             if let cachedThumbPayload = RemoteImageCache.shared.decodedPayload(for: thumbUrl) {
                 containerView?.applyDecodedPayload(cachedThumbPayload)

@@ -63,6 +63,54 @@ class SearchParsersTest {
         assertEquals("cat gif", SearchFilter.GIF.buildEffectiveQuery("cat"))
         assertEquals("cat gif", SearchFilter.GIF.buildEffectiveQuery("cat gif"))
         assertEquals("dog meme", SearchFilter.MEME.buildEffectiveQuery("dog"))
+        assertEquals("tomato transparent png", SearchFilter.TRANSPARENT.buildEffectiveQuery("tomato"))
+        assertEquals("tomato png transparent", SearchFilter.TRANSPARENT.buildEffectiveQuery("tomato png"))
+    }
+
+    @Test
+    fun `parseBingAsyncImagesHtml with forceTransparentHint drops opaque jpgs and marks transparent`() {
+        val sampleHtml = """
+            <div class="imgpt">
+                <a class="iusc" m="{&quot;murl&quot;:&quot;https://example.com/opaque.jpg&quot;,&quot;turl&quot;:&quot;https://ts1.mm.bing.net/th?id=OIP.1&quot;,&quot;t&quot;:&quot;Opaque Tomato&quot;}"></a>
+                <a class="iusc" m="{&quot;murl&quot;:&quot;https://example.com/sticker.webp&quot;,&quot;turl&quot;:&quot;https://ts2.mm.bing.net/th?id=OIP.2&quot;,&quot;t&quot;:&quot;WebP Tomato&quot;}"></a>
+                <a class="iusc" m="{&quot;murl&quot;:&quot;https://example.com/cutout.png&quot;,&quot;turl&quot;:&quot;https://ts3.mm.bing.net/th?id=OIP.3&quot;,&quot;t&quot;:&quot;PNG Tomato&quot;}"></a>
+            </div>
+        """.trimIndent()
+
+        val results = SearchParsers.parseBingAsyncImagesHtml(sampleHtml, forceTransparentHint = true)
+        assertEquals(2, results.size)
+        assertEquals("https://example.com/cutout.png", results[0].fullImageUrl)
+        assertTrue(results[0].isTransparent)
+        assertEquals("https://example.com/sticker.webp", results[1].fullImageUrl)
+        assertTrue(results[1].isTransparent)
+    }
+
+    @Test
+    fun `parseBingAsyncImagesHtml with forceGifHint prioritizes genuine gifs over static jpgs`() {
+        val sampleHtml = """
+            <div class="imgpt">
+                <a class="iusc" m="{&quot;murl&quot;:&quot;https://example.com/static.jpg&quot;,&quot;turl&quot;:&quot;https://ts1.mm.bing.net/th?id=OIP.1&quot;,&quot;t&quot;:&quot;Static&quot;}"></a>
+                <a class="iusc" m="{&quot;murl&quot;:&quot;https://example.com/anim.gif&quot;,&quot;turl&quot;:&quot;https://ts2.mm.bing.net/th?id=OIP.2&quot;,&quot;t&quot;:&quot;Animated&quot;}"></a>
+            </div>
+        """.trimIndent()
+
+        val results = SearchParsers.parseBingAsyncImagesHtml(sampleHtml, forceGifHint = true)
+        assertEquals(1, results.size)
+        assertEquals("https://example.com/anim.gif", results[0].fullImageUrl)
+        assertTrue(results[0].isAnimatedGif)
+    }
+
+    @Test
+    fun `parseTenorSearchHtml normalizes AAAAM thumb and AAAAC full urls`() {
+        val sampleHtml = """
+            <img src="https://media.tenor.com/5Pdhkfq8xYEAAAAM/spongebob-cant-wait.gif" alt="SpongeBob Excited">
+        """.trimIndent()
+
+        val results = SearchParsers.parseTenorSearchHtml(sampleHtml)
+        assertEquals(1, results.size)
+        assertEquals("https://media.tenor.com/5Pdhkfq8xYEAAAAM/spongebob-cant-wait.gif", results[0].thumbnailUrl)
+        assertEquals("https://media1.tenor.com/m/5Pdhkfq8xYEAAAAC/spongebob-cant-wait.gif", results[0].fullImageUrl)
+        assertTrue(results[0].isAnimatedGif)
     }
 
     @Test
