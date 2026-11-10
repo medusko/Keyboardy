@@ -166,9 +166,12 @@
             android:layout_height="28dp"
             android:layout_marginEnd="5dp"
             android:layout_weight="1"
+            android:drawableStart="@drawable/ic_paste"
+            android:drawablePadding="3dp"
             android:gravity="center"
-            android:text="📋 Paste"
-            android:textSize="12sp"
+            android:paddingHorizontal="6dp"
+            android:text="Paste"
+            android:textSize="11.5sp"
             android:textStyle="bold" />
 
         <TextView
@@ -177,9 +180,12 @@
             android:layout_height="28dp"
             android:layout_marginEnd="5dp"
             android:layout_weight="1"
+            android:drawableStart="@drawable/ic_copy"
+            android:drawablePadding="3dp"
             android:gravity="center"
-            android:text="📄 Copy"
-            android:textSize="12sp"
+            android:paddingHorizontal="6dp"
+            android:text="Copy"
+            android:textSize="11.5sp"
             android:textStyle="bold" />
 
         <TextView
@@ -188,9 +194,12 @@
             android:layout_height="28dp"
             android:layout_marginEnd="5dp"
             android:layout_weight="1"
+            android:drawableStart="@drawable/ic_cut"
+            android:drawablePadding="3dp"
             android:gravity="center"
-            android:text="✂️ Cut"
-            android:textSize="12sp"
+            android:paddingHorizontal="6dp"
+            android:text="Cut"
+            android:textSize="11.5sp"
             android:textStyle="bold" />
 
         <TextView
@@ -198,9 +207,12 @@
             android:layout_width="0dp"
             android:layout_height="28dp"
             android:layout_weight="1"
+            android:drawableStart="@drawable/ic_select_all"
+            android:drawablePadding="3dp"
             android:gravity="center"
-            android:text="Select All"
-            android:textSize="12sp"
+            android:paddingHorizontal="6dp"
+            android:text="All"
+            android:textSize="11.5sp"
             android:textStyle="bold" />
     </LinearLayout>
 
@@ -304,7 +316,7 @@
                 android:background="@drawable/bg_chip_inactive"
                 android:gravity="center"
                 android:paddingHorizontal="10dp"
-                android:text="⊞ 3x Grid"
+                android:text="3x Grid"
                 android:textColor="@color/kb_text_primary"
                 android:textSize="11.5sp"
                 android:textStyle="bold" />
@@ -318,7 +330,7 @@
                 android:background="@drawable/bg_chip_inactive"
                 android:gravity="center"
                 android:paddingHorizontal="10dp"
-                android:text="⛶ Fullscreen"
+                android:text="Fullscreen"
                 android:textColor="@color/kb_text_secondary"
                 android:textSize="11.5sp"
                 android:textStyle="bold" />
@@ -355,7 +367,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:gravity="center"
-                android:text="Type below to search Google Images &amp; GIFs — or tap 🕒 for your search history!"
+                android:text="Type below to search Images &amp; GIFs — or tap history for previous searches!"
                 android:textColor="@color/kb_text_secondary"
                 android:textSize="13.5sp" />
         </LinearLayout>

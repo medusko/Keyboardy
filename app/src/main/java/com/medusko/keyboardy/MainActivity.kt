@@ -448,10 +448,14 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
-        // Title Row: Info Icon + "About Keyboardy"
+        // Title Row: Info Icon + "About Keyboardy" + Top-Right Close Button (X)
         val titleRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
         }
         val infoIcon = ImageView(this).apply {
             setImageResource(R.drawable.ic_info)
@@ -465,9 +469,29 @@ class MainActivity : AppCompatActivity() {
             setTextColor(palette.textPrimary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 19f)
             typeface = Typeface.create("sans-serif-black", Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f
+            )
+        }
+        val closeTopBtn = ImageView(this).apply {
+            setImageResource(R.drawable.ic_clear)
+            setColorFilter(palette.textSecondary)
+            val pad = dpToPx(5)
+            setPadding(pad, pad, pad, pad)
+            layoutParams = LinearLayout.LayoutParams(dpToPx(28), dpToPx(28))
+            val outVal = TypedValue()
+            theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, outVal, true)
+            setBackgroundResource(outVal.resourceId)
+            contentDescription = "Close About Dialog"
+            setOnClickListener {
+                dialog.dismiss()
+            }
         }
         titleRow.addView(infoIcon)
         titleRow.addView(titleText)
+        titleRow.addView(closeTopBtn)
         container.addView(titleRow)
 
         val vName = try {
@@ -558,7 +582,7 @@ class MainActivity : AppCompatActivity() {
                    "• Compile-time Unfiltered Mode & Ad flags for Google Play compliance\n" +
                    "• Community support & GitHub Sponsor resource links\n" +
                    "• Solid boundary bar directly on top of the keyboard area\n" +
-                   "• Instant Settings button (⚙️) directly in keyboard top bar\n" +
+                   "• Instant Settings button directly in keyboard top bar\n" +
                    "• Transparent launcher app icon with smooth borders\n" +
                    "• Hybrid Google WebView + Instant Web engine with Tenor GIFs"
             setTextColor(palette.textPrimary)
@@ -624,7 +648,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         linksRow2.addView(createLinkBtn("Source Code ↗", "https://github.com/medusko/Keyboardy"))
-        linksRow2.addView(createLinkBtn("Sponsor ☕ ↗", "https://github.com/sponsors/Zlatty"))
+        linksRow2.addView(createLinkBtn("Sponsor ↗", "https://github.com/sponsors/Zlatty"))
         scrollContent.addView(linksRow2)
 
         // Contact & Social Information Card

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [android-v1.0.1-RC2-Beta] - 2026-11-09
+
+### 🌟 Release Candidate 2 Feedback & Enhancements
+- **Keyboard Selection Text Streamlining**:
+  - Simplified system Input Method name from `Keyboardy (Image & GIF Search)` to **`Keyboardy`**.
+  - Updated subtype summary text from `Google Image & GIF Search` to clean **`Image & GIF Search`** (removed third-party brand naming).
+- **Theme-Aware Vector Icons**:
+  - Replaced emojis in text selection context action bar (Paste, Copy, Cut, Select All) with Material vector drawables (`ic_paste`, `ic_copy`, `ic_cut`, `ic_select_all`) that dynamically tint in dark and light modes.
+  - Replaced emojis in word suggestion bar with vector icons (`ic_check` for spell corrections, `ic_sparkle` for default suggestions).
+  - Added dedicated vector icons for grid columns (`ic_grid`) and fullscreen toggle (`ic_fullscreen`).
+  - Retained the lightning/thunderbolt (`⚡`) engine indicator.
+- **Top-Right Close Button in About Dialog**:
+  - Added an interactive `X` icon button in the top-right corner of the About Keyboardy dialog header matching the dialog theme and providing single-tap dismissal.
+
+---
+
 ## [android-v1.0.1-RC1.1] - 2026-11-04
 
 ### 🌟 Release Candidate 1.1 Highlights

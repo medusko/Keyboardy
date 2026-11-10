@@ -6,6 +6,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
@@ -33,6 +34,8 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.ContextCompat
+import androidx.core.widget.TextViewCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.medusko.keyboardy.MainActivity
@@ -422,7 +425,7 @@ class KeyboardyImeService : InputMethodService() {
         gridAdapter?.submitList(emptyList())
         emptyStateContainer?.visibility = View.VISIBLE
         tvStatusMessage?.text =
-            "Type below to search Google Images & GIFs — or tap 🕒 for your search history!"
+            "Type below to search Images & GIFs — or tap history for previous searches!"
         updateWordSuggestions("")
         if (showQwerty) {
             setMiniQwertyVisible(true)
@@ -642,6 +645,9 @@ class KeyboardyImeService : InputMethodService() {
                 strokeColor = palette.accentBlue
             )
             ctxBtn?.setTextColor(palette.textPrimary)
+            ctxBtn?.let { btn ->
+                TextViewCompat.setCompoundDrawableTintList(btn, ColorStateList.valueOf(palette.accentBlue))
+            }
         }
 
         // Style History Panel
@@ -691,7 +697,12 @@ class KeyboardyImeService : InputMethodService() {
                 strokeColor = palette.accentBlue
             )
             setTextColor(palette.accentBlue)
-            text = "⊞ ${prefs.gridColumns}x Grid"
+            text = "${prefs.gridColumns}x Grid"
+            val d = ContextCompat.getDrawable(this@KeyboardyImeService, R.drawable.ic_grid)?.mutate()
+            d?.setBounds(0, 0, dpToPx(13), dpToPx(13))
+            d?.setTint(palette.accentBlue)
+            setCompoundDrawables(d, null, null, null)
+            compoundDrawablePadding = dpToPx(4)
         }
 
         chipFullScreen?.apply {
@@ -702,8 +713,14 @@ class KeyboardyImeService : InputMethodService() {
                 strokeWidthPx = strokePx,
                 strokeColor = if (isFull) palette.accentBluePressed else palette.accentBlue
             )
-            setTextColor(if (isFull) palette.chipActiveText else palette.accentBlue)
-            text = if (isFull) "⛶ Height: Full" else "⛶ Height: Standard"
+            val iconColor = if (isFull) palette.chipActiveText else palette.accentBlue
+            setTextColor(iconColor)
+            text = if (isFull) "Height: Full" else "Height: Standard"
+            val d = ContextCompat.getDrawable(this@KeyboardyImeService, R.drawable.ic_fullscreen)?.mutate()
+            d?.setBounds(0, 0, dpToPx(13), dpToPx(13))
+            d?.setTint(iconColor)
+            setCompoundDrawables(d, null, null, null)
+            compoundDrawablePadding = dpToPx(4)
         }
 
         // Empty State Text
@@ -817,12 +834,7 @@ class KeyboardyImeService : InputMethodService() {
 
         for (item in items) {
             val chipTv = TextView(this).apply {
-                val displayLabel = when {
-                    item.isSpellCorrection -> "✓ ${item.text}"
-                    item.isDefaultKeyword -> "✨ ${item.text}"
-                    else -> item.text
-                }
-                text = displayLabel
+                text = item.text
                 gravity = Gravity.CENTER
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f)
                 typeface = if (item.isSpellCorrection) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
@@ -833,7 +845,21 @@ class KeyboardyImeService : InputMethodService() {
                     strokeWidthPx = strokePx,
                     strokeColor = if (item.isSpellCorrection) palette.accentBlue else palette.border
                 )
-                setPadding(dpToPx(12), dpToPx(3), dpToPx(12), dpToPx(3))
+                val iconRes = when {
+                    item.isSpellCorrection -> R.drawable.ic_check
+                    item.isDefaultKeyword -> R.drawable.ic_sparkle
+                    else -> 0
+                }
+                if (iconRes != 0) {
+                    val d = ContextCompat.getDrawable(this@KeyboardyImeService, iconRes)?.mutate()
+                    d?.setBounds(0, 0, dpToPx(13), dpToPx(13))
+                    d?.setTint(palette.accentBlue)
+                    setCompoundDrawables(d, null, null, null)
+                    compoundDrawablePadding = dpToPx(4)
+                } else {
+                    setCompoundDrawables(null, null, null, null)
+                }
+                setPadding(dpToPx(10), dpToPx(3), dpToPx(10), dpToPx(3))
                 layoutParams = LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT,
                     dpToPx(28)
