@@ -1104,17 +1104,32 @@ class MainActivity : AppCompatActivity() {
         val pillColor = if (isEnabled) palette.successGreen else Color.parseColor("#FF1744")
         val pillBgAlpha = Color.argb(38, Color.red(pillColor), Color.green(pillColor), Color.blue(pillColor))
 
-        statusPillContainer.setPadding(dpToPx(8), dpToPx(3), dpToPx(8), dpToPx(3))
+        val pillHeightPx = dpToPx(26)
+        statusPillContainer.layoutParams = (statusPillContainer.layoutParams as ViewGroup.MarginLayoutParams).apply {
+            height = pillHeightPx
+            marginStart = dpToPx(10)
+        }
+        statusPillContainer.setPadding(dpToPx(10), 0, dpToPx(10), 0)
         statusPillContainer.background = palette.createRoundedRect(
             fillColor = pillBgAlpha,
             cornerRadiusPx = 20f * density,
             strokeWidthPx = strokePx,
             strokeColor = pillColor
         )
+        val dotPx = dpToPx(7)
+        statusPillDot.layoutParams = (statusPillDot.layoutParams as ViewGroup.MarginLayoutParams).apply {
+            width = dotPx
+            height = dotPx
+        }
         statusPillDot.background = palette.createRoundedRect(
             fillColor = pillColor,
             cornerRadiusPx = 10f * density
         )
+        tvStatusPillText.layoutParams = (tvStatusPillText.layoutParams as ViewGroup.MarginLayoutParams).apply {
+            marginStart = dpToPx(6)
+        }
+        tvStatusPillText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f)
+        tvStatusPillText.letterSpacing = 0.03f
         tvStatusPillText.text = if (isEnabled) "ACTIVE" else "SETUP"
         tvStatusPillText.setTextColor(pillColor)
 

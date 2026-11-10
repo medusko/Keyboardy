@@ -541,7 +541,12 @@ class KeyboardyImeService : InputMethodService() {
         val strokePx = (1f * density).toInt().coerceAtLeast(1)
 
         // Direct Bottom Bar Offset in pixels so every tap of -4 / +4 visibly moves the bottom of the keyboard!
-        val bottomOffsetPx = dpToPx(prefs.bottomNavClearanceDp)
+        val isQwertyVisible = containerMiniQwerty?.visibility != View.GONE
+        val bottomOffsetPx = if (isQwertyVisible) {
+            dpToPx(prefs.bottomNavClearanceDp)
+        } else {
+            dpToPx(8)
+        }
 
         // Height: standard mode (~74% screen) leaves clear room to see and scroll host app content,
         // while Full Screen Mode (~96% screen) maximizes search & thumbnail viewing area.
@@ -802,6 +807,20 @@ class KeyboardyImeService : InputMethodService() {
         containerMiniQwerty?.visibility = if (visible) View.VISIBLE else View.GONE
         suggestionBarScroll?.visibility = if (visible) View.VISIBLE else View.GONE
         etSearchQuery?.setCursorActive(visible)
+
+        bottomNavSpacer?.let { spacer ->
+            val targetHeightPx = if (visible) {
+                dpToPx(prefs.bottomNavClearanceDp)
+            } else {
+                dpToPx(8)
+            }
+            val lp = spacer.layoutParams
+            if (lp != null && lp.height != targetHeightPx) {
+                lp.height = targetHeightPx
+                spacer.layoutParams = lp
+                spacer.requestLayout()
+            }
+        }
     }
 
     private fun updateWordSuggestions(query: String) {

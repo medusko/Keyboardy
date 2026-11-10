@@ -17,17 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - **Light Mode**: High-contrast clean surfaces with preserved status bar icons.
   - Updated top-bar quick toggle icon to reflect current mode: **Sun icon in Light Mode**, **Moon icon in Dark Mode**.
 - **Lagatron-Aligned Status Pill**:
-  - Matched IME status indicator to Lagatron's exact design: text updated to **`ACTIVE`** (10sp bold), 7dp circular dot, 5dp spacing, 8dp x 3dp padding, `#00C853` green with 15% opacity background and 1dp border.
-- **Bottom Navigation Clearance & Snug Layout**:
-  - Removed bloated 48dp full-screen extra bottom clearance and adjusted default bottom offset from 38dp to 8dp.
-  - In Image Selection view (when typing pad is lowered), image results expand cleanly down to the navigation bar without empty void.
-  - In Keyboard Typing view, maintains comfortable ~8dp-12dp breathing room between keys and the bottom system navigation switcher icon.
-- **Fixed Blank First Image Result**:
-  - Identified root cause in web extraction where Google's header 24px SVG logo (`googleg/v6/24px.svg`) and search links were captured into image results.
-  - Added robust multi-tier image filtering in JavaScript extractor and `SearchParsers.isSafeImageUrl()` to reject non-image SVGs, branding icons, and Google search links.
-- **Classic App Icon in Medusko Gold**:
-  - Rendered a new edition of the app launcher icon blending the classic original holographic keyboard + photo frame with Medusko gold/amber keys and deep navy background, stamped with the RC2 badge.
-  - Added mipmap densities (`mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi`) and store asset (512x512).
+  - Matched IME status indicator to Lagatron's exact design & proportions: 26dp pill height, text **`ACTIVE`** in bold 11.5sp with 0.03 letter spacing, 7dp circular dot, 6dp spacing, 10dp horizontal padding, and `#00C853` green with 15% opacity background and 1dp border.
+- **Bottom Navigation Clearance & Standard Mode Spacing**:
+  - Fixed standard-height mode clearance so the system navigation bar (gesture line, back arrow, and keyboard switcher globe) sits cleanly in the bottom tray below the keys without overlapping the `Space` or `Search` buttons.
+  - In Image Selection view (when typing pad is lowered/hidden), the bottom spacer dynamically contracts to 8dp so image results fill the screen all the way down.
+- **Custom Medusko Vector App Icon**:
+  - Designed a brand new vector line-art app launcher icon matching Medusko's obsidian & warm gold aesthetic (`#0D111A` / `#FFA726` / `#F59E0B`).
+  - Features an isometric keyboard chassis with glowing keycaps, holographic projection rays, a hovering photo frame with twin mountain peaks and a radiant rising sun, and the signature pill "RC2" badge matching Lagatron.
 - **Keyboard Selection Text Streamlining**:
   - Simplified system Input Method name from `Keyboardy (Image & GIF Search)` to **`Keyboardy`**.
   - Updated subtype summary text from `Google Image & GIF Search` to clean **`Image & GIF Search`** (removed third-party brand naming).

@@ -39,12 +39,11 @@
             <LinearLayout
                 android:id="@+id/status_pill_container"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+                android:layout_height="26dp"
                 android:layout_marginStart="10dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingHorizontal="8dp"
-                android:paddingVertical="3dp">
+                android:paddingHorizontal="10dp">
 
                 <View
                     android:id="@+id/status_pill_dot"
@@ -55,10 +54,11 @@
                     android:id="@+id/tv_status_pill_text"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="5dp"
+                    android:layout_marginStart="6dp"
                     android:includeFontPadding="false"
+                    android:letterSpacing="0.03"
                     android:text="ACTIVE"
-                    android:textSize="10sp"
+                    android:textSize="11.5sp"
                     android:textStyle="bold" />
             </LinearLayout>
         </LinearLayout>
