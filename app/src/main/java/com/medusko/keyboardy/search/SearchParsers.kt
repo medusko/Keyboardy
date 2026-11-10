@@ -1,10 +1,11 @@
 package com.medusko.keyboardy.search
 
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
-import java.net.URL
+import java.net.InetAddress
 
 object SearchParsers {
 
@@ -304,44 +305,238 @@ object SearchParsers {
     }
 
     /**
-     * Validates that a URL uses http/https and does not target loopback, link-local, or private LAN addresses.
+     * Validates that a URL uses http/https, carries no embedded credentials, and does not target
+     * loopback, link-local, CGNAT, multicast, or private/internal network addresses.
      */
     fun isSafeHttpUrl(urlStr: String): Boolean {
         val trimmed = urlStr.trim()
         if (trimmed.isEmpty()) return false
-        val parsed = try {
-            URL(trimmed)
-        } catch (_: Exception) {
-            return false
-        }
-        val scheme = parsed.protocol?.lowercase() ?: return false
-        if (scheme != "http" && scheme != "https") return false
+        val parsed = trimmed.toHttpUrlOrNull() ?: return false
+        if (parsed.scheme != "http" && parsed.scheme != "https") return false
+        if (parsed.username.isNotEmpty() || parsed.password.isNotEmpty()) return false
+        return !isBlockedHostname(parsed.host)
+    }
 
-        val rawHost = parsed.host?.trim()?.lowercase()?.removePrefix("[")?.removeSuffix("]") ?: return false
-        if (rawHost.isEmpty()) return false
-        if (rawHost == "localhost" ||
-            rawHost.endsWith(".localhost") ||
-            rawHost.endsWith(".local") ||
-            rawHost == "::1" ||
-            rawHost == "0:0:0:0:0:0:0:1" ||
-            rawHost == "0.0.0.0" ||
-            rawHost.startsWith("fe80:") ||
-            rawHost.startsWith("fc00:") ||
-            rawHost.startsWith("fd00:")
+    /**
+     * Returns true if [rawHost] is localhost, an internal/reserved hostname, a single-label
+     * hostname, or any literal IPv4/IPv6 address (including decimal/octal/hex/shorthand/mapped forms)
+     * that is not a publicly routable address. Performs zero DNS network calls.
+     */
+    fun isBlockedHostname(rawHost: String): Boolean {
+        val host = rawHost.trim()
+            .removePrefix("[")
+            .removeSuffix("]")
+            .trimEnd('.')
+            .lowercase()
+        if (host.isEmpty() || host.contains('%')) return true
+
+        if (host == "localhost" ||
+            host.endsWith(".localhost") ||
+            host == "localhost.localdomain" ||
+            host == "ip6-localhost" ||
+            host == "ip6-loopback" ||
+            host == "local" ||
+            host.endsWith(".local") ||
+            host.endsWith(".internal") ||
+            host.endsWith(".arpa")
+        ) {
+            return true
+        }
+
+        val literal = parseIpLiteral(host)
+        if (literal != null) {
+            return !isPublicIpAddress(literal)
+        }
+
+        // Single-label hostnames without dots (e.g. http://router/ or http://nas/) are LAN-only.
+        if (!host.contains('.')) return true
+
+        return false
+    }
+
+    /**
+     * Returns true only if [addr] is a globally routable public IPv4 or IPv6 address.
+     */
+    fun isPublicIpAddress(addr: InetAddress): Boolean {
+        if (addr.isAnyLocalAddress ||
+            addr.isLoopbackAddress ||
+            addr.isLinkLocalAddress ||
+            addr.isSiteLocalAddress ||
+            addr.isMulticastAddress
         ) {
             return false
         }
 
-        val parts = rawHost.split('.')
-        if (parts.size == 4 && parts.all { it.toIntOrNull() in 0..255 }) {
-            val a = parts[0].toInt()
-            val b = parts[1].toInt()
-            if (a == 0 || a == 10 || a == 127) return false
-            if (a == 169 && b == 254) return false
-            if (a == 192 && b == 168) return false
-            if (a == 172 && b in 16..31) return false
+        val bytes = addr.address
+        return when (bytes.size) {
+            4 -> isPublicIpv4Bytes(bytes[0], bytes[1], bytes[2], bytes[3])
+            16 -> isPublicIpv6Bytes(bytes)
+            else -> false
         }
+    }
+
+    private fun isPublicIpv4Bytes(a0: Byte, a1: Byte, a2: Byte, @Suppress("UNUSED_PARAMETER") a3: Byte): Boolean {
+        val b0 = a0.toInt() and 0xFF
+        val b1 = a1.toInt() and 0xFF
+        val b2 = a2.toInt() and 0xFF
+
+        if (b0 == 0) return false // 0.0.0.0/8 ("this" network)
+        if (b0 == 10) return false // 10.0.0.0/8 (RFC 1918)
+        if (b0 == 100 && b1 in 64..127) return false // 100.64.0.0/10 (RFC 6598 CGNAT)
+        if (b0 == 127) return false // 127.0.0.0/8 (loopback)
+        if (b0 == 169 && b1 == 254) return false // 169.254.0.0/16 (link-local / metadata)
+        if (b0 == 172 && b1 in 16..31) return false // 172.16.0.0/12 (RFC 1918)
+        if (b0 == 192 && b1 == 0 && b2 == 0) return false // 192.0.0.0/24 (IETF protocol)
+        if (b0 == 192 && b1 == 168) return false // 192.168.0.0/16 (RFC 1918)
+        if (b0 == 198 && b1 in 18..19) return false // 198.18.0.0/15 (benchmarking)
+        if (b0 >= 224) return false // 224.0.0.0/4 multicast + 240.0.0.0/4 reserved/broadcast
         return true
+    }
+
+    private fun isPublicIpv6Bytes(bytes: ByteArray): Boolean {
+        if (bytes.size != 16) return false
+        val b0 = bytes[0].toInt() and 0xFF
+        val b1 = bytes[1].toInt() and 0xFF
+
+        // ::/128 (unspecified) or ::1/128 (loopback)
+        val first15Zero = (0..14).all { bytes[it].toInt() == 0 }
+        if (first15Zero && (bytes[15].toInt() == 0 || bytes[15].toInt() == 1)) return false
+
+        // fc00::/7 (Unique Local Addresses: fc00:: through fdff::)
+        if ((b0 and 0xFE) == 0xFC) return false
+
+        // fe80::/10 (link-local) and fec0::/10 (deprecated site-local)
+        if (b0 == 0xFE && (b1 and 0xC0) == 0x80) return false
+        if (b0 == 0xFE && (b1 and 0xC0) == 0xC0) return false
+
+        // ff00::/8 (multicast)
+        if (b0 == 0xFF) return false
+
+        // IPv4-mapped (::ffff:0:0/96) and IPv4-compatible (::/96)
+        val first10Zero = (0..9).all { bytes[it].toInt() == 0 }
+        if (first10Zero) {
+            val b10 = bytes[10].toInt() and 0xFF
+            val b11 = bytes[11].toInt() and 0xFF
+            if ((b10 == 0xFF && b11 == 0xFF) || (b10 == 0 && b11 == 0)) {
+                return isPublicIpv4Bytes(bytes[12], bytes[13], bytes[14], bytes[15])
+            }
+        }
+
+        // IPv4-translated (::ffff:0:0:0/96)
+        if ((0..7).all { bytes[it].toInt() == 0 } &&
+            (bytes[8].toInt() and 0xFF) == 0xFF &&
+            (bytes[9].toInt() and 0xFF) == 0xFF &&
+            bytes[10].toInt() == 0 &&
+            bytes[11].toInt() == 0
+        ) {
+            return isPublicIpv4Bytes(bytes[12], bytes[13], bytes[14], bytes[15])
+        }
+
+        // NAT64 (64:ff9b::/96 and local-use 64:ff9b:1::/48)
+        if (b0 == 0x00 && b1 == 0x64 &&
+            (bytes[2].toInt() and 0xFF) == 0xFF && (bytes[3].toInt() and 0xFF) == 0x9B
+        ) {
+            if ((4..11).all { bytes[it].toInt() == 0 }) {
+                return isPublicIpv4Bytes(bytes[12], bytes[13], bytes[14], bytes[15])
+            }
+            if (bytes[4].toInt() == 0 && bytes[5].toInt() == 1) {
+                return false
+            }
+        }
+
+        // 6to4 (2002::/16) embeds IPv4 in bytes 2..5
+        if (b0 == 0x20 && b1 == 0x02) {
+            return isPublicIpv4Bytes(bytes[2], bytes[3], bytes[4], bytes[5])
+        }
+
+        return true
+    }
+
+    private fun parseIpLiteral(host: String): InetAddress? {
+        parseIpv4Literal(host)?.let { ipv4Bytes ->
+            return try {
+                InetAddress.getByAddress(host, ipv4Bytes)
+            } catch (_: Exception) {
+                null
+            }
+        }
+        // Only pass strict IPv6-literal syntax (contains ':' and only hex/:/.) to InetAddress.getByName
+        // so it never triggers a DNS lookup.
+        if (host.contains(':') && host.all { it in '0'..'9' || it in 'a'..'f' || it == ':' || it == '.' }) {
+            return try {
+                InetAddress.getByName(host)
+            } catch (_: Exception) {
+                null
+            }
+        }
+        return null
+    }
+
+    /**
+     * Parses decimal, octal, hex, and shorthand IPv4 literals (e.g. 2130706433, 0177.0.0.1,
+     * 0x7f000001, 127.1) according to inet_aton semantics without performing DNS lookups.
+     */
+    private fun parseIpv4Literal(host: String): ByteArray? {
+        if (host.isEmpty()) return null
+        val parts = host.split('.')
+        if (parts.isEmpty() || parts.size > 4 || parts.any { it.isEmpty() }) return null
+
+        val nums = LongArray(parts.size)
+        for (i in parts.indices) {
+            val part = parts[i]
+            val parsed = parseIpv4Part(part) ?: return null
+            nums[i] = parsed
+        }
+
+        val value: Long = when (parts.size) {
+            1 -> {
+                if (nums[0] > 0xFFFFFFFFL) return null
+                nums[0]
+            }
+            2 -> {
+                if (nums[0] > 0xFFL || nums[1] > 0xFFFFFFL) return null
+                (nums[0] shl 24) or nums[1]
+            }
+            3 -> {
+                if (nums[0] > 0xFFL || nums[1] > 0xFFL || nums[2] > 0xFFFFL) return null
+                (nums[0] shl 24) or (nums[1] shl 16) or nums[2]
+            }
+            4 -> {
+                if (nums.any { it > 0xFFL }) return null
+                (nums[0] shl 24) or (nums[1] shl 16) or (nums[2] shl 8) or nums[3]
+            }
+            else -> return null
+        }
+
+        return byteArrayOf(
+            ((value ushr 24) and 0xFFL).toByte(),
+            ((value ushr 16) and 0xFFL).toByte(),
+            ((value ushr 8) and 0xFFL).toByte(),
+            (value and 0xFFL).toByte()
+        )
+    }
+
+    private fun parseIpv4Part(part: String): Long? {
+        if (part.isEmpty()) return null
+        return try {
+            when {
+                part.startsWith("0x") || part.startsWith("0X") -> {
+                    val hex = part.substring(2)
+                    if (hex.isEmpty() || !hex.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }) return null
+                    hex.toLong(16)
+                }
+                part.length > 1 && part.startsWith("0") -> {
+                    if (!part.all { it in '0'..'7' }) return null
+                    part.toLong(8)
+                }
+                else -> {
+                    if (!part.all { it in '0'..'9' }) return null
+                    part.toLong(10)
+                }
+            }
+        } catch (_: NumberFormatException) {
+            null
+        }
     }
 
     /**

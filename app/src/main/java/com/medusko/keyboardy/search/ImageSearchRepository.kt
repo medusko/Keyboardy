@@ -4,9 +4,6 @@ import com.medusko.keyboardy.prefs.SearchEngineMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
 
 class ImageSearchRepository(
@@ -89,8 +86,8 @@ class ImageSearchRepository(
         effectiveQuery: String,
         filter: SearchFilter,
         nsfwMode: Boolean
-    ): List<ImageResult> = withContext(Dispatchers.IO) {
-        try {
+    ): List<ImageResult> {
+        return try {
             val encoded = URLEncoder.encode(effectiveQuery, "UTF-8")
             val qftFilter = when {
                 filter.animatedOnly -> "&qft=+filterui:photo-animatedgif"
@@ -112,7 +109,7 @@ class ImageSearchRepository(
         }
     }
 
-    private fun fetchOptionalApiResults(
+    private suspend fun fetchOptionalApiResults(
         effectiveQuery: String,
         filter: SearchFilter,
         nsfwMode: Boolean,
@@ -142,40 +139,23 @@ class ImageSearchRepository(
         }
     }
 
-    private fun httpGetString(
+    private suspend fun httpGetString(
         urlStr: String,
         extraHeaders: Map<String, String> = emptyMap()
     ): String {
-        if (!SearchParsers.isSafeHttpUrl(urlStr)) return ""
-        val conn = (URL(urlStr).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 4500
-            readTimeout = 4500
-            instanceFollowRedirects = true
-            setRequestProperty(
+        val headers = buildMap {
+            put(
                 "User-Agent",
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
             )
-            setRequestProperty("Accept-Language", "en-US,en;q=0.9")
-            for ((k, v) in extraHeaders) {
-                setRequestProperty(k, v)
-            }
+            put("Accept-Language", "en-US,en;q=0.9")
+            putAll(extraHeaders)
         }
-        return try {
-            if (conn.responseCode in 200..299 &&
-                SearchParsers.isSafeHttpUrl(conn.url.toString()) &&
-                conn.contentLengthLong <= MAX_TEXT_RESPONSE_BYTES
-            ) {
-                val bytes = conn.inputStream.use {
-                    SearchParsers.readBoundedBytes(it, MAX_TEXT_RESPONSE_BYTES)
-                }
-                bytes?.toString(Charsets.UTF_8).orEmpty()
-            } else {
-                ""
-            }
-        } finally {
-            conn.disconnect()
-        }
+        return SafeNetworkClient.fetchStringBounded(
+            url = urlStr,
+            headers = headers,
+            maxBytes = MAX_TEXT_RESPONSE_BYTES
+        )
     }
 
     companion object {

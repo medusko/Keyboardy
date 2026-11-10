@@ -1,11 +1,10 @@
 package com.medusko.keyboardy.suggest
 
+import com.medusko.keyboardy.search.SafeNetworkClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
 import kotlin.math.min
 
@@ -16,6 +15,8 @@ data class SuggestionItem(
 )
 
 object SpellAndSuggestionEngine {
+
+    private const val MAX_SUGGEST_RESPONSE_BYTES = 512 * 1024 // 512 KB
 
     // Default trending GIF & meme search terms shown when search bar is blank
     val DEFAULT_SUGGESTIONS = listOf(
@@ -188,29 +189,25 @@ object SpellAndSuggestionEngine {
         val onlineList = withTimeoutOrNull(900L) {
             try {
                 val encoded = URLEncoder.encode(trimmed, "UTF-8")
-                val url = URL("https://suggestqueries.google.com/complete/search?client=firefox&q=$encoded")
-                val conn = url.openConnection() as HttpURLConnection
-                conn.connectTimeout = 800
-                conn.readTimeout = 800
-                conn.setRequestProperty("User-Agent", "Mozilla/5.0")
-                try {
-                    if (conn.responseCode == 200) {
-                        val body = conn.inputStream.bufferedReader().use { it.readText() }
-                        val jsonArray = JSONArray(body)
-                        val suggestionsArray = jsonArray.optJSONArray(1) ?: JSONArray()
-                        val items = mutableListOf<String>()
-                        for (i in 0 until min(suggestionsArray.length(), 6)) {
-                            val text = suggestionsArray.optString(i, "").trim()
-                            if (text.isNotEmpty() && !text.equals(trimmed, ignoreCase = true)) {
-                                items.add(text)
-                            }
+                val url = "https://suggestqueries.google.com/complete/search?client=firefox&q=$encoded"
+                val body = SafeNetworkClient.fetchStringBounded(
+                    url = url,
+                    headers = mapOf("User-Agent" to "Mozilla/5.0"),
+                    maxBytes = MAX_SUGGEST_RESPONSE_BYTES
+                )
+                if (body.isNotEmpty()) {
+                    val jsonArray = JSONArray(body)
+                    val suggestionsArray = jsonArray.optJSONArray(1) ?: JSONArray()
+                    val items = mutableListOf<String>()
+                    for (i in 0 until min(suggestionsArray.length(), 6)) {
+                        val text = suggestionsArray.optString(i, "").trim()
+                        if (text.isNotEmpty() && !text.equals(trimmed, ignoreCase = true)) {
+                            items.add(text)
                         }
-                        items
-                    } else {
-                        emptyList()
                     }
-                } finally {
-                    conn.disconnect()
+                    items
+                } else {
+                    emptyList()
                 }
             } catch (_: Exception) {
                 emptyList()

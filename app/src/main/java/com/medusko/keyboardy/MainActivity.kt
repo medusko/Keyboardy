@@ -33,9 +33,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
-import coil.ImageLoader
-import coil.decode.GifDecoder
-import coil.decode.ImageDecoderDecoder
+import coil.imageLoader
 import coil.request.ImageRequest
 import com.medusko.keyboardy.prefs.KeyboardScale
 import com.medusko.keyboardy.prefs.KeyboardyPrefs
@@ -162,7 +160,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         prefs = KeyboardyPrefs(this)
-        prefs.registerListener(prefChangeListener)
+        prefs.registerPrivateListener(prefChangeListener)
 
         rootScreenContainer = findViewById(R.id.root_screen_container)
         topAppBar = findViewById(R.id.top_app_bar)
@@ -294,15 +292,15 @@ class MainActivity : AppCompatActivity() {
                 WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
             )
             topAppBar.setPadding(
-                dpToPx(18),
+                bars.left + dpToPx(18),
                 bars.top + dpToPx(12),
-                dpToPx(14),
+                bars.right + dpToPx(14),
                 dpToPx(12)
             )
             mainContentContainer.setPadding(
-                dpToPx(18),
+                bars.left + dpToPx(18),
                 dpToPx(14),
-                dpToPx(18),
+                bars.right + dpToPx(18),
                 bars.bottom + dpToPx(28)
             )
             insets
@@ -382,16 +380,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Configure Live Chat Sandbox EditText to accept rich images & GIFs via CommitContent API!
-        val imageLoader = ImageLoader.Builder(this)
-            .components {
-                if (Build.VERSION.SDK_INT >= 28) {
-                    add(ImageDecoderDecoder.Factory())
-                } else {
-                    add(GifDecoder.Factory())
-                }
-            }
-            .build()
-
         ViewCompat.setOnReceiveContentListener(
             etChatSandbox,
             arrayOf("image/*", "image/png", "image/jpeg", "image/gif", "image/webp")
@@ -408,7 +396,7 @@ class MainActivity : AppCompatActivity() {
                         .data(uri)
                         .target(ivSandboxReceived)
                         .build()
-                    imageLoader.enqueue(req)
+                    applicationContext.imageLoader.enqueue(req)
                 }
             }
             null
@@ -447,7 +435,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        prefs.unregisterListener(prefChangeListener)
+        prefs.unregisterPrivateListener(prefChangeListener)
         super.onDestroy()
     }
 

@@ -14,13 +14,12 @@ import androidx.core.view.inputmethod.EditorInfoCompat
 import androidx.core.view.inputmethod.InputConnectionCompat
 import androidx.core.view.inputmethod.InputContentInfoCompat
 import com.medusko.keyboardy.search.ImageResult
+import com.medusko.keyboardy.search.SafeNetworkClient
 import com.medusko.keyboardy.search.SearchParsers
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 
 enum class CommitOutcome {
     COMMITTED_DIRECTLY,
@@ -36,14 +35,12 @@ class ImageCommitHelper(private val context: Context) {
         editorInfo: EditorInfo?,
         onBeforeCommit: (() -> Unit)? = null
     ): CommitOutcome {
-        val rawBytes = withContext(Dispatchers.IO) {
-            downloadBytes(item.fullImageUrl)
-                ?: if (item.thumbnailUrl != item.fullImageUrl) {
-                    downloadBytes(item.thumbnailUrl)
-                } else {
-                    null
-                }
-        } ?: return CommitOutcome.DOWNLOAD_FAILED
+        val rawBytes = downloadBytes(item.fullImageUrl)
+            ?: if (item.thumbnailUrl != item.fullImageUrl) {
+                downloadBytes(item.thumbnailUrl)
+            } else {
+                null
+            } ?: return CommitOutcome.DOWNLOAD_FAILED
 
         var (mimeType, ext) = SearchParsers.detectImageMimeTypeAndExtension(rawBytes)
         var finalBytes = rawBytes
@@ -152,38 +149,15 @@ class ImageCommitHelper(private val context: Context) {
         }
     }
 
-    private fun downloadBytes(urlStr: String): ByteArray? {
-        if (!SearchParsers.isSafeHttpUrl(urlStr)) return null
-        val conn = try {
-            (URL(urlStr).openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = 4500
-                readTimeout = 5000
-                instanceFollowRedirects = true
-                setRequestProperty(
-                    "User-Agent",
-                    "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
-                )
-                setRequestProperty("Accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8")
-            }
-        } catch (_: Exception) {
-            return null
-        }
-
-        return try {
-            if (conn.responseCode in 200..299 &&
-                SearchParsers.isSafeHttpUrl(conn.url.toString()) &&
-                conn.contentLengthLong <= MAX_IMAGE_BYTES
-            ) {
-                conn.inputStream.use { SearchParsers.readBoundedBytes(it, MAX_IMAGE_BYTES) }
-            } else {
-                null
-            }
-        } catch (_: Exception) {
-            null
-        } finally {
-            conn.disconnect()
-        }
+    private suspend fun downloadBytes(urlStr: String): ByteArray? {
+        return SafeNetworkClient.fetchBytesBounded(
+            url = urlStr,
+            headers = mapOf(
+                "User-Agent" to "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
+                "Accept" to "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+            ),
+            maxBytes = MAX_IMAGE_BYTES
+        )
     }
 
     companion object {

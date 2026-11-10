@@ -42,6 +42,7 @@ import com.medusko.keyboardy.MainActivity
 import com.medusko.keyboardy.R
 import com.medusko.keyboardy.prefs.KeyboardScale
 import com.medusko.keyboardy.prefs.KeyboardyPrefs
+import com.medusko.keyboardy.prefs.SearchEngineMode
 import com.medusko.keyboardy.search.HeadlessGoogleWebViewSearcher
 import com.medusko.keyboardy.search.ImageResult
 import com.medusko.keyboardy.search.ImageSearchRepository
@@ -119,6 +120,20 @@ class KeyboardyImeService : InputMethodService() {
     private var gridLayoutManager: GridLayoutManager? = null
     private var vibrator: Vibrator? = null
 
+    private data class AppliedImeStyle(
+        val isDark: Boolean,
+        val scale: KeyboardScale,
+        val gridColumns: Int,
+        val isFullScreen: Boolean,
+        val bottomClearanceDp: Int,
+        val isQwertyVisible: Boolean,
+        val screenHeightPx: Int,
+        val currentLayer: KeyboardLayer,
+        val currentFilter: SearchFilter,
+        val isHistoryVisible: Boolean,
+        val engineMode: SearchEngineMode
+    )
+
     // State
     private var currentFilter: SearchFilter = SearchFilter.ALL
     private var currentLayer: KeyboardLayer = KeyboardLayer.LETTERS
@@ -129,13 +144,21 @@ class KeyboardyImeService : InputMethodService() {
     private var suggestJob: Job? = null
     private val letterKeyViews = mutableListOf<Pair<TextView, String>>()
     private var shiftKeyView: TextView? = null
+    private var lastAppliedStyle: AppliedImeStyle? = null
+    private var lastRenderedSuggestions: List<SuggestionItem> = SpellAndSuggestionEngine.DEFAULT_SUGGESTIONS
 
-    // Real-time preference listener so changes in MainActivity apply immediately to the keyboard
+    // Real-time preference listener filtered by key so counter/history/unrelated writes never rebuild the IME.
     private val prefChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         mainHandler.post {
-            applyScaleAndTheme()
-            if (key == "nsfw_mode_enabled" && getCurrentQuery().isNotBlank()) {
-                triggerSearch(immediate = true, hideKeyboardOnStart = false)
+            when (classifyPrefChange(key)) {
+                ImePrefReaction.STYLE_UPDATE -> applyStyleIfChanged()
+                ImePrefReaction.ENGINE_CHIP_UPDATE -> updateEngineChipUi()
+                ImePrefReaction.RE_RUN_SEARCH -> {
+                    if (getCurrentQuery().isNotBlank()) {
+                        triggerSearch(immediate = true, hideKeyboardOnStart = false)
+                    }
+                }
+                ImePrefReaction.NONE -> Unit
             }
         }
     }
@@ -237,14 +260,14 @@ class KeyboardyImeService : InputMethodService() {
         chipGridScale?.setOnClickListener { view ->
             performTapHaptic(view)
             prefs.cycleGridColumns()
-            applyScaleAndTheme()
+            applyStyleIfChanged()
         }
 
         // Fullscreen Toggle Chip (toggles between standard ~74% height and ~96% fullscreen)
         chipFullScreen?.setOnClickListener { view ->
             performTapHaptic(view)
             prefs.isFullScreenMode = !prefs.isFullScreenMode
-            applyScaleAndTheme()
+            applyStyleIfChanged()
         }
 
         // Settings Button (⚙️) opens Keyboardy Settings and lowers the keyboard
@@ -357,7 +380,7 @@ class KeyboardyImeService : InputMethodService() {
                 performTapHaptic(view)
                 currentFilter = filter
                 setHistoryPanelVisible(false)
-                applyScaleAndTheme()
+                applyStyleIfChanged()
                 if (getCurrentQuery().isNotBlank()) {
                     triggerSearch(immediate = true, hideKeyboardOnStart = true)
                 }
@@ -374,18 +397,19 @@ class KeyboardyImeService : InputMethodService() {
             }
         }
 
-        applyScaleAndTheme()
+        lastAppliedStyle = null
+        applyStyleIfChanged()
         return root
     }
 
     override fun onWindowShown() {
         super.onWindowShown()
-        applyScaleAndTheme()
+        applyStyleIfChanged()
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
-        applyScaleAndTheme()
+        applyStyleIfChanged()
 
         if (!restarting) {
             currentLayer = KeyboardLayer.LETTERS
@@ -393,8 +417,10 @@ class KeyboardyImeService : InputMethodService() {
             setHistoryPanelVisible(false)
             hideSelectionActionBar()
 
-            // Optional Auto-Search from Chat Box (OFF by default so every search starts blank unless user enables it!)
-            if (prefs.autoReadAndReplaceChatQuery) {
+            // Optional Auto-Search from Chat Box (OFF by default; blocked on password/sensitive/incognito fields)
+            if (prefs.autoReadAndReplaceChatQuery &&
+                ImePrivacyPolicy.shouldAllowAutoRead(info, packageName, R.id.et_optional_api_key)
+            ) {
                 val hostText = readHostEditorText()?.trim().orEmpty()
                 if (hostText.isNotEmpty() && hostText.length <= 60 && !hostText.contains("\n")) {
                     queryOriginatedFromHostEditor = true
@@ -407,8 +433,13 @@ class KeyboardyImeService : InputMethodService() {
 
             // Default behavior: Start every new search session fresh & blank!
             resetToBlankSearch(showQwerty = true)
+        } else if (!ImePrivacyPolicy.shouldAllowAutoRead(info, packageName, R.id.et_optional_api_key)) {
+            queryOriginatedFromHostEditor = false
         }
     }
+
+    private fun isIncognitoSession(): Boolean =
+        ImePrivacyPolicy.isNoPersonalizedLearning(currentInputEditorInfo)
 
     private fun getCurrentQuery(): String = etSearchQuery?.getQueryText().orEmpty()
 
@@ -441,11 +472,17 @@ class KeyboardyImeService : InputMethodService() {
     }
 
     private fun setHistoryPanelVisible(visible: Boolean) {
+        if (isHistoryVisible == visible &&
+            (historyPanelContainer?.visibility == View.VISIBLE) == visible
+        ) {
+            return
+        }
         isHistoryVisible = visible
         historyPanelContainer?.visibility = if (visible) View.VISIBLE else View.GONE
         if (visible) {
             populateHistoryPanel(ThemePalette.forMode(prefs.isDarkMode))
         }
+        applyStyleIfChanged()
     }
 
     private fun populateHistoryPanel(palette: ThemePalette) {
@@ -531,217 +568,261 @@ class KeyboardyImeService : InputMethodService() {
     }
 
     /**
-     * Dynamically applies Light/Dark mode colors, full-screen search results height,
-     * the selected KeyboardScale for the typing pad, and Bottom Navigation Bar clearance.
+     * Applies Light/Dark mode colors, full-screen height, KeyboardScale, grid columns,
+     * and bottom clearance only for the properties that actually changed since the last pass.
      */
-    private fun applyScaleAndTheme() {
-        val palette = ThemePalette.forMode(prefs.isDarkMode)
+    private fun applyStyleIfChanged() {
+        val isDark = prefs.isDarkMode
         val scale = prefs.keyboardScale
+        val gridCols = prefs.gridColumns
+        val isFull = prefs.isFullScreenMode
+        val bottomClearanceDp = prefs.bottomNavClearanceDp
+        val isQwertyVisible = containerMiniQwerty?.visibility != View.GONE
+        val screenHeightPx = resources.displayMetrics.heightPixels
+        val engineMode = prefs.engineMode
+
+        val next = AppliedImeStyle(
+            isDark = isDark,
+            scale = scale,
+            gridColumns = gridCols,
+            isFullScreen = isFull,
+            bottomClearanceDp = bottomClearanceDp,
+            isQwertyVisible = isQwertyVisible,
+            screenHeightPx = screenHeightPx,
+            currentLayer = currentLayer,
+            currentFilter = currentFilter,
+            isHistoryVisible = isHistoryVisible,
+            engineMode = engineMode
+        )
+        val prev = lastAppliedStyle
+        if (prev == next) return
+        lastAppliedStyle = next
+
+        val themeChanged = prev == null || prev.isDark != next.isDark
+        val scaleChanged = prev == null || prev.scale != next.scale
+        val heightOrSpacerChanged = themeChanged ||
+            prev.isFullScreen != next.isFullScreen ||
+            prev.isQwertyVisible != next.isQwertyVisible ||
+            prev.bottomClearanceDp != next.bottomClearanceDp ||
+            prev.screenHeightPx != next.screenHeightPx
+        val historyChromeChanged = themeChanged || prev.isHistoryVisible != next.isHistoryVisible
+        val filterChipsChanged = themeChanged || prev.currentFilter != next.currentFilter
+        val engineChipChanged = themeChanged || prev.engineMode != next.engineMode
+        val gridChanged = themeChanged || scaleChanged || prev.gridColumns != next.gridColumns
+        val fullScreenChipChanged = themeChanged || prev.isFullScreen != next.isFullScreen
+        val keyboardPadChanged = themeChanged ||
+            scaleChanged ||
+            prev.currentLayer != next.currentLayer ||
+            containerMiniQwerty?.childCount == 0
+
+        val palette = ThemePalette.forMode(isDark)
         val density = resources.displayMetrics.density
         val strokePx = (1f * density).toInt().coerceAtLeast(1)
 
-        // Direct Bottom Bar Offset in pixels so every tap of -4 / +4 visibly moves the bottom of the keyboard!
-        val isQwertyVisible = containerMiniQwerty?.visibility != View.GONE
-        val bottomOffsetPx = if (isQwertyVisible) {
-            dpToPx(prefs.bottomNavClearanceDp)
-        } else {
-            dpToPx(8)
-        }
-
-        // Height: standard mode (~74% screen) leaves clear room to see and scroll host app content,
-        // while Full Screen Mode (~96% screen) maximizes search & thumbnail viewing area.
-        val isFull = prefs.isFullScreenMode
-        val screenHeightPx = resources.displayMetrics.heightPixels
-        val targetContainerHeightPx = if (isFull) {
-            (screenHeightPx * 0.96f).toInt()
-        } else {
-            (screenHeightPx * 0.74f).toInt().coerceAtLeast(dpToPx(420))
-        }
-
-        // Apply background and target container height directly to root IME container
-        rootImeContainer?.let { root ->
-            root.setBackgroundColor(palette.background)
-            val lp = root.layoutParams
-            if (lp != null) {
-                lp.height = targetContainerHeightPx
-                root.layoutParams = lp
+        if (heightOrSpacerChanged) {
+            val bottomOffsetPx = if (isQwertyVisible) {
+                dpToPx(bottomClearanceDp)
+            } else {
+                dpToPx(8)
             }
-            root.requestLayout()
-        }
+            val targetContainerHeightPx = if (isFull) {
+                (screenHeightPx * 0.96f).toInt()
+            } else {
+                (screenHeightPx * 0.74f).toInt().coerceAtLeast(dpToPx(420))
+            }
 
-        // Blue bar directly on top of the keyboard area
-        imeTopLine?.let { line ->
-            line.setBackgroundColor(palette.accentBlue)
-            val lp = line.layoutParams
-            if (lp != null) {
-                lp.width = ViewGroup.LayoutParams.MATCH_PARENT
-                lp.height = dpToPx(3)
-                line.layoutParams = lp
+            rootImeContainer?.let { root ->
+                root.setBackgroundColor(palette.background)
+                val lp = root.layoutParams
+                if (lp != null && lp.height != targetContainerHeightPx) {
+                    lp.height = targetContainerHeightPx
+                    root.layoutParams = lp
+                    root.requestLayout()
+                }
+            }
+
+            bottomNavSpacer?.let { spacer ->
+                spacer.setBackgroundColor(palette.keyboardTrayBg)
+                val lp = spacer.layoutParams
+                if (lp != null && lp.height != bottomOffsetPx) {
+                    lp.height = bottomOffsetPx
+                    spacer.layoutParams = lp
+                    spacer.requestLayout()
+                }
             }
         }
 
-        // Update Top Bar height
-        topBarContainer?.let { bar ->
-            val lp = bar.layoutParams
-            if (lp != null) {
-                lp.height = dpToPx(scale.topBarHeightDp)
-                bar.layoutParams = lp
+        if (scaleChanged) {
+            topBarContainer?.let { bar ->
+                val lp = bar.layoutParams
+                val targetTopHeight = dpToPx(scale.topBarHeightDp)
+                if (lp != null && lp.height != targetTopHeight) {
+                    lp.height = targetTopHeight
+                    bar.layoutParams = lp
+                }
             }
         }
 
-        // Update Bottom Nav Spacer height and color directly from bottomOffsetPx
-        bottomNavSpacer?.let { spacer ->
-            spacer.setBackgroundColor(palette.keyboardTrayBg)
-            val lp = spacer.layoutParams
-            if (lp != null) {
-                lp.height = bottomOffsetPx
-                spacer.layoutParams = lp
+        if (themeChanged) {
+            imeTopLine?.let { line ->
+                line.setBackgroundColor(palette.accentBlue)
+                val lp = line.layoutParams
+                if (lp != null) {
+                    lp.width = ViewGroup.LayoutParams.MATCH_PARENT
+                    lp.height = dpToPx(3)
+                    line.layoutParams = lp
+                }
             }
-            spacer.requestLayout()
-        }
 
-        // Style Top Bar buttons & Search Bar
-        btnBackKeyboard?.background = palette.createKeyDrawable(
-            isAccent = false,
-            cornerRadiusPx = 8f * density,
-            strokeWidthPx = strokePx
-        )
-        ivBackIcon?.setColorFilter(palette.textPrimary)
-        tvBackLabel?.setTextColor(palette.textPrimary)
-
-        btnHistory?.background = palette.createKeyDrawable(
-            isAccent = isHistoryVisible,
-            cornerRadiusPx = 8f * density,
-            strokeWidthPx = strokePx
-        )
-        ivHistoryIcon?.setColorFilter(if (isHistoryVisible) Color.WHITE else palette.textPrimary)
-
-        btnSettings?.background = palette.createKeyDrawable(
-            isAccent = false,
-            cornerRadiusPx = 8f * density,
-            strokeWidthPx = strokePx
-        )
-        ivSettingsIcon?.setColorFilter(palette.textPrimary)
-
-        searchBarContainer?.background = palette.createRoundedRect(
-            fillColor = palette.surface,
-            cornerRadiusPx = 20f * density,
-            strokeWidthPx = strokePx,
-            strokeColor = palette.border
-        )
-        ivSearchIcon?.setColorFilter(palette.textSecondary)
-        btnClearQuery?.setColorFilter(palette.textSecondary)
-        etSearchQuery?.apply {
-            setTextColor(palette.textPrimary)
-            setHintTextColor(palette.textSecondary)
-            setAccentColor(palette.accentBlue)
-        }
-
-        // Style Copy / Cut / Paste / Select All Action Bar
-        selectionActionBar?.setBackgroundColor(palette.surfaceVariant)
-        for (ctxBtn in listOf(btnCtxPaste, btnCtxCopy, btnCtxCut, btnCtxSelectAll)) {
-            ctxBtn?.background = palette.createRoundedRect(
-                fillColor = palette.surface,
+            btnBackKeyboard?.background = palette.createKeyDrawable(
+                isAccent = false,
                 cornerRadiusPx = 8f * density,
-                strokeWidthPx = strokePx,
-                strokeColor = palette.accentBlue
+                strokeWidthPx = strokePx
             )
-            ctxBtn?.setTextColor(palette.textPrimary)
-            ctxBtn?.let { btn ->
-                TextViewCompat.setCompoundDrawableTintList(btn, ColorStateList.valueOf(palette.accentBlue))
-            }
-        }
+            ivBackIcon?.setColorFilter(palette.textPrimary)
+            tvBackLabel?.setTextColor(palette.textPrimary)
 
-        // Style History Panel
-        historyPanelContainer?.setBackgroundColor(palette.background)
-        tvHistoryTitle?.setTextColor(palette.accentBlue)
-        btnClearHistory?.apply {
-            background = palette.createRoundedRect(
-                fillColor = palette.surface,
+            btnSettings?.background = palette.createKeyDrawable(
+                isAccent = false,
                 cornerRadiusPx = 8f * density,
+                strokeWidthPx = strokePx
+            )
+            ivSettingsIcon?.setColorFilter(palette.textPrimary)
+
+            searchBarContainer?.background = palette.createRoundedRect(
+                fillColor = palette.surface,
+                cornerRadiusPx = 20f * density,
                 strokeWidthPx = strokePx,
                 strokeColor = palette.border
             )
-            setTextColor(palette.textPrimary)
-        }
-        if (isHistoryVisible) {
-            populateHistoryPanel(palette)
+            ivSearchIcon?.setColorFilter(palette.textSecondary)
+            btnClearQuery?.setColorFilter(palette.textSecondary)
+            etSearchQuery?.apply {
+                setTextColor(palette.textPrimary)
+                setHintTextColor(palette.textSecondary)
+                setAccentColor(palette.accentBlue)
+            }
+
+            selectionActionBar?.setBackgroundColor(palette.surfaceVariant)
+            for (ctxBtn in listOf(btnCtxPaste, btnCtxCopy, btnCtxCut, btnCtxSelectAll)) {
+                ctxBtn?.background = palette.createRoundedRect(
+                    fillColor = palette.surface,
+                    cornerRadiusPx = 8f * density,
+                    strokeWidthPx = strokePx,
+                    strokeColor = palette.accentBlue
+                )
+                ctxBtn?.setTextColor(palette.textPrimary)
+                ctxBtn?.let { btn ->
+                    TextViewCompat.setCompoundDrawableTintList(btn, ColorStateList.valueOf(palette.accentBlue))
+                }
+            }
+
+            historyPanelContainer?.setBackgroundColor(palette.background)
+            tvHistoryTitle?.setTextColor(palette.accentBlue)
+            btnClearHistory?.apply {
+                background = palette.createRoundedRect(
+                    fillColor = palette.surface,
+                    cornerRadiusPx = 8f * density,
+                    strokeWidthPx = strokePx,
+                    strokeColor = palette.border
+                )
+                setTextColor(palette.textPrimary)
+            }
+            if (isHistoryVisible && prev != null) {
+                populateHistoryPanel(palette)
+            }
+
+            tvStatusMessage?.setTextColor(palette.textSecondary)
+            suggestionBarScroll?.setBackgroundColor(palette.keyboardTrayBg)
+            renderSuggestions(lastRenderedSuggestions, palette)
         }
 
-        // Style Filter Chips & Engine Mode Chip
-        for ((filter, view) in filterChipViews) {
-            val isActive = filter == currentFilter
-            view.background = palette.createRoundedRect(
-                fillColor = if (isActive) palette.chipActiveBg else palette.chipInactiveBg,
-                cornerRadiusPx = 14f * density,
-                strokeWidthPx = if (isActive) 0 else strokePx,
-                strokeColor = palette.border
+        if (historyChromeChanged) {
+            btnHistory?.background = palette.createKeyDrawable(
+                isAccent = isHistoryVisible,
+                cornerRadiusPx = 8f * density,
+                strokeWidthPx = strokePx
             )
-            view.setTextColor(if (isActive) palette.chipActiveText else palette.chipInactiveText)
+            ivHistoryIcon?.setColorFilter(if (isHistoryVisible) Color.WHITE else palette.textPrimary)
         }
 
-        chipEngineMode?.apply {
-            background = palette.createRoundedRect(
-                fillColor = palette.chipInactiveBg,
-                cornerRadiusPx = 14f * density,
-                strokeWidthPx = strokePx,
-                strokeColor = palette.accentBlue
-            )
-            setTextColor(palette.accentBlue)
-            text = "Engine: ${prefs.engineMode.displayName}"
+        if (filterChipsChanged) {
+            for ((filter, view) in filterChipViews) {
+                val isActive = filter == currentFilter
+                view.background = palette.createRoundedRect(
+                    fillColor = if (isActive) palette.chipActiveBg else palette.chipInactiveBg,
+                    cornerRadiusPx = 14f * density,
+                    strokeWidthPx = if (isActive) 0 else strokePx,
+                    strokeColor = palette.border
+                )
+                view.setTextColor(if (isActive) palette.chipActiveText else palette.chipInactiveText)
+            }
         }
 
-        chipGridScale?.apply {
-            background = palette.createRoundedRect(
-                fillColor = palette.chipInactiveBg,
-                cornerRadiusPx = 14f * density,
-                strokeWidthPx = strokePx,
-                strokeColor = palette.accentBlue
-            )
-            setTextColor(palette.accentBlue)
-            text = "${prefs.gridColumns}x Grid"
-            val d = ContextCompat.getDrawable(this@KeyboardyImeService, R.drawable.ic_grid)?.mutate()
-            d?.setBounds(0, 0, dpToPx(13), dpToPx(13))
-            d?.setTint(palette.accentBlue)
-            setCompoundDrawables(d, null, null, null)
-            compoundDrawablePadding = dpToPx(4)
+        if (engineChipChanged) {
+            chipEngineMode?.apply {
+                background = palette.createRoundedRect(
+                    fillColor = palette.chipInactiveBg,
+                    cornerRadiusPx = 14f * density,
+                    strokeWidthPx = strokePx,
+                    strokeColor = palette.accentBlue
+                )
+                setTextColor(palette.accentBlue)
+                text = "Engine: ${engineMode.displayName}"
+            }
         }
 
-        chipFullScreen?.apply {
-            val isFull = prefs.isFullScreenMode
-            background = palette.createRoundedRect(
-                fillColor = if (isFull) palette.chipActiveBg else palette.chipInactiveBg,
-                cornerRadiusPx = 14f * density,
-                strokeWidthPx = strokePx,
-                strokeColor = if (isFull) palette.accentBluePressed else palette.accentBlue
-            )
-            val iconColor = if (isFull) palette.chipActiveText else palette.accentBlue
-            setTextColor(iconColor)
-            text = if (isFull) "Height: Full" else "Height: Standard"
-            val d = ContextCompat.getDrawable(this@KeyboardyImeService, R.drawable.ic_fullscreen)?.mutate()
-            d?.setBounds(0, 0, dpToPx(13), dpToPx(13))
-            d?.setTint(iconColor)
-            setCompoundDrawables(d, null, null, null)
-            compoundDrawablePadding = dpToPx(4)
+        if (gridChanged) {
+            chipGridScale?.apply {
+                background = palette.createRoundedRect(
+                    fillColor = palette.chipInactiveBg,
+                    cornerRadiusPx = 14f * density,
+                    strokeWidthPx = strokePx,
+                    strokeColor = palette.accentBlue
+                )
+                setTextColor(palette.accentBlue)
+                text = "${gridCols}x Grid"
+                val d = ContextCompat.getDrawable(this@KeyboardyImeService, R.drawable.ic_grid)?.mutate()
+                d?.setBounds(0, 0, dpToPx(13), dpToPx(13))
+                d?.setTint(palette.accentBlue)
+                setCompoundDrawables(d, null, null, null)
+                compoundDrawablePadding = dpToPx(4)
+            }
+
+            gridLayoutManager?.spanCount = gridCols
+            val dynamicHeightDp = prefs.getGridItemHeightDp(gridCols)
+            gridAdapter?.updateStyle(dpToPx(dynamicHeightDp), palette)
         }
 
-        // Empty State Text
-        tvStatusMessage?.setTextColor(palette.textSecondary)
-
-        // Update Image Grid columns and calculated thumbnail height
-        gridLayoutManager?.spanCount = prefs.gridColumns
-        val dynamicHeightDp = prefs.getGridItemHeightDp(prefs.gridColumns)
-        gridAdapter?.updateStyle(dpToPx(dynamicHeightDp), palette)
-
-        // Rebuild Scalable QWERTY / Numbers / Symbols Pad
-        suggestionBarScroll?.setBackgroundColor(palette.keyboardTrayBg)
-        updateWordSuggestions(getCurrentQuery())
-        containerMiniQwerty?.let { tray ->
-            tray.setBackgroundColor(palette.keyboardTrayBg)
-            buildKeyboardPad(tray, scale, palette)
+        if (fullScreenChipChanged) {
+            chipFullScreen?.apply {
+                background = palette.createRoundedRect(
+                    fillColor = if (isFull) palette.chipActiveBg else palette.chipInactiveBg,
+                    cornerRadiusPx = 14f * density,
+                    strokeWidthPx = strokePx,
+                    strokeColor = if (isFull) palette.accentBluePressed else palette.accentBlue
+                )
+                val iconColor = if (isFull) palette.chipActiveText else palette.accentBlue
+                setTextColor(iconColor)
+                text = if (isFull) "Height: Full" else "Height: Standard"
+                val d = ContextCompat.getDrawable(this@KeyboardyImeService, R.drawable.ic_fullscreen)?.mutate()
+                d?.setBounds(0, 0, dpToPx(13), dpToPx(13))
+                d?.setTint(iconColor)
+                setCompoundDrawables(d, null, null, null)
+                compoundDrawablePadding = dpToPx(4)
+            }
         }
 
-        window?.window?.decorView?.requestLayout()
+        if (keyboardPadChanged) {
+            containerMiniQwerty?.let { tray ->
+                tray.setBackgroundColor(palette.keyboardTrayBg)
+                buildKeyboardPad(tray, scale, palette)
+            }
+        }
+
+        if (heightOrSpacerChanged || scaleChanged) {
+            window?.window?.decorView?.requestLayout()
+        }
     }
 
     private fun readClipboardText(): String? {
@@ -800,13 +881,16 @@ class KeyboardyImeService : InputMethodService() {
     }
 
     private fun updateEngineChipUi() {
-        chipEngineMode?.text = "Engine: ${prefs.engineMode.displayName}"
+        val mode = prefs.engineMode
+        chipEngineMode?.text = "Engine: ${mode.displayName}"
+        lastAppliedStyle = lastAppliedStyle?.copy(engineMode = mode)
     }
 
     private fun setMiniQwertyVisible(visible: Boolean) {
         containerMiniQwerty?.visibility = if (visible) View.VISIBLE else View.GONE
         suggestionBarScroll?.visibility = if (visible) View.VISIBLE else View.GONE
         etSearchQuery?.setCursorActive(visible)
+        lastAppliedStyle = lastAppliedStyle?.copy(isQwertyVisible = visible)
 
         bottomNavSpacer?.let { spacer ->
             val targetHeightPx = if (visible) {
@@ -841,6 +925,7 @@ class KeyboardyImeService : InputMethodService() {
     }
 
     private fun renderSuggestions(items: List<SuggestionItem>, palette: ThemePalette) {
+        lastRenderedSuggestions = items
         val container = suggestionBarContainer ?: return
         container.removeAllViews()
         if (items.isEmpty()) return
@@ -905,11 +990,14 @@ class KeyboardyImeService : InputMethodService() {
             return
         }
 
+        val incognito = isIncognitoSession()
         if (hideKeyboardOnStart) {
             setMiniQwertyVisible(false)
             setHistoryPanelVisible(false)
             hideSelectionActionBar()
-            prefs.addSearchHistoryQuery(queryToRun)
+            if (!incognito) {
+                prefs.addSearchHistoryQuery(queryToRun)
+            }
         }
 
         // Cancel previous search and abort ongoing WebView activity immediately
@@ -931,11 +1019,13 @@ class KeyboardyImeService : InputMethodService() {
                 tvStatusMessage?.text = "Searching ${prefs.engineMode.displayName} for \"$queryToRun\"..."
             }
 
-            // Record search execution count (once per distinct query/filter execution)
-            val countKey = "${queryToRun.lowercase()}|${currentFilter.name}|${prefs.engineMode.name}|${prefs.nsfwModeEnabled}"
-            if (countKey != lastCountedSearchQuery) {
-                lastCountedSearchQuery = countKey
-                prefs.recordSearchExecuted()
+            // Record search execution count (once per distinct query/filter execution), except in incognito sessions
+            if (!incognito) {
+                val countKey = "${queryToRun.lowercase()}|${currentFilter.name}|${prefs.engineMode.name}|${prefs.nsfwModeEnabled}"
+                if (countKey != lastCountedSearchQuery) {
+                    lastCountedSearchQuery = countKey
+                    prefs.recordSearchExecuted()
+                }
             }
 
             val repo = searchRepository ?: return@launch
@@ -966,8 +1056,9 @@ class KeyboardyImeService : InputMethodService() {
     }
 
     private fun onImageResultSelected(item: ImageResult) {
+        val incognito = isIncognitoSession()
         val q = getCurrentQuery().trim()
-        if (q.isNotEmpty()) {
+        if (!incognito && q.isNotEmpty()) {
             prefs.addSearchHistoryQuery(q)
         }
 
@@ -988,14 +1079,18 @@ class KeyboardyImeService : InputMethodService() {
 
             when (outcome) {
                 CommitOutcome.COMMITTED_DIRECTLY -> {
-                    prefs.recordImageInserted()
+                    if (!incognito) {
+                        prefs.recordImageInserted()
+                    }
                     if (prefs.autoReturnToPreviousKeyboard) {
                         switchToPreviousKeyboard()
                     }
                 }
 
                 CommitOutcome.COPIED_TO_CLIPBOARD_FALLBACK -> {
-                    prefs.recordImageInserted()
+                    if (!incognito) {
+                        prefs.recordImageInserted()
+                    }
                     Toast.makeText(
                         this@KeyboardyImeService,
                         "App doesn't accept direct images — copied to clipboard! Paste in chat.",
@@ -1059,6 +1154,7 @@ class KeyboardyImeService : InputMethodService() {
         scale: KeyboardScale,
         palette: ThemePalette
     ) {
+        lastAppliedStyle = lastAppliedStyle?.copy(currentLayer = currentLayer)
         container.removeAllViews()
         letterKeyViews.clear()
         shiftKeyView = null
@@ -1410,5 +1506,31 @@ class KeyboardyImeService : InputMethodService() {
         headlessGoogleSearcher?.destroy()
         serviceScope.cancel()
         super.onDestroy()
+    }
+
+    enum class ImePrefReaction {
+        NONE,
+        STYLE_UPDATE,
+        ENGINE_CHIP_UPDATE,
+        RE_RUN_SEARCH
+    }
+
+    companion object {
+        fun classifyPrefChange(key: String?): ImePrefReaction {
+            return when (key) {
+                null,
+                KeyboardyPrefs.KEY_THEME_MODE,
+                KeyboardyPrefs.KEY_KEYBOARD_SCALE,
+                KeyboardyPrefs.KEY_BOTTOM_CLEARANCE_DP,
+                KeyboardyPrefs.KEY_GRID_COLUMNS,
+                KeyboardyPrefs.KEY_FULL_SCREEN_MODE -> ImePrefReaction.STYLE_UPDATE
+
+                KeyboardyPrefs.KEY_ENGINE_MODE -> ImePrefReaction.ENGINE_CHIP_UPDATE
+
+                KeyboardyPrefs.KEY_NSFW_MODE -> ImePrefReaction.RE_RUN_SEARCH
+
+                else -> ImePrefReaction.NONE
+            }
+        }
     }
 }

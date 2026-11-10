@@ -1,7 +1,6 @@
 package com.medusko.keyboardy.ime
 
 import android.content.Context
-import android.os.Build
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -10,10 +9,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
-import coil.ImageLoader
-import coil.decode.GifDecoder
-import coil.decode.ImageDecoderDecoder
-import coil.memory.MemoryCache
+import coil.imageLoader
 import coil.request.ImageRequest
 import com.medusko.keyboardy.R
 import com.medusko.keyboardy.search.ImageResult
@@ -29,22 +25,7 @@ class ImageGridAdapter(
     private var loadingItemId: String? = null
     private var itemHeightPx: Int = (120 * context.resources.displayMetrics.density).toInt()
     private var palette: ThemePalette = ThemePalette.DARK
-
-    private val imageLoader: ImageLoader = ImageLoader.Builder(context.applicationContext)
-        .memoryCache {
-            MemoryCache.Builder(context.applicationContext)
-                .maxSizePercent(0.15)
-                .build()
-        }
-        .components {
-            if (Build.VERSION.SDK_INT >= 28) {
-                add(ImageDecoderDecoder.Factory())
-            } else {
-                add(GifDecoder.Factory())
-            }
-        }
-        .crossfade(true)
-        .build()
+    private val imageLoader = context.applicationContext.imageLoader
 
     fun updateStyle(newHeightPx: Int, newPalette: ThemePalette) {
         val changed = itemHeightPx != newHeightPx || palette.isDark != newPalette.isDark

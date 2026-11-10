@@ -7,6 +7,7 @@ import android.os.Looper
 import android.view.ViewGroup
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -14,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.io.ByteArrayInputStream
 import java.net.URLEncoder
 import kotlin.coroutines.resume
 
@@ -104,6 +106,30 @@ class HeadlessGoogleWebViewSearcher(
                     ): Boolean {
                         val reqUrl = request?.url?.toString().orEmpty()
                         return !SearchParsers.isSafeHttpUrl(reqUrl)
+                    }
+
+                    override fun shouldInterceptRequest(
+                        view: WebView?,
+                        request: WebResourceRequest?
+                    ): WebResourceResponse? {
+                        val reqUrl = request?.url?.toString().orEmpty()
+                        val scheme = request?.url?.scheme?.lowercase().orEmpty()
+                        if (scheme == "http" || scheme == "https") {
+                            if (!SearchParsers.isSafeHttpUrl(reqUrl)) {
+                                return WebResourceResponse(
+                                    "text/plain",
+                                    "utf-8",
+                                    ByteArrayInputStream(ByteArray(0))
+                                )
+                            }
+                        } else if (scheme != "data" && scheme != "blob" && scheme != "about") {
+                            return WebResourceResponse(
+                                "text/plain",
+                                "utf-8",
+                                ByteArrayInputStream(ByteArray(0))
+                            )
+                        }
+                        return super.shouldInterceptRequest(view, request)
                     }
 
                     override fun onPageFinished(view: WebView?, url: String?) {
