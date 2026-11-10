@@ -190,16 +190,20 @@ object SearchParsers {
                 val thumbUrl = obj.optString("turl").trim()
                 val title = obj.optString("t", "Image").trim()
 
-                if (isSafeHttpUrl(fullUrl) && seenUrls.add(fullUrl)) {
-                    val tenorPair = normalizeTenorGifUrls(fullUrl)
+                val safeFull = fullUrl.takeIf { isSafeHttpUrl(it) }
+                val safeThumb = thumbUrl.takeIf { isSafeHttpUrl(it) }
+                val candidateUrl = safeFull ?: safeThumb ?: continue
+
+                if (seenUrls.add(candidateUrl)) {
+                    val tenorPair = normalizeTenorGifUrls(candidateUrl)
                     val effectiveThumb = when {
                         tenorPair != null -> tenorPair.first
-                        thumbUrl.isNotEmpty() && isSafeHttpUrl(thumbUrl) -> thumbUrl
+                        safeThumb != null -> safeThumb
                             .replace("&amp;c=7", "&amp;c=0")
                             .replace("&c=7", "&c=0")
-                        else -> fullUrl
+                        else -> candidateUrl
                     }
-                    val effectiveFull = tenorPair?.second ?: fullUrl
+                    val effectiveFull = tenorPair?.second ?: candidateUrl
                     val ext = extractUrlExtension(effectiveFull)
                     val isGif = !isStaticNonGifExt(ext) && (
                         effectiveFull.lowercase().contains(".gif") ||
@@ -254,8 +258,10 @@ object SearchParsers {
                 val fullUrl = item.optString("full").trim()
                 val thumbUrl = item.optString("thumb").trim()
                 val title = item.optString("title", "Google Image").trim()
-                val primaryUrl = fullUrl.ifEmpty { thumbUrl }
-                if (!isSafeImageUrl(primaryUrl) || !seen.add(primaryUrl)) continue
+                val safeFull = fullUrl.takeIf { isSafeImageUrl(it) }
+                val safeThumb = thumbUrl.takeIf { isSafeImageUrl(it) }
+                val primaryUrl = safeFull ?: safeThumb ?: continue
+                if (!seen.add(primaryUrl)) continue
 
                 val ext = extractUrlExtension(primaryUrl)
                 val isGif = !isStaticNonGifExt(ext) && (
@@ -474,14 +480,14 @@ object SearchParsers {
     }
 
     /**
-     * Validates that a URL uses http/https, carries no embedded credentials, and does not target
+     * Validates that a URL uses HTTPS, carries no embedded credentials, and does not target
      * loopback, link-local, CGNAT, multicast, or private/internal network addresses.
      */
     fun isSafeHttpUrl(urlStr: String): Boolean {
         val trimmed = urlStr.trim()
         if (trimmed.isEmpty()) return false
         val parsed = trimmed.toHttpUrlOrNull() ?: return false
-        if (parsed.scheme != "http" && parsed.scheme != "https") return false
+        if (parsed.scheme != "https") return false
         if (parsed.username.isNotEmpty() || parsed.password.isNotEmpty()) return false
         return !isBlockedHostname(parsed.host)
     }

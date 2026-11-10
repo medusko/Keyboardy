@@ -37,6 +37,7 @@ class HeadlessGoogleWebViewSearcher(
             settings.domStorageEnabled = true
             settings.allowFileAccess = false
             settings.allowContentAccess = false
+            settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             settings.setSupportMultipleWindows(false)
             settings.loadsImagesAutomatically = false // Faster! We only need the image URLs from DOM/scripts
             settings.blockNetworkImage = true
@@ -251,8 +252,10 @@ class HeadlessGoogleWebViewSearcher(
                 var results = [];
                 var seen = {};
                 function addItem(thumb, full, title, srcBadge) {
-                    var key = full || thumb;
-                    if (!key || key.indexOf('http') !== 0 || seen[key]) return;
+                    var safeThumb = (thumb && thumb.indexOf('https://') === 0) ? thumb : '';
+                    var safeFull = (full && full.indexOf('https://') === 0) ? full : '';
+                    var key = safeFull || safeThumb;
+                    if (!key || seen[key]) return;
                     if (key.indexOf('.svg') !== -1 ||
                         key.indexOf('fonts.gstatic.com') !== -1 ||
                         key.indexOf('productlogos') !== -1 ||
@@ -262,10 +265,10 @@ class HeadlessGoogleWebViewSearcher(
                     if (key.indexOf('google.') !== -1 && key.indexOf('encrypted-tbn0.gstatic.com') === -1) return;
                     seen[key] = true;
                     results.push({
-                        thumb: thumb || full,
-                        full: full || thumb,
+                        thumb: safeThumb || safeFull,
+                        full: safeFull || safeThumb,
                         title: title || 'Image',
-                        isGif: (full || '').toLowerCase().indexOf('.gif') !== -1,
+                        isGif: key.toLowerCase().indexOf('.gif') !== -1,
                         source: srcBadge || 'G'
                     });
                 }

@@ -5,13 +5,67 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
+import java.io.FileInputStream
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.UnknownHostException
+import java.security.KeyStore
 import java.util.concurrent.atomic.AtomicInteger
+import javax.net.ssl.KeyManagerFactory
+import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLServerSocket
+import javax.net.ssl.TrustManagerFactory
+import javax.net.ssl.X509TrustManager
 import kotlin.concurrent.thread
 
 class SafeNetworkClientTest {
+
+    private data class TestTlsMaterial(
+        val sslContext: SSLContext,
+        val trustManager: X509TrustManager
+    )
+
+    private fun createSelfSignedTlsMaterial(): TestTlsMaterial {
+        val keystoreFile = File.createTempFile("keyboardy-test-", ".p12")
+        keystoreFile.delete()
+        try {
+            val password = "changeit".toCharArray()
+            val keytoolPath = File(System.getProperty("java.home"), "bin/keytool").absolutePath
+            val process = ProcessBuilder(
+                keytoolPath,
+                "-genkeypair",
+                "-alias", "test",
+                "-keyalg", "RSA",
+                "-keysize", "2048",
+                "-validity", "1",
+                "-dname", "CN=bounce.example.com",
+                "-storetype", "PKCS12",
+                "-keystore", keystoreFile.absolutePath,
+                "-storepass", "changeit",
+                "-keypass", "changeit"
+            ).redirectErrorStream(true).start()
+            val exitCode = process.waitFor()
+            check(exitCode == 0) { "keytool failed ($exitCode): ${process.inputStream.bufferedReader().readText()}" }
+
+            val keyStore = KeyStore.getInstance("PKCS12")
+            FileInputStream(keystoreFile).use { keyStore.load(it, password) }
+
+            val kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm()).apply {
+                init(keyStore, password)
+            }
+            val tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm()).apply {
+                init(keyStore)
+            }
+            val trustManager = tmf.trustManagers.filterIsInstance<X509TrustManager>().first()
+            val sslContext = SSLContext.getInstance("TLS").apply {
+                init(kmf.keyManagers, arrayOf(trustManager), null)
+            }
+            return TestTlsMaterial(sslContext = sslContext, trustManager = trustManager)
+        } finally {
+            keystoreFile.delete()
+        }
+    }
 
     @Test(expected = UnknownHostException::class)
     fun `SafeDns rejects hostname resolving to loopback address`() {
@@ -45,6 +99,15 @@ class SafeNetworkClientTest {
     }
 
     @Test
+    fun `SafeNetworkClient blocks cleartext http requests immediately`() {
+        val result = SafeNetworkClient.getBytesBoundedBlocking(
+            url = "http://example.com/photo.jpg",
+            maxBytes = 1024
+        )
+        assertNull(result)
+    }
+
+    @Test
     fun `SafeNetworkClient blocks direct loopback request without opening socket`() {
         val connections = AtomicInteger(0)
         ServerSocket(0, 5, InetAddress.getLoopbackAddress()).use { server ->
@@ -58,7 +121,7 @@ class SafeNetworkClientTest {
                 }
             }
             val result = SafeNetworkClient.getBytesBoundedBlocking(
-                url = "http://127.0.0.1:${server.localPort}/secret",
+                url = "https://127.0.0.1:${server.localPort}/secret",
                 maxBytes = 1024
             )
             assertNull(result)
@@ -69,10 +132,15 @@ class SafeNetworkClientTest {
     }
 
     @Test
-    fun `SafeNetworkClient blocks redirect to private or loopback address`() {
+    fun `SafeNetworkClient blocks redirect to private or loopback address and http downgrades`() {
+        val tls = createSelfSignedTlsMaterial()
         val targetHits = AtomicInteger(0)
         ServerSocket(0, 5, InetAddress.getLoopbackAddress()).use { targetServer ->
-            ServerSocket(0, 5, InetAddress.getLoopbackAddress()).use { bounceServer ->
+            (tls.sslContext.serverSocketFactory.createServerSocket(
+                0,
+                5,
+                InetAddress.getLoopbackAddress()
+            ) as SSLServerSocket).use { bounceServer ->
                 val targetThread = thread(isDaemon = true) {
                     while (!targetServer.isClosed) {
                         try {
@@ -83,23 +151,31 @@ class SafeNetworkClientTest {
                     }
                 }
                 val bounceThread = thread(isDaemon = true) {
-                    try {
-                        bounceServer.accept().use { sock ->
-                            sock.getInputStream()
-                            val resp = (
-                                "HTTP/1.1 302 Found\r\n" +
-                                    "Location: http://127.0.0.1:${targetServer.localPort}/admin\r\n" +
-                                    "Content-Length: 0\r\n\r\n"
-                                ).toByteArray(Charsets.US_ASCII)
-                            sock.getOutputStream().write(resp)
-                            sock.getOutputStream().flush()
+                    repeat(2) { idx ->
+                        try {
+                            bounceServer.accept().use { sock ->
+                                sock.getInputStream().read()
+                                val location = if (idx == 0) {
+                                    "https://127.0.0.1:${targetServer.localPort}/admin"
+                                } else {
+                                    "http://example.com/downgrade.gif"
+                                }
+                                val resp = (
+                                    "HTTP/1.1 302 Found\r\n" +
+                                        "Location: $location\r\n" +
+                                        "Content-Length: 0\r\n" +
+                                        "Connection: close\r\n\r\n"
+                                    ).toByteArray(Charsets.US_ASCII)
+                                sock.getOutputStream().write(resp)
+                                sock.getOutputStream().flush()
+                            }
+                        } catch (_: Exception) {
                         }
-                    } catch (_: Exception) {
                     }
                 }
 
-                // Allow only "bounce.example.com" to reach the local bounce server; target redirect
-                // to 127.0.0.1 must still be blocked by SafeUrlInterceptor.
+                // Allow only "bounce.example.com" to reach the local bounce server; target redirects
+                // to 127.0.0.1 or plain http:// must still be blocked by SafeUrlInterceptor.
                 val testDns = object : Dns {
                     override fun lookup(hostname: String): List<InetAddress> {
                         return if (hostname == "bounce.example.com") {
@@ -110,15 +186,26 @@ class SafeNetworkClientTest {
                     }
                 }
                 val client = SafeNetworkClient.createClient(dns = testDns)
-                val result = SafeNetworkClient.getBytesBoundedBlocking(
-                    url = "http://bounce.example.com:${bounceServer.localPort}/start",
+                    .newBuilder()
+                    .sslSocketFactory(tls.sslContext.socketFactory, tls.trustManager)
+                    .hostnameVerifier { _, _ -> true }
+                    .build()
+
+                val loopbackRedirectResult = SafeNetworkClient.getBytesBoundedBlocking(
+                    url = "https://bounce.example.com:${bounceServer.localPort}/start",
+                    maxBytes = 1024,
+                    client = client
+                )
+                val downgradeRedirectResult = SafeNetworkClient.getBytesBoundedBlocking(
+                    url = "https://bounce.example.com:${bounceServer.localPort}/downgrade",
                     maxBytes = 1024,
                     client = client
                 )
 
-                assertNull(result)
+                assertNull(loopbackRedirectResult)
+                assertNull(downgradeRedirectResult)
                 assertTrue(targetHits.get() == 0)
-                bounceThread.join(500)
+                bounceThread.join(1000)
                 targetServer.close()
                 targetThread.join(500)
             }

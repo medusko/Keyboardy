@@ -3,6 +3,7 @@ package com.medusko.keyboardy.search
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
+import okhttp3.ConnectionSpec
 import okhttp3.Dns
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
@@ -55,6 +56,7 @@ object SafeNetworkClient {
         val urlGuard = SafeUrlInterceptor()
         return OkHttpClient.Builder()
             .dns(dns)
+            .connectionSpecs(listOf(ConnectionSpec.MODERN_TLS, ConnectionSpec.COMPATIBLE_TLS))
             .followRedirects(true)
             .followSslRedirects(true)
             .connectTimeout(4500, TimeUnit.MILLISECONDS)

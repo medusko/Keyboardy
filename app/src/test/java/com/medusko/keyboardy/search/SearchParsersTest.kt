@@ -114,43 +114,61 @@ class SearchParsersTest {
     }
 
     @Test
-    fun `isSafeHttpUrl accepts public http and https urls and rejects local or non-http urls`() {
+    fun `isSafeHttpUrl enforces https on public hosts and rejects cleartext or internal urls`() {
         assertTrue(SearchParsers.isSafeHttpUrl("https://media.tenor.com/abc/funny.gif"))
-        assertTrue(SearchParsers.isSafeHttpUrl("http://example.com/photo.jpg"))
-        assertTrue(SearchParsers.isSafeHttpUrl("http://8.8.8.8/photo.jpg"))
+        assertTrue(SearchParsers.isSafeHttpUrl("https://example.com/photo.jpg"))
+        assertTrue(SearchParsers.isSafeHttpUrl("https://8.8.8.8/photo.jpg"))
         assertTrue(SearchParsers.isSafeHttpUrl("https://[2607:f8b0:4005:80b::200e]/photo.jpg"))
-        assertTrue(SearchParsers.isSafeHttpUrl("http://100.63.255.254/photo.jpg"))
-        assertTrue(SearchParsers.isSafeHttpUrl("http://100.128.0.1/photo.jpg"))
+        assertTrue(SearchParsers.isSafeHttpUrl("https://100.63.255.254/photo.jpg"))
+        assertTrue(SearchParsers.isSafeHttpUrl("https://100.128.0.1/photo.jpg"))
 
+        assertFalse(SearchParsers.isSafeHttpUrl("http://media.tenor.com/abc/funny.gif"))
+        assertFalse(SearchParsers.isSafeHttpUrl("http://example.com/photo.jpg"))
+        assertFalse(SearchParsers.isSafeHttpUrl("http://8.8.8.8/photo.jpg"))
         assertFalse(SearchParsers.isSafeHttpUrl("file:///etc/passwd"))
         assertFalse(SearchParsers.isSafeHttpUrl("javascript:alert(1)"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://localhost:8080/img.png"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://localhost./img.png"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://sub.localhost/img.png"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://router.local/img.png"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://metadata.google.internal/img.png"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://intranet/img.png"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://127.0.0.1/img.png"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://0.0.0.0/img.png"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://169.254.169.254/latest/meta-data/"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://192.168.1.1/admin.png"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://10.0.0.1/test.gif"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://172.16.0.1/test.gif"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://100.64.0.1/test.gif"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://100.127.255.254/test.gif"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://224.0.0.1/test.gif"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://255.255.255.255/test.gif"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://[::1]/test.gif"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://[::ffff:192.168.1.1]/test.gif"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://[::ffff:7f00:1]/test.gif"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://[fc12::1]/test.gif"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://[fd12:3456:789a::1]/test.gif"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://[fe80::1]/test.gif"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://2130706433/test.gif"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://0177.0.0.1/test.gif"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://0x7f000001/test.gif"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://127.1/test.gif"))
-        assertFalse(SearchParsers.isSafeHttpUrl("http://google.com@127.0.0.1/test.gif"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://localhost:8080/img.png"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://localhost./img.png"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://sub.localhost/img.png"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://router.local/img.png"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://metadata.google.internal/img.png"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://intranet/img.png"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://127.0.0.1/img.png"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://0.0.0.0/img.png"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://169.254.169.254/latest/meta-data/"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://192.168.1.1/admin.png"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://10.0.0.1/test.gif"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://172.16.0.1/test.gif"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://100.64.0.1/test.gif"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://100.127.255.254/test.gif"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://224.0.0.1/test.gif"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://255.255.255.255/test.gif"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://[::1]/test.gif"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://[::ffff:192.168.1.1]/test.gif"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://[::ffff:7f00:1]/test.gif"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://[fc12::1]/test.gif"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://[fd12:3456:789a::1]/test.gif"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://[fe80::1]/test.gif"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://2130706433/test.gif"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://0177.0.0.1/test.gif"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://0x7f000001/test.gif"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://127.1/test.gif"))
+        assertFalse(SearchParsers.isSafeHttpUrl("https://google.com@127.0.0.1/test.gif"))
+    }
+
+    @Test
+    fun `parsers reject cleartext http urls and only emit https image urls`() {
+        val bingHtml = """
+            <a class="iusc" m="{&quot;murl&quot;:&quot;http://insecure.example.com/only-http.png&quot;,&quot;turl&quot;:&quot;http://insecure.example.com/thumb.png&quot;,&quot;t&quot;:&quot;Plain HTTP&quot;}"></a>
+            <a class="iusc" m="{&quot;murl&quot;:&quot;http://insecure.example.com/full.jpg&quot;,&quot;turl&quot;:&quot;https://tse1.mm.bing.net/th?id=OIP.safe&quot;,&quot;t&quot;:&quot;HTTPS Thumb Fallback&quot;}"></a>
+            <a class="iusc" m="{&quot;murl&quot;:&quot;https://cdn.example.com/cat.png&quot;,&quot;turl&quot;:&quot;https://tse2.mm.bing.net/th?id=OIP.cat&quot;,&quot;t&quot;:&quot;Cat&quot;}"></a>
+        """.trimIndent()
+
+        val bingResults = SearchParsers.parseBingAsyncImagesHtml(bingHtml)
+        assertEquals(2, bingResults.size)
+        assertTrue(bingResults.all { it.fullImageUrl.startsWith("https://") && it.thumbnailUrl.startsWith("https://") })
+        assertEquals("https://tse1.mm.bing.net/th?id=OIP.safe", bingResults[0].fullImageUrl)
+        assertEquals("https://cdn.example.com/cat.png", bingResults[1].fullImageUrl)
     }
 
     @Test
