@@ -540,15 +540,12 @@ class KeyboardyImeService : InputMethodService() {
         val density = resources.displayMetrics.density
         val strokePx = (1f * density).toInt().coerceAtLeast(1)
 
-        // Direct Bottom Bar Offset in pixels so every tap of -6 / +6 visibly moves the bottom of the keyboard!
-        // In full screen mode, add extra clearance (48dp) so the entire keyboard moves up above Android's
-        // system navigation bar buttons (lower keyboard / switch keyboard), matching non-full screen mode.
-        val isFull = prefs.isFullScreenMode
-        val fullScreenExtraClearanceDp = if (isFull) 48 else 0
-        val bottomOffsetPx = dpToPx(prefs.bottomNavClearanceDp + fullScreenExtraClearanceDp)
+        // Direct Bottom Bar Offset in pixels so every tap of -4 / +4 visibly moves the bottom of the keyboard!
+        val bottomOffsetPx = dpToPx(prefs.bottomNavClearanceDp)
 
         // Height: standard mode (~74% screen) leaves clear room to see and scroll host app content,
         // while Full Screen Mode (~96% screen) maximizes search & thumbnail viewing area.
+        val isFull = prefs.isFullScreenMode
         val screenHeightPx = resources.displayMetrics.heightPixels
         val targetContainerHeightPx = if (isFull) {
             (screenHeightPx * 0.96f).toInt()

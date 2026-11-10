@@ -10,6 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [android-v1.0.1-RC2-Beta] - 2026-11-09
 
 ### 🌟 Release Candidate 2 Feedback & Enhancements
+- **Lagatron-Aligned Theme Switcher Settings**:
+  - Added dedicated **Theme Mode** card matching Lagatron's design with three options:
+    - **System Default** (default): Follows Android system-wide dark or light mode setting.
+    - **Dark Mode**: Deep navy backgrounds with warm gold/amber accents.
+    - **Light Mode**: High-contrast clean surfaces with preserved status bar icons.
+  - Updated top-bar quick toggle icon to reflect current mode: **Sun icon in Light Mode**, **Moon icon in Dark Mode**.
+- **Lagatron-Aligned Status Pill**:
+  - Matched IME status indicator to Lagatron's exact design: text updated to **`ACTIVE`** (10sp bold), 7dp circular dot, 5dp spacing, 8dp x 3dp padding, `#00C853` green with 15% opacity background and 1dp border.
+- **Bottom Navigation Clearance & Snug Layout**:
+  - Removed bloated 48dp full-screen extra bottom clearance and adjusted default bottom offset from 38dp to 8dp.
+  - In Image Selection view (when typing pad is lowered), image results expand cleanly down to the navigation bar without empty void.
+  - In Keyboard Typing view, maintains comfortable ~8dp-12dp breathing room between keys and the bottom system navigation switcher icon.
+- **Fixed Blank First Image Result**:
+  - Identified root cause in web extraction where Google's header 24px SVG logo (`googleg/v6/24px.svg`) and search links were captured into image results.
+  - Added robust multi-tier image filtering in JavaScript extractor and `SearchParsers.isSafeImageUrl()` to reject non-image SVGs, branding icons, and Google search links.
+- **Classic App Icon in Medusko Gold**:
+  - Rendered a new edition of the app launcher icon blending the classic original holographic keyboard + photo frame with Medusko gold/amber keys and deep navy background, stamped with the RC2 badge.
+  - Added mipmap densities (`mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, `xxxhdpi`) and store asset (512x512).
 - **Keyboard Selection Text Streamlining**:
   - Simplified system Input Method name from `Keyboardy (Image & GIF Search)` to **`Keyboardy`**.
   - Updated subtype summary text from `Google Image & GIF Search` to clean **`Image & GIF Search`** (removed third-party brand naming).

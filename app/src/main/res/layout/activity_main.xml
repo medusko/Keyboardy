@@ -35,15 +35,16 @@
                 android:textSize="22sp"
                 android:textStyle="bold" />
 
-            <!-- Lagatron-style Status Pill (ENABLED / SETUP) -->
+            <!-- Lagatron-style Status Pill (ACTIVE / SETUP) -->
             <LinearLayout
                 android:id="@+id/status_pill_container"
                 android:layout_width="wrap_content"
-                android:layout_height="26dp"
+                android:layout_height="wrap_content"
                 android:layout_marginStart="10dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingHorizontal="10dp">
+                android:paddingHorizontal="8dp"
+                android:paddingVertical="3dp">
 
                 <View
                     android:id="@+id/status_pill_dot"
@@ -56,8 +57,8 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="5dp"
                     android:includeFontPadding="false"
-                    android:text="ENABLED"
-                    android:textSize="10.5sp"
+                    android:text="ACTIVE"
+                    android:textSize="10sp"
                     android:textStyle="bold" />
             </LinearLayout>
         </LinearLayout>
@@ -465,6 +466,188 @@
                         android:textSize="12sp"
                         android:textStyle="bold" />
                 </LinearLayout>
+            </LinearLayout>
+
+            <!-- Card: Theme Mode Selector (Matching Lagatron's ThemeModeSelector) -->
+            <LinearLayout
+                android:id="@+id/card_theme_mode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/tv_theme_mode_header"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Theme Mode"
+                    android:textColor="#2E6BD9"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tv_theme_mode_desc"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="12dp"
+                    android:text="Choose your preferred application color theme"
+                    android:textColor="#B8C2D4"
+                    android:textSize="12.5sp" />
+
+                <!-- Option 1: System Default -->
+                <LinearLayout
+                    android:id="@+id/btn_theme_system"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="10dp">
+
+                    <RadioButton
+                        android:id="@+id/rb_theme_system"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:clickable="false"
+                        android:focusable="false" />
+
+                    <ImageView
+                        android:id="@+id/iv_theme_system"
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_marginHorizontal="8dp"
+                        android:src="@drawable/ic_brightness_auto" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tv_theme_system_title"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="System Default"
+                            android:textSize="13.5sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tv_theme_system_desc"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Follows Android system-wide dark or light mode setting"
+                            android:textColor="#8E9AA8"
+                            android:textSize="11.5sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Option 2: Dark Mode -->
+                <LinearLayout
+                    android:id="@+id/btn_theme_dark"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="10dp">
+
+                    <RadioButton
+                        android:id="@+id/rb_theme_dark"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:clickable="false"
+                        android:focusable="false" />
+
+                    <ImageView
+                        android:id="@+id/iv_theme_dark"
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_marginHorizontal="8dp"
+                        android:src="@drawable/ic_dark_mode" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tv_theme_dark_title"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Dark Mode"
+                            android:textSize="13.5sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tv_theme_dark_desc"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Deep navy backgrounds with warm gold/amber accents"
+                            android:textColor="#8E9AA8"
+                            android:textSize="11.5sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Option 3: Light Mode -->
+                <LinearLayout
+                    android:id="@+id/btn_theme_light"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="12dp"
+                    android:paddingVertical="10dp">
+
+                    <RadioButton
+                        android:id="@+id/rb_theme_light"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:clickable="false"
+                        android:focusable="false" />
+
+                    <ImageView
+                        android:id="@+id/iv_theme_light"
+                        android:layout_width="22dp"
+                        android:layout_height="22dp"
+                        android:layout_marginHorizontal="8dp"
+                        android:src="@drawable/ic_light_mode" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tv_theme_light_title"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Light Mode"
+                            android:textSize="13.5sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tv_theme_light_desc"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="High-contrast clean surfaces with preserved status bar icons"
+                            android:textColor="#8E9AA8"
+                            android:textSize="11.5sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
             </LinearLayout>
 
             <!-- Card: App Launcher Icon Selection -->

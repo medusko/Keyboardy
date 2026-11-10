@@ -2,6 +2,7 @@ package com.medusko.keyboardy.prefs
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.medusko.keyboardy.theme.ThemeMode
 import org.json.JSONArray
 import java.time.LocalDate
 import java.time.YearMonth
@@ -54,7 +55,7 @@ enum class KeyboardScale(
     );
 }
 
-class KeyboardyPrefs(context: Context) {
+class KeyboardyPrefs(private val context: Context) {
     private val prefs: SharedPreferences =
         context.getSharedPreferences("keyboardy_prefs", Context.MODE_PRIVATE)
 
@@ -66,9 +67,27 @@ class KeyboardyPrefs(context: Context) {
         prefs.unregisterOnSharedPreferenceChangeListener(listener)
     }
 
+    var themeMode: ThemeMode
+        get() {
+            val raw = prefs.getString(KEY_THEME_MODE, ThemeMode.SYSTEM.name)
+            return ThemeMode.entries.firstOrNull { it.name == raw } ?: ThemeMode.SYSTEM
+        }
+        set(value) = prefs.edit().putString(KEY_THEME_MODE, value.name).apply()
+
     var isDarkMode: Boolean
-        get() = prefs.getBoolean(KEY_DARK_MODE, true)
-        set(value) = prefs.edit().putBoolean(KEY_DARK_MODE, value).apply()
+        get() {
+            return when (themeMode) {
+                ThemeMode.SYSTEM -> {
+                    val nightFlags = context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK
+                    nightFlags == android.content.res.Configuration.UI_MODE_NIGHT_YES
+                }
+                ThemeMode.DARK -> true
+                ThemeMode.LIGHT -> false
+            }
+        }
+        set(value) {
+            themeMode = if (value) ThemeMode.DARK else ThemeMode.LIGHT
+        }
 
     var keyboardScale: KeyboardScale
         get() {
@@ -79,7 +98,7 @@ class KeyboardyPrefs(context: Context) {
         set(value) = prefs.edit().putString(KEY_KEYBOARD_SCALE, value.name).apply()
 
     var bottomNavClearanceDp: Int
-        get() = prefs.getInt(KEY_BOTTOM_CLEARANCE_DP, 38)
+        get() = prefs.getInt(KEY_BOTTOM_CLEARANCE_DP, 8)
         set(value) = prefs.edit().putInt(KEY_BOTTOM_CLEARANCE_DP, value.coerceIn(0, 160)).apply()
 
     var autoReturnToPreviousKeyboard: Boolean
@@ -250,9 +269,10 @@ class KeyboardyPrefs(context: Context) {
     }
 
     companion object {
+        private const val KEY_THEME_MODE = "pref_theme_mode_v2"
         private const val KEY_DARK_MODE = "is_dark_mode"
         private const val KEY_KEYBOARD_SCALE = "keyboard_scale"
-        private const val KEY_BOTTOM_CLEARANCE_DP = "bottom_clearance_dp_v2"
+        private const val KEY_BOTTOM_CLEARANCE_DP = "bottom_clearance_dp_v3"
         private const val KEY_AUTO_RETURN = "auto_return_gboard"
         private const val KEY_AUTO_READ_CHAT_V2 = "auto_read_chat_query_v2"
         private const val KEY_NSFW_MODE = "nsfw_mode_enabled"

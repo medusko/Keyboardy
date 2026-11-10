@@ -206,7 +206,13 @@ class HeadlessGoogleWebViewSearcher(
                 function addItem(thumb, full, title) {
                     var key = full || thumb;
                     if (!key || key.indexOf('http') !== 0 || seen[key]) return;
-                    if (key.indexOf('google.com/images/branding') !== -1 || key.indexOf('gstatic.com/kp') !== -1) return;
+                    if (key.indexOf('.svg') !== -1 ||
+                        key.indexOf('fonts.gstatic.com') !== -1 ||
+                        key.indexOf('productlogos') !== -1 ||
+                        key.indexOf('google.com/images/branding') !== -1 ||
+                        key.indexOf('google.com/search') !== -1 ||
+                        key.indexOf('gstatic.com/kp') !== -1) return;
+                    if (key.indexOf('google.') !== -1 && key.indexOf('encrypted-tbn0.gstatic.com') === -1) return;
                     seen[key] = true;
                     results.push({
                         thumb: thumb || full,
@@ -222,7 +228,7 @@ class HeadlessGoogleWebViewSearcher(
                     while ((m = pairRegex.exec(html)) !== null && results.length < 40) {
                         var tUrl = m[1].replace(/\\u003d/g, '=').replace(/\\u0026/g, '&');
                         var fUrl = m[2].replace(/\\u003d/g, '=').replace(/\\u0026/g, '&');
-                        if (fUrl.indexOf('gstatic.com') === -1) {
+                        if (fUrl.indexOf('gstatic.com') === -1 && fUrl.indexOf('google.') === -1 && fUrl.indexOf('.svg') === -1) {
                             addItem(tUrl, fUrl, 'Google Image');
                         }
                     }
@@ -231,10 +237,14 @@ class HeadlessGoogleWebViewSearcher(
                     var imgs = document.querySelectorAll('img');
                     for (var i = 0; i < imgs.length && results.length < 45; i++) {
                         var img = imgs[i];
+                        var w = img.naturalWidth || img.width || 0;
+                        var h = img.naturalHeight || img.height || 0;
+                        if ((w > 0 && w < 40) || (h > 0 && h < 40)) continue;
                         var src = img.getAttribute('data-iurl') || img.getAttribute('data-src') || img.src || '';
+                        if (!src || src.indexOf('.svg') !== -1 || src.indexOf('fonts.gstatic.com') !== -1) continue;
                         var alt = img.alt || 'Google Image';
                         if (src.indexOf('https://encrypted-tbn0.gstatic.com/images') === 0 ||
-                            (src.indexOf('http') === 0 && src.indexOf('google.com') === -1)) {
+                            (src.indexOf('http') === 0 && src.indexOf('google.') === -1 && src.indexOf('gstatic.com') === -1)) {
                             addItem(src, src, alt);
                         }
                     }

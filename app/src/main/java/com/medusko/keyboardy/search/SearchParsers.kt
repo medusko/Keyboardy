@@ -109,7 +109,7 @@ object SearchParsers {
                 val thumbUrl = item.optString("thumb").trim()
                 val title = item.optString("title", "Google Image").trim()
                 val primaryUrl = fullUrl.ifEmpty { thumbUrl }
-                if (!isSafeHttpUrl(primaryUrl) || !seen.add(primaryUrl)) continue
+                if (!isSafeImageUrl(primaryUrl) || !seen.add(primaryUrl)) continue
 
                 val isGif = forceGifHint ||
                     item.optBoolean("isGif", false) ||
@@ -120,7 +120,7 @@ object SearchParsers {
                     ImageResult(
                         id = "gweb_${i}_${primaryUrl.hashCode()}",
                         title = title,
-                        thumbnailUrl = thumbUrl.takeIf { isSafeHttpUrl(it) } ?: primaryUrl,
+                        thumbnailUrl = thumbUrl.takeIf { isSafeImageUrl(it) } ?: primaryUrl,
                         fullImageUrl = primaryUrl,
                         isAnimatedGif = isGif,
                         sourceLabel = "G"
@@ -143,13 +143,13 @@ object SearchParsers {
         for (match in GOOGLE_SCRIPT_PAIR_REGEX.findAll(html)) {
             val thumb = decodeUnicodeEscapes(match.groupValues[1])
             val full = decodeUnicodeEscapes(match.groupValues[2])
-            if (isSafeHttpUrl(full) && !full.contains("gstatic.com") && seen.add(full)) {
+            if (isSafeImageUrl(full) && !full.contains("gstatic.com") && seen.add(full)) {
                 val isGif = forceGifHint || full.lowercase().contains(".gif")
                 results.add(
                     ImageResult(
                         id = "ghtml_${results.size}_${full.hashCode()}",
                         title = "Google Image",
-                        thumbnailUrl = thumb.takeIf { isSafeHttpUrl(it) } ?: full,
+                        thumbnailUrl = thumb.takeIf { isSafeImageUrl(it) } ?: full,
                         fullImageUrl = full,
                         isAnimatedGif = isGif,
                         sourceLabel = "G"
@@ -340,6 +340,28 @@ object SearchParsers {
             if (a == 169 && b == 254) return false
             if (a == 192 && b == 168) return false
             if (a == 172 && b in 16..31) return false
+        }
+        return true
+    }
+
+    /**
+     * Checks if a URL is safe and points to a legitimate image, filtering out SVG logos,
+     * Google search links, and non-image Google assets.
+     */
+    fun isSafeImageUrl(urlStr: String): Boolean {
+        if (!isSafeHttpUrl(urlStr)) return false
+        val lower = urlStr.lowercase()
+        if (lower.contains(".svg") ||
+            lower.contains("fonts.gstatic.com") ||
+            lower.contains("productlogos") ||
+            lower.contains("google.com/images/branding") ||
+            lower.contains("google.com/search") ||
+            lower.contains("gstatic.com/kp")
+        ) {
+            return false
+        }
+        if (lower.contains("google.") && !lower.contains("encrypted-tbn0.gstatic.com")) {
+            return false
         }
         return true
     }

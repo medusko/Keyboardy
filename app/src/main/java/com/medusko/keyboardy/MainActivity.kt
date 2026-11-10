@@ -25,6 +25,7 @@ import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.RadioButton
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -38,6 +39,7 @@ import coil.decode.ImageDecoderDecoder
 import coil.request.ImageRequest
 import com.medusko.keyboardy.prefs.KeyboardScale
 import com.medusko.keyboardy.prefs.KeyboardyPrefs
+import com.medusko.keyboardy.theme.ThemeMode
 import com.medusko.keyboardy.theme.ThemePalette
 
 class MainActivity : AppCompatActivity() {
@@ -103,6 +105,25 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cbAutoReadChat: CheckBox
     private lateinit var cbNsfwMode: CheckBox
     private lateinit var cbFullScreenMode: CheckBox
+
+    private lateinit var cardThemeMode: LinearLayout
+    private lateinit var tvThemeModeHeader: TextView
+    private lateinit var tvThemeModeDesc: TextView
+    private lateinit var btnThemeSystem: LinearLayout
+    private lateinit var rbThemeSystem: RadioButton
+    private lateinit var ivThemeSystem: ImageView
+    private lateinit var tvThemeSystemTitle: TextView
+    private lateinit var tvThemeSystemDesc: TextView
+    private lateinit var btnThemeDark: LinearLayout
+    private lateinit var rbThemeDark: RadioButton
+    private lateinit var ivThemeDark: ImageView
+    private lateinit var tvThemeDarkTitle: TextView
+    private lateinit var tvThemeDarkDesc: TextView
+    private lateinit var btnThemeLight: LinearLayout
+    private lateinit var rbThemeLight: RadioButton
+    private lateinit var ivThemeLight: ImageView
+    private lateinit var tvThemeLightTitle: TextView
+    private lateinit var tvThemeLightDesc: TextView
 
     private lateinit var cardAppIcon: LinearLayout
     private lateinit var tvAppIconHeader: TextView
@@ -195,6 +216,38 @@ class MainActivity : AppCompatActivity() {
         tvSandboxReceivedInfo = findViewById(R.id.tv_sandbox_received_info)
         etChatSandbox = findViewById(R.id.et_chat_sandbox)
 
+        cardThemeMode = findViewById(R.id.card_theme_mode)
+        tvThemeModeHeader = findViewById(R.id.tv_theme_mode_header)
+        tvThemeModeDesc = findViewById(R.id.tv_theme_mode_desc)
+        btnThemeSystem = findViewById(R.id.btn_theme_system)
+        rbThemeSystem = findViewById(R.id.rb_theme_system)
+        ivThemeSystem = findViewById(R.id.iv_theme_system)
+        tvThemeSystemTitle = findViewById(R.id.tv_theme_system_title)
+        tvThemeSystemDesc = findViewById(R.id.tv_theme_system_desc)
+        btnThemeDark = findViewById(R.id.btn_theme_dark)
+        rbThemeDark = findViewById(R.id.rb_theme_dark)
+        ivThemeDark = findViewById(R.id.iv_theme_dark)
+        tvThemeDarkTitle = findViewById(R.id.tv_theme_dark_title)
+        tvThemeDarkDesc = findViewById(R.id.tv_theme_dark_desc)
+        btnThemeLight = findViewById(R.id.btn_theme_light)
+        rbThemeLight = findViewById(R.id.rb_theme_light)
+        ivThemeLight = findViewById(R.id.iv_theme_light)
+        tvThemeLightTitle = findViewById(R.id.tv_theme_light_title)
+        tvThemeLightDesc = findViewById(R.id.tv_theme_light_desc)
+
+        btnThemeSystem.setOnClickListener {
+            prefs.themeMode = ThemeMode.SYSTEM
+            applyThemeAndState()
+        }
+        btnThemeDark.setOnClickListener {
+            prefs.themeMode = ThemeMode.DARK
+            applyThemeAndState()
+        }
+        btnThemeLight.setOnClickListener {
+            prefs.themeMode = ThemeMode.LIGHT
+            applyThemeAndState()
+        }
+
         cardAppIcon = findViewById(R.id.card_app_icon)
         tvAppIconHeader = findViewById(R.id.tv_app_icon_header)
         tvAppIconDesc = findViewById(R.id.tv_app_icon_desc)
@@ -273,9 +326,9 @@ class MainActivity : AppCompatActivity() {
             showAboutKeyboardyDialog()
         }
 
-        // Light / Dark Mode IconButton (Sun in Dark Mode, Moon in Light Mode — matching Lagatron)
+        // Light / Dark Mode IconButton (Light mode displays Sun, Dark mode displays Moon)
         btnToggleTheme.setOnClickListener {
-            prefs.isDarkMode = !prefs.isDarkMode
+            prefs.themeMode = if (prefs.isDarkMode) ThemeMode.LIGHT else ThemeMode.DARK
             applyThemeAndState()
         }
 
@@ -795,10 +848,10 @@ class MainActivity : AppCompatActivity() {
 
         tvAppTitle.setTextColor(palette.textPrimary)
 
-        // Info Icon & Light/Dark Theme Icon matching Lagatron
+        // Info Icon & Light/Dark Theme Icon (Light mode shows Sun, Dark mode shows Moon)
         btnAboutInfo.setColorFilter(palette.accentBlue)
         btnToggleTheme.setImageResource(
-            if (isDark) R.drawable.ic_light_mode else R.drawable.ic_dark_mode
+            if (isDark) R.drawable.ic_dark_mode else R.drawable.ic_light_mode
         )
         btnToggleTheme.setColorFilter(palette.accentBlue)
 
@@ -808,7 +861,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Style all Cards
-        val cards = listOf(cardSetup, cardScale, cardGridScale, cardSandbox, cardAppIcon, cardSettings, cardBadges, cardQuota)
+        val cards = listOf(cardSetup, cardScale, cardGridScale, cardSandbox, cardThemeMode, cardAppIcon, cardSettings, cardBadges, cardQuota)
         for (card in cards) {
             card.background = palette.createRoundedRect(
                 fillColor = palette.surface,
@@ -824,6 +877,7 @@ class MainActivity : AppCompatActivity() {
             tvScaleHeader,
             tvGridScaleHeader,
             tvSandboxHeader,
+            tvThemeModeHeader,
             tvAppIconHeader,
             tvSettingsHeader,
             tvBadgesHeader,
@@ -833,7 +887,7 @@ class MainActivity : AppCompatActivity() {
         for (h in headers) {
             h.setTextColor(palette.accentBlue)
         }
-        val descriptions = listOf(tvSetupDesc, tvScaleDesc, tvGridScaleDesc, tvSandboxDesc, tvAppIconDesc, tvBadgesDesc, tvApiKeyLabel)
+        val descriptions = listOf(tvSetupDesc, tvScaleDesc, tvGridScaleDesc, tvSandboxDesc, tvThemeModeDesc, tvAppIconDesc, tvBadgesDesc, tvApiKeyLabel)
         for (d in descriptions) {
             d.setTextColor(palette.textSecondary)
         }
@@ -935,6 +989,7 @@ class MainActivity : AppCompatActivity() {
         btnSaveSettings.backgroundTintList = ColorStateList.valueOf(palette.accentBlue)
         btnSaveSettings.setTextColor(Color.WHITE)
 
+        updateThemeModeUi(palette, density, strokePx)
         updateImeStatusBanner()
         updateQuotaStatsUi()
         updateAppIconUi()
@@ -1001,6 +1056,41 @@ class MainActivity : AppCompatActivity() {
         tvIconClassicBadge.setTextColor(if (classicSelected) palette.accentBlue else palette.textSecondary)
     }
 
+    private fun updateThemeModeUi(palette: ThemePalette, density: Float, strokePx: Int) {
+        val currentMode = prefs.themeMode
+
+        val options = listOf(
+            Triple(btnThemeSystem, rbThemeSystem, ThemeMode.SYSTEM),
+            Triple(btnThemeDark, rbThemeDark, ThemeMode.DARK),
+            Triple(btnThemeLight, rbThemeLight, ThemeMode.LIGHT)
+        )
+
+        for ((btn, rb, mode) in options) {
+            val isSelected = mode == currentMode
+            rb.isChecked = isSelected
+            rb.buttonTintList = ColorStateList.valueOf(palette.accentBlue)
+
+            btn.background = palette.createRoundedRect(
+                fillColor = if (isSelected) palette.surfaceVariant else palette.surface,
+                cornerRadiusPx = 10f * density,
+                strokeWidthPx = strokePx,
+                strokeColor = if (isSelected) palette.accentBlue else palette.border
+            )
+        }
+
+        ivThemeSystem.setColorFilter(if (currentMode == ThemeMode.SYSTEM) palette.accentBlue else palette.textSecondary)
+        ivThemeDark.setColorFilter(if (currentMode == ThemeMode.DARK) palette.accentBlue else palette.textSecondary)
+        ivThemeLight.setColorFilter(if (currentMode == ThemeMode.LIGHT) palette.accentBlue else palette.textSecondary)
+
+        tvThemeSystemTitle.setTextColor(palette.textPrimary)
+        tvThemeDarkTitle.setTextColor(palette.textPrimary)
+        tvThemeLightTitle.setTextColor(palette.textPrimary)
+
+        tvThemeSystemDesc.setTextColor(palette.textSecondary)
+        tvThemeDarkDesc.setTextColor(palette.textSecondary)
+        tvThemeLightDesc.setTextColor(palette.textSecondary)
+    }
+
     private fun updateImeStatusBanner() {
         val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
         val isEnabled = imm?.enabledInputMethodList?.any {
@@ -1014,6 +1104,7 @@ class MainActivity : AppCompatActivity() {
         val pillColor = if (isEnabled) palette.successGreen else Color.parseColor("#FF1744")
         val pillBgAlpha = Color.argb(38, Color.red(pillColor), Color.green(pillColor), Color.blue(pillColor))
 
+        statusPillContainer.setPadding(dpToPx(8), dpToPx(3), dpToPx(8), dpToPx(3))
         statusPillContainer.background = palette.createRoundedRect(
             fillColor = pillBgAlpha,
             cornerRadiusPx = 20f * density,
@@ -1024,7 +1115,7 @@ class MainActivity : AppCompatActivity() {
             fillColor = pillColor,
             cornerRadiusPx = 10f * density
         )
-        tvStatusPillText.text = if (isEnabled) "ENABLED" else "SETUP NEEDED"
+        tvStatusPillText.text = if (isEnabled) "ACTIVE" else "SETUP"
         tvStatusPillText.setTextColor(pillColor)
 
         val shouldExpand = !isEnabled || setupCardManuallyExpanded
