@@ -13,6 +13,17 @@ import java.io.File
 
 class KeyboardyApp : Application(), ImageLoaderFactory {
 
+    override fun onCreate() {
+        super.onCreate()
+        if (BuildConfig.SHOW_ADS) {
+            try {
+                com.google.android.gms.ads.MobileAds.initialize(this) {}
+            } catch (e: Exception) {
+                android.util.Log.e("KeyboardyApp", "Failed to initialize MobileAds", e)
+            }
+        }
+    }
+
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)
             .okHttpClient(SafeNetworkClient.okHttpClient)

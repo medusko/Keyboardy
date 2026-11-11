@@ -863,4 +863,12 @@
 
         </LinearLayout>
     </ScrollView>
+
+    <!-- Bottom AdMob Banner Container -->
+    <FrameLayout
+        android:id="@+id/ad_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:visibility="gone" />
 </LinearLayout>

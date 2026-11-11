@@ -20,6 +20,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -397,16 +398,51 @@ class MainActivity : AppCompatActivity() {
         }
 
         applyThemeAndState()
+        setupAds()
+    }
+
+    private var adView: com.google.android.gms.ads.AdView? = null
+
+    private fun setupAds() {
+        if (!BuildConfig.SHOW_ADS) return
+        try {
+            val adContainer = findViewById<FrameLayout>(R.id.ad_container) ?: return
+            val banner = com.google.android.gms.ads.AdView(this).apply {
+                setAdSize(com.google.android.gms.ads.AdSize.BANNER)
+                // Google's official Test Ad Unit ID for banners
+                adUnitId = "ca-app-pub-3940256099942544/6300978111"
+            }
+            adView = banner
+            adContainer.removeAllViews()
+            adContainer.addView(banner)
+            adContainer.visibility = View.VISIBLE
+            val adRequest = com.google.android.gms.ads.AdRequest.Builder().build()
+            banner.loadAd(adRequest)
+        } catch (e: Exception) {
+            android.util.Log.e("Keyboardy", "Failed to load AdView", e)
+        }
     }
 
     override fun onResume() {
         super.onResume()
+        adView?.resume()
         updateImeStatusBanner()
         updateQuotaStatsUi()
     }
 
+    override fun onPause() {
+        super.onPause()
+        adView?.pause()
+    }
+
     override fun onDestroy() {
         prefs.unregisterPrivateListener(prefChangeListener)
+        try {
+            adView?.destroy()
+            adView = null
+        } catch (e: Exception) {
+            android.util.Log.e("Keyboardy", "Failed to destroy AdView", e)
+        }
         super.onDestroy()
     }
 
