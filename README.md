@@ -4,6 +4,23 @@
 
 ---
 
+## 🧪 Google Play Closed Testing (Join the Android Beta)
+
+> [!NOTE]
+> Closed testing will begin **later this week** once Google finishes reviewing the initial track release.
+
+- **Google Group:** https://groups.google.com/g/medusko-app-testers
+- **Web Link (Join test):** https://play.google.com/apps/testing/com.medusko.keyboardy
+- **Android Link (Download):** https://play.google.com/store/apps/details?id=com.medusko.keyboardy
+
+### Instructions:
+1. Join the **Medusko App Testers** Google Group above using your Google account.
+2. Click the Web link to opt-in ("Become a tester").
+3. Download **Keyboardy** from the Android Play Store link.
+4. Keep the app installed for 14 days. Drop a screenshot below and I will test your app in return!
+
+---
+
 ## 📥 Downloads & Installation
 
 ### 🍺 Install via Homebrew (macOS)

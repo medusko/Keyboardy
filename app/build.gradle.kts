@@ -26,7 +26,7 @@ android {
         applicationId = "com.medusko.keyboardy"
         minSdk = 26
         targetSdk = 36
-        versionCode = 11
+        versionCode = 12
         versionName = "1.0.1-RC2-Beta"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
