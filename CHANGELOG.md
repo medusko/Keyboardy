@@ -7,9 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [android-v1.0.1-RC2-Beta] - 2026-11-09
+## [android-v1.0.1-RC2] - 2026-11-10
 
-### 🌟 Release Candidate 2 Feedback & Enhancements
+### 🌟 Release Candidate 2 Highlights
+- **AdMob SDK & Google Ads Integration**:
+  - Integrated official Google Mobile Ads SDK with test banner support.
+  - Declared `AD_ID` permission and configured official AdMob application ID.
+- **Search Filtering Fixes**:
+  - Fixed image type filter so Transparent, Clipart, and Line Art searches strictly enforce transparency parameters.
+- **Icon Selector Removal**:
+  - Removed app launcher icon selection capability, standardizing on the clean Medusko gold icon.
+- **Network & Privacy Hardening**:
+  - Enforced strict HTTPS-only network requests across all search parsers and image downloaders.
 - **Lagatron-Aligned Theme Switcher Settings**:
   - Added dedicated **Theme Mode** card matching Lagatron's design with three options:
     - **System Default** (default): Follows Android system-wide dark or light mode setting.
