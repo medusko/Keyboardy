@@ -137,17 +137,3 @@ Click inside the message input box, trigger Keyboardy (`⌥ ⇧ Space` or menu b
 - **Support Contact:** [support@medusko.com](mailto:support@medusko.com)
 - **Social:** [@meduskodev on Twitter](https://twitter.com/meduskodev)
 
----
-
-## Publishing Per-Platform Releases on GitHub
-
-This repository uses independent tag prefixes (`.github/workflows/release-android.yml` and `.github/workflows/release-macos.yml`):
-
-- **Publish a new Android release:**
-  ```bash
-  git tag android-v1.0.1 && git push origin android-v1.0.1
-  ```
-- **Publish a new macOS release:**
-  ```bash
-  git tag macos-v1.0.1 && git push origin macos-v1.0.1
-  ```
